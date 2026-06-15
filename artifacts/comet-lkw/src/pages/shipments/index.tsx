@@ -320,6 +320,7 @@ export default function ShipmentsPage() {
                   />
                 </TableHead>
               )}
+              <TableHead className="w-[60px] text-slate-400 font-normal text-xs">ID</TableHead>
               <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("kennzeichen")}>
                 Kennzeichen <SortIcon field="kennzeichen" sortField={sortField} sortDir={sortDir} />
               </TableHead>
@@ -374,6 +375,7 @@ export default function ShipmentsPage() {
                       />
                     </TableCell>
                   )}
+                  <TableCell className="text-xs text-slate-400 font-mono">{shipment.id}</TableCell>
                   <TableCell className="font-medium">{shipment.kennzeichen || "-"}</TableCell>
                   <TableCell>{shipment.speditionName || "-"}</TableCell>
                   <TableCell>{shipment.lkwArt || "-"}</TableCell>

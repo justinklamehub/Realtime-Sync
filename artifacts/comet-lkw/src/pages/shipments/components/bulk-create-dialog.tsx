@@ -147,8 +147,8 @@ export function BulkCreateDialog({ open, onOpenChange }: Props) {
                   <th className="sticky top-0 bg-slate-50 text-left px-2 py-2 text-xs font-semibold text-slate-600 border-b border-slate-200 min-w-[140px]">LKW-Art</th>
                   <th className="sticky top-0 bg-slate-50 text-left px-2 py-2 text-xs font-semibold text-slate-600 border-b border-slate-200 min-w-[140px]">ETA Datum</th>
                   <th className="sticky top-0 bg-slate-50 text-left px-2 py-2 text-xs font-semibold text-slate-600 border-b border-slate-200 min-w-[110px]">ETA Zeit</th>
-                  <th className="sticky top-0 bg-slate-50 text-left px-2 py-2 text-xs font-semibold text-slate-600 border-b border-slate-200 min-w-[120px]">Tor</th>
-                  <th className="sticky top-0 bg-slate-50 text-left px-2 py-2 text-xs font-semibold text-slate-600 border-b border-slate-200 min-w-[120px]">Status</th>
+                  {isCometUser && <th className="sticky top-0 bg-slate-50 text-left px-2 py-2 text-xs font-semibold text-slate-600 border-b border-slate-200 min-w-[120px]">Tor</th>}
+                  {isCometUser && <th className="sticky top-0 bg-slate-50 text-left px-2 py-2 text-xs font-semibold text-slate-600 border-b border-slate-200 min-w-[120px]">Status</th>}
                   {isCometUser && (
                     <th className="sticky top-0 bg-slate-50 text-left px-2 py-2 text-xs font-semibold text-slate-600 border-b border-slate-200 min-w-[160px]">Spedition</th>
                   )}
@@ -204,22 +204,26 @@ export function BulkCreateDialog({ open, onOpenChange }: Props) {
                           className="h-8 text-sm"
                         />
                       </td>
-                      <td className="px-1 py-1.5 border-b border-slate-100">
-                        <Select value={row.tor} onValueChange={(v) => updateRow(row.id, "tor", v)}>
-                          <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Tor" /></SelectTrigger>
-                          <SelectContent>
-                            {TOR_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="px-1 py-1.5 border-b border-slate-100">
-                        <Select value={row.status} onValueChange={(v) => updateRow(row.id, "status", v)}>
-                          <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {STATUS_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </td>
+                      {isCometUser && (
+                        <td className="px-1 py-1.5 border-b border-slate-100">
+                          <Select value={row.tor} onValueChange={(v) => updateRow(row.id, "tor", v)}>
+                            <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Tor" /></SelectTrigger>
+                            <SelectContent>
+                              {TOR_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </td>
+                      )}
+                      {isCometUser && (
+                        <td className="px-1 py-1.5 border-b border-slate-100">
+                          <Select value={row.status} onValueChange={(v) => updateRow(row.id, "status", v)}>
+                            <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {STATUS_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </td>
+                      )}
                       {isCometUser && (
                         <td className="px-1 py-1.5 border-b border-slate-100">
                           <Select value={row.speditionId} onValueChange={(v) => updateRow(row.id, "speditionId", v)}>
