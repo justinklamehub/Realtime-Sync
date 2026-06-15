@@ -380,6 +380,35 @@ router.post("/shipments/:id/unlock", requireAuth, async (req, res) => {
   }
 });
 
+router.patch("/shipments/:id/reschedule", requireAuth, async (req, res) => {
+  try {
+    const role = req.session.role!;
+    if (!(await can(role, "shipment.reschedule"))) {
+      return res.status(403).json({ error: "Keine Berechtigung zum Verschieben von Sendungen" });
+    }
+    const id = Number(req.params.id);
+    const { newDate } = req.body;
+    if (!newDate || !/^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
+      return res.status(400).json({ error: "newDate im Format YYYY-MM-DD erforderlich" });
+    }
+    const [existing] = await db.select().from(shipmentsTable).where(eq(shipmentsTable.id, id)).limit(1);
+    if (!existing) return res.status(404).json({ error: "Sendung nicht gefunden" });
+
+    const [shipment] = await db
+      .update(shipmentsTable)
+      .set({ etaDate: newDate, updatedAt: new Date(), updatedBy: req.session.userId })
+      .where(eq(shipmentsTable.id, id))
+      .returning();
+
+    await logAudit(req.session.userId!, "shipment", id, "etaDate", existing.etaDate ?? null, newDate);
+    emit(req, "shipment.updated", { id }, existing.speditionId);
+    return res.json(await buildShipmentResponse(shipment));
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.get("/shipments/:id/history", requireAuth, async (req, res) => {
   try {
     const role = req.session.role!;

@@ -19,6 +19,7 @@ import AuditlogPage from "@/pages/auditlog";
 import SpeditionsfreigebePage from "@/pages/speditionsfreigabe";
 import SettingsPage from "@/pages/settings";
 import BerechtigungenPage from "@/pages/berechtigungen";
+import WochenansichtPage from "@/pages/wochenansicht";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -68,6 +69,7 @@ function Router() {
             <Route path="/speditionsfreigabe"><ProtectedRoute component={SpeditionsfreigebePage} roles={["speditions_admin"]} /></Route>
             <Route path="/settings"><ProtectedRoute component={SettingsPage} roles={["comet_admin"]} /></Route>
             <Route path="/berechtigungen"><ProtectedRoute component={BerechtigungenPage} roles={["comet_admin"]} /></Route>
+            <Route path="/wochenansicht"><ProtectedRoute component={WochenansichtPage} /></Route>
             <Route component={NotFound} />
           </Switch>
         </AppLayout>

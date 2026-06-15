@@ -9,6 +9,7 @@ export type Permission =
   | "shipment.edit"
   | "shipment.delete"
   | "shipment.lock"
+  | "shipment.reschedule"
   | "austrag.create"
   | "austrag.delete"
   | "reconciliation.create"
@@ -39,6 +40,7 @@ export const ALL_PERMISSIONS: Permission[] = [
   "shipment.edit",
   "shipment.delete",
   "shipment.lock",
+  "shipment.reschedule",
   "austrag.create",
   "austrag.delete",
   "reconciliation.create",
@@ -53,6 +55,7 @@ export const PERMISSION_LABELS: Record<Permission, { label: string; category: st
   "shipment.edit":        { label: "Sendung bearbeiten",      category: "Verladungen" },
   "shipment.delete":      { label: "Sendung löschen",         category: "Verladungen" },
   "shipment.lock":        { label: "Sendung sperren",         category: "Verladungen" },
+  "shipment.reschedule":  { label: "Datum verschieben (DnD)", category: "Verladungen" },
   "austrag.create":       { label: "Austrag durchführen",     category: "Austragen" },
   "austrag.delete":       { label: "Austrag löschen",         category: "Austragen" },
   "reconciliation.create":{ label: "Abstimmung erstellen",    category: "Abstimmungen" },

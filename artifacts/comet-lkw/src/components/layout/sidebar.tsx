@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, 
   Truck, 
+  CalendarDays,
   Building2, 
   Users, 
   PackageSearch, 
@@ -41,6 +42,7 @@ export function AppSidebar() {
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, show: true },
     { name: "Verladungen", href: "/shipments", icon: Truck, show: true },
+    { name: "Wochenplan", href: "/wochenansicht", icon: CalendarDays, show: true },
     { name: "Speditionen", href: "/speditionen", icon: Building2, show: canManageSpeditionen },
     { name: "Benutzer", href: "/users", icon: Users, show: canManageUsers },
     { name: "Palettenkonto", href: "/paletten", icon: PackageSearch, show: true },

@@ -102,4 +102,19 @@ router.get("/auth/me", requireAuth, async (req, res) => {
   }
 });
 
+router.get("/auth/permissions", requireAuth, async (req, res) => {
+  try {
+    const role = req.session.role!;
+    const { can, ALL_PERMISSIONS } = await import("../lib/permissions");
+    const result: Record<string, boolean> = {};
+    for (const perm of ALL_PERMISSIONS) {
+      result[perm] = await can(role, perm);
+    }
+    return res.json(result);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;
