@@ -62,18 +62,20 @@ export function AppSidebar() {
       <div className="flex-1 overflow-y-auto py-4">
         <nav className="px-3 space-y-1">
           {navigation.filter(item => item.show).map((item) => {
-            const isActive = location === item.href || (location.startsWith(item.href) && item.href !== "/dashboard");
+            const isActive = location === item.href || (item.href !== "/dashboard" && location.startsWith(item.href + "/"));
             return (
-              <Link key={item.name} href={item.href}>
-                <a className={cn(
+              <Link
+                key={item.name}
+                href={item.href}
+                className={cn(
                   "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                  isActive 
-                    ? "bg-primary/10 text-primary" 
+                  isActive
+                    ? "bg-primary/10 text-primary"
                     : "text-slate-400 hover:text-slate-100 hover:bg-slate-900"
-                )}>
-                  <item.icon className={cn("w-4 h-4", isActive ? "text-primary" : "text-slate-500")} />
-                  {item.name}
-                </a>
+                )}
+              >
+                <item.icon className={cn("w-4 h-4", isActive ? "text-primary" : "text-slate-500")} />
+                {item.name}
               </Link>
             );
           })}
