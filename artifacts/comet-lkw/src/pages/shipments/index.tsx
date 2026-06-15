@@ -50,8 +50,9 @@ export default function ShipmentsPage() {
   const [filterSpeditionId, setFilterSpeditionId] = useState("__all__");
   const [filterLkwArt, setFilterLkwArt] = useState("__all__");
   const [filterTor, setFilterTor] = useState("__all__");
-  const [filterDateFrom, setFilterDateFrom] = useState("");
-  const [filterDateTo, setFilterDateTo] = useState("");
+  const today = new Date().toISOString().slice(0, 10);
+  const [filterDateFrom, setFilterDateFrom] = useState(today);
+  const [filterDateTo, setFilterDateTo] = useState(today);
   const [sortField, setSortField] = useState<SortField>("etaDate");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
