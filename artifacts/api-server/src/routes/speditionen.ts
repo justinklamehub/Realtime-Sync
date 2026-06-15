@@ -90,10 +90,11 @@ router.patch("/speditionen/:id", requireAuth, async (req, res) => {
 router.get("/speditionen/:id/permissions", requireAuth, async (req, res) => {
   try {
     const role = req.session.role!;
-    if (!["comet_admin", "comet_leitstand"].includes(role)) {
+    const id = Number(req.params.id);
+    const isOwnSped = role === "speditions_admin" && req.session.speditionId === id;
+    if (!["comet_admin", "comet_leitstand"].includes(role) && !isOwnSped) {
       return res.status(403).json({ error: "Forbidden" });
     }
-    const id = Number(req.params.id);
     const perms = await db
       .select()
       .from(speditionPermissionsTable)
@@ -118,11 +119,12 @@ router.get("/speditionen/:id/permissions", requireAuth, async (req, res) => {
 
 router.post("/speditionen/:id/permissions", requireAuth, async (req, res) => {
   try {
-    if (req.session.role !== "comet_admin") {
-      return res.status(403).json({ error: "Nur COMET Admin kann Zugriffsrechte verwalten" });
-    }
-
+    const role = req.session.role!;
     const grantingId = Number(req.params.id);
+    const isOwnSped = role === "speditions_admin" && req.session.speditionId === grantingId;
+    if (role !== "comet_admin" && !isOwnSped) {
+      return res.status(403).json({ error: "Nur COMET Admin oder eigene Spedition kann Zugriffsrechte verwalten" });
+    }
     const { receivingSpeditionId, permissionLevel } = req.body;
 
     const existing = await db
@@ -179,11 +181,12 @@ router.post("/speditionen/:id/permissions", requireAuth, async (req, res) => {
 
 router.delete("/speditionen/:id/permissions/:receivingId", requireAuth, async (req, res) => {
   try {
-    if (req.session.role !== "comet_admin") {
-      return res.status(403).json({ error: "Nur COMET Admin kann Zugriffsrechte entfernen" });
-    }
-
+    const role = req.session.role!;
     const grantingId = Number(req.params.id);
+    const isOwnSped = role === "speditions_admin" && req.session.speditionId === grantingId;
+    if (role !== "comet_admin" && !isOwnSped) {
+      return res.status(403).json({ error: "Nur COMET Admin oder eigene Spedition kann Zugriffsrechte entfernen" });
+    }
     const receivingId = Number(req.params.receivingId);
 
     await db

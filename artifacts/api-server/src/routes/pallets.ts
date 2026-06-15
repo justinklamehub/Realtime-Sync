@@ -73,7 +73,10 @@ router.post("/pallet-movements", requireAuth, async (req, res) => {
     const role = req.session.role!;
     const sessionSpeditionId = req.session.speditionId;
 
-    if (["comet_viewer", "speditions_viewer"].includes(role)) {
+    if (SPED_ROLES.includes(role)) {
+      return res.status(403).json({ error: "Speditionen können keine Palettenbuchungen erstellen" });
+    }
+    if (role === "comet_viewer") {
       return res.status(403).json({ error: "Forbidden" });
     }
 

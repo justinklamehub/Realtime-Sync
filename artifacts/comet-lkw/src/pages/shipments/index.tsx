@@ -303,6 +303,7 @@ export default function ShipmentsPage() {
                 Spedition <SortIcon field="speditionName" sortField={sortField} sortDir={sortDir} />
               </TableHead>
               <TableHead>Art</TableHead>
+              <TableHead>Relation</TableHead>
               <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("etaDate")}>
                 ETA / ATA <SortIcon field="etaDate" sortField={sortField} sortDir={sortDir} />
               </TableHead>
@@ -352,6 +353,7 @@ export default function ShipmentsPage() {
                   <TableCell className="font-medium">{shipment.kennzeichen || "-"}</TableCell>
                   <TableCell>{shipment.speditionName || "-"}</TableCell>
                   <TableCell>{shipment.lkwArt || "-"}</TableCell>
+                  <TableCell className="text-slate-600 text-sm">{shipment.relation || "-"}</TableCell>
                   <TableCell>
                     <div className="text-xs">
                       {shipment.etaDate && shipment.etaTime ? (

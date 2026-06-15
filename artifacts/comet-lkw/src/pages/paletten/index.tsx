@@ -14,7 +14,7 @@ import { useAuth } from "@/contexts/auth-context";
 export default function PalettenPage() {
   const { user } = useAuth();
   const isCometUser = user?.role && ["comet_admin", "comet_leitstand", "comet_lager", "comet_viewer"].includes(user.role);
-  const canWrite = user?.role && ["comet_admin", "comet_leitstand", "comet_lager", "speditions_admin", "speditions_bearbeiter"].includes(user.role);
+  const canWrite = user?.role && ["comet_admin", "comet_leitstand", "comet_lager"].includes(user.role);
 
   const [filterSpeditionId, setFilterSpeditionId] = useState<string>("__all__");
   const [dateFrom, setDateFrom] = useState("");
