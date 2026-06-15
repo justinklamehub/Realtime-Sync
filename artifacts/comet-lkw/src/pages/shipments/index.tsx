@@ -335,10 +335,10 @@ export default function ShipmentsPage() {
               <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("status")}>
                 Status <SortIcon field="status" sortField={sortField} sortDir={sortDir} />
               </TableHead>
+              <TableHead>Ware</TableHead>
               <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("tor")}>
                 Tor <SortIcon field="tor" sortField={sortField} sortDir={sortDir} />
               </TableHead>
-              <TableHead>Ware</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -400,7 +400,6 @@ export default function ShipmentsPage() {
                       {shipment.status}
                     </Badge>
                   </TableCell>
-                  <TableCell className="font-medium">{shipment.tor || "-"}</TableCell>
                   <TableCell>
                     {(() => {
                       const ws = (shipment as any).wareStatus || "nicht bereit";
@@ -416,6 +415,7 @@ export default function ShipmentsPage() {
                       return <Badge variant="outline" className={`text-xs ${cls}`}>{label}</Badge>;
                     })()}
                   </TableCell>
+                  <TableCell className="font-medium">{shipment.tor || "-"}</TableCell>
                   <TableCell>
                     {shipment.gesperrtFuerSpedition ? (
                       <Lock className="w-4 h-4 text-red-500" />
