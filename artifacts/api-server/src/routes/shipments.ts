@@ -271,7 +271,7 @@ router.patch("/shipments/:id", requireAuth, async (req, res) => {
 
     const isCometUser = ["comet_admin", "comet_leitstand", "comet_lager"].includes(role);
 
-    const SPED_ALLOWED = ["bezeichnung", "kennzeichen", "relation", "lkwArt", "etaDate", "etaTime", "bemerkungen", "telefon"];
+    const SPED_ALLOWED = ["bezeichnung", "kennzeichen", "relation", "lkwArt", "etaDate", "etaTime", "bemerkungen", "telefon", "wareStatus"];
     const COMET_ALLOWED = [...SPED_ALLOWED, "status", "tor", "ataDate", "ataTime", "gesperrtFuerSpedition", "cometBearbeitet", "speditionId", "subSpeditionId"];
     const allowedFields = isCometUser ? COMET_ALLOWED : SPED_ALLOWED;
 

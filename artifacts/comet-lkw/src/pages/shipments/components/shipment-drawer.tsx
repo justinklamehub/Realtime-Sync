@@ -166,6 +166,7 @@ export function ShipmentDrawer({ shipmentId, open, onOpenChange }: ShipmentDrawe
     ataTime: "",
     tor: "",
     status: "Angemeldet",
+    wareStatus: "",
     speditionId: "",
     bemerkungen: "",
     telefon: "",
@@ -184,12 +185,13 @@ export function ShipmentDrawer({ shipmentId, open, onOpenChange }: ShipmentDrawe
         ataTime: shipment.ataTime || "",
         tor: shipment.tor || "",
         status: shipment.status || "Angemeldet",
+        wareStatus: (shipment as any).wareStatus || "",
         speditionId: shipment.speditionId ? String(shipment.speditionId) : "",
         bemerkungen: shipment.bemerkungen || "",
         telefon: shipment.telefon || "",
       });
     } else if (!shipmentId && open) {
-      setForm({ bezeichnung: "", kennzeichen: "", relation: "", lkwArt: "", etaDate: "", etaTime: "", ataDate: "", ataTime: "", tor: "", status: "Angemeldet", speditionId: user?.speditionId ? String(user.speditionId) : "", bemerkungen: "", telefon: "" });
+      setForm({ bezeichnung: "", kennzeichen: "", relation: "", lkwArt: "", etaDate: "", etaTime: "", ataDate: "", ataTime: "", tor: "", status: "Angemeldet", wareStatus: "", speditionId: user?.speditionId ? String(user.speditionId) : "", bemerkungen: "", telefon: "" });
     }
   }, [shipment, open, shipmentId, user]);
 
@@ -205,6 +207,13 @@ export function ShipmentDrawer({ shipmentId, open, onOpenChange }: ShipmentDrawe
     mutation: {
       onSuccess: () => { invalidate(); toast({ title: "Gespeichert" }); onOpenChange(false); },
       onError: (e: any) => toast({ title: e?.response?.data?.error ?? "Fehler beim Speichern", variant: "destructive" }),
+    }
+  });
+
+  const quickUpdateMutation = useUpdateShipment({
+    mutation: {
+      onSuccess: () => { invalidate(); toast({ title: "ATA eingetragen" }); },
+      onError: (e: any) => toast({ title: e?.response?.data?.error ?? "Fehler", variant: "destructive" }),
     }
   });
 
@@ -247,6 +256,7 @@ export function ShipmentDrawer({ shipmentId, open, onOpenChange }: ShipmentDrawe
       data.tor = (form.tor && form.tor !== "__none__") ? form.tor : undefined;
       data.status = form.status;
     }
+    if (form.wareStatus) data.wareStatus = form.wareStatus;
 
     if (isCometAdmin && !isEditing) {
       data.speditionId = form.speditionId ? parseInt(form.speditionId) : undefined;
@@ -370,18 +380,22 @@ export function ShipmentDrawer({ shipmentId, open, onOpenChange }: ShipmentDrawe
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label className="text-xs text-slate-500">ATA <span className="text-slate-400">(COMET)</span></Label>
-                    {isCometUser && (
+                    {isCometUser && isEditing && shipmentId && (
                       <button
                         type="button"
+                        disabled={quickUpdateMutation.isPending}
                         onClick={() => {
                           const now = new Date();
                           const date = now.toISOString().slice(0, 10);
                           const time = now.toTimeString().slice(0, 5);
                           setForm(f => ({ ...f, ataDate: date, ataTime: time }));
+                          quickUpdateMutation.mutate({ id: shipmentId, data: { ataDate: date, ataTime: time } });
                         }}
-                        className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium transition-colors"
+                        className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium transition-colors disabled:opacity-50"
                       >
-                        <Clock className="w-3 h-3" />
+                        {quickUpdateMutation.isPending
+                          ? <Loader2 className="w-3 h-3 animate-spin" />
+                          : <Clock className="w-3 h-3" />}
                         Jetzt eintragen
                       </button>
                     )}
@@ -421,6 +435,24 @@ export function ShipmentDrawer({ shipmentId, open, onOpenChange }: ShipmentDrawe
                   <Badge variant="outline" className="font-normal">{shipment.status}</Badge>
                 </div>
               )}
+
+              <div className="space-y-1">
+                <Label className="text-xs text-slate-500">Ware Status</Label>
+                <Select
+                  value={form.wareStatus || "__none__"}
+                  onValueChange={v => setForm(f => ({ ...f, wareStatus: v === "__none__" ? "" : v }))}
+                  disabled={!canEdit || (isSpedUser && isLocked)}
+                >
+                  <SelectTrigger className="h-9"><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">—</SelectItem>
+                    <SelectItem value="nicht bereit">Nicht bereit</SelectItem>
+                    <SelectItem value="ausgedruckt">Ausgedruckt</SelectItem>
+                    <SelectItem value="in bearbeitung">In Bearbeitung</SelectItem>
+                    <SelectItem value="vorbereitet">Vorbereitet</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
               <div className="space-y-1">
                 <Label className="text-xs text-slate-500">Bemerkungen</Label>

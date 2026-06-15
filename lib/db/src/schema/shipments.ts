@@ -18,6 +18,7 @@ export const shipmentsTable = pgTable("shipments", {
   lkwArt: text("lkw_art"),
   status: text("status").notNull().default("Angemeldet"),
   tor: text("tor"),
+  wareStatus: text("ware_status"),
   cometBearbeitet: boolean("comet_bearbeitet").notNull().default(false),
   gesperrtFuerSpedition: boolean("gesperrt_fuer_spedition").notNull().default(false),
   createdBy: integer("created_by"),
