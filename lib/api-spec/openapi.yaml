@@ -3,13 +3,30 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: COMET LKW-Verladungsverwaltung API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: users
+    description: User management
+  - name: speditionen
+    description: Freight company management
+  - name: shipments
+    description: Truck loading management (Verladungen)
+  - name: pallets
+    description: Pallet account management
+  - name: reconciliations
+    description: Pallet reconciliation management
+  - name: dashboard
+    description: Dashboard statistics
+  - name: audit
+    description: Audit log
+
 paths:
   /healthz:
     get:
@@ -24,6 +41,805 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+        "401":
+          description: Invalid credentials
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+        "401":
+          description: Not authenticated
+
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List users
+      parameters:
+        - name: speditionId
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Users list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Get user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    patch:
+      operationId: updateUser
+      tags: [users]
+      summary: Update user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    delete:
+      operationId: deleteUser
+      tags: [users]
+      summary: Delete (deactivate) user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deactivated
+
+  /speditionen:
+    get:
+      operationId: listSpeditionen
+      tags: [speditionen]
+      summary: List freight companies
+      responses:
+        "200":
+          description: Speditionen list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Spedition"
+    post:
+      operationId: createSpedition
+      tags: [speditionen]
+      summary: Create freight company
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpeditionInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Spedition"
+
+  /speditionen/{id}:
+    get:
+      operationId: getSpedition
+      tags: [speditionen]
+      summary: Get freight company
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Spedition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Spedition"
+    patch:
+      operationId: updateSpedition
+      tags: [speditionen]
+      summary: Update freight company
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpeditionUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Spedition"
+
+  /speditionen/{id}/permissions:
+    get:
+      operationId: listSpeditionPermissions
+      tags: [speditionen]
+      summary: Get permissions granted by this spedition
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Permissions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SpeditionPermission"
+    post:
+      operationId: setSpeditionPermission
+      tags: [speditionen]
+      summary: Set permission for another spedition
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpeditionPermissionInput"
+      responses:
+        "200":
+          description: Permission set
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpeditionPermission"
+
+  /speditionen/{id}/permissions/{receivingId}:
+    delete:
+      operationId: revokeSpeditionPermission
+      tags: [speditionen]
+      summary: Revoke permission
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: receivingId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Revoked
+
+  /shipments:
+    get:
+      operationId: listShipments
+      tags: [shipments]
+      summary: List shipments (Verladungen)
+      parameters:
+        - name: dateFrom
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: dateTo
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: speditionId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: status
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: lkwArt
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: relation
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: kennzeichen
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: tor
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: search
+          in: query
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: Shipments list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Shipment"
+    post:
+      operationId: createShipment
+      tags: [shipments]
+      summary: Create shipment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShipmentInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shipment"
+
+  /shipments/bulk:
+    post:
+      operationId: bulkCreateShipments
+      tags: [shipments]
+      summary: Bulk create shipments
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkShipmentInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Shipment"
+
+  /shipments/{id}:
+    get:
+      operationId: getShipment
+      tags: [shipments]
+      summary: Get shipment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Shipment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shipment"
+    patch:
+      operationId: updateShipment
+      tags: [shipments]
+      summary: Update shipment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShipmentUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shipment"
+    delete:
+      operationId: deleteShipment
+      tags: [shipments]
+      summary: Delete shipment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+
+  /shipments/{id}/lock:
+    post:
+      operationId: lockShipment
+      tags: [shipments]
+      summary: Lock shipment for spedition
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Locked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shipment"
+
+  /shipments/{id}/unlock:
+    post:
+      operationId: unlockShipment
+      tags: [shipments]
+      summary: Unlock shipment for spedition
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Unlocked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shipment"
+
+  /shipments/{id}/history:
+    get:
+      operationId: getShipmentHistory
+      tags: [shipments]
+      summary: Get shipment change history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: History
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditEntry"
+
+  /pallet-movements:
+    get:
+      operationId: listPalletMovements
+      tags: [pallets]
+      summary: List pallet movements
+      parameters:
+        - name: speditionId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: dateFrom
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: dateTo
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: shipmentId
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Pallet movements
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PalletMovement"
+    post:
+      operationId: createPalletMovement
+      tags: [pallets]
+      summary: Create pallet movement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PalletMovementInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PalletMovement"
+
+  /pallet-movements/{id}:
+    patch:
+      operationId: updatePalletMovement
+      tags: [pallets]
+      summary: Update pallet movement
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PalletMovementUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PalletMovement"
+    delete:
+      operationId: deletePalletMovement
+      tags: [pallets]
+      summary: Delete pallet movement
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+
+  /pallet-balances:
+    get:
+      operationId: listPalletBalances
+      tags: [pallets]
+      summary: Get pallet balances per spedition
+      responses:
+        "200":
+          description: Pallet balances
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PalletBalance"
+
+  /pallet-export:
+    get:
+      operationId: exportPalletMovements
+      tags: [pallets]
+      summary: Export pallet movements as CSV
+      parameters:
+        - name: speditionId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: dateFrom
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: dateTo
+          in: query
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: CSV export
+          content:
+            text/csv:
+              schema:
+                type: string
+
+  /reconciliations:
+    get:
+      operationId: listReconciliations
+      tags: [reconciliations]
+      summary: List pallet reconciliations
+      parameters:
+        - name: speditionId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: status
+          in: query
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: Reconciliations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Reconciliation"
+    post:
+      operationId: createReconciliation
+      tags: [reconciliations]
+      summary: Create pallet reconciliation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReconciliationInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reconciliation"
+
+  /reconciliations/{id}:
+    get:
+      operationId: getReconciliation
+      tags: [reconciliations]
+      summary: Get reconciliation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Reconciliation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reconciliation"
+    patch:
+      operationId: updateReconciliation
+      tags: [reconciliations]
+      summary: Update reconciliation status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReconciliationUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reconciliation"
+
+  /reconciliations/{id}/comments:
+    get:
+      operationId: listReconciliationComments
+      tags: [reconciliations]
+      summary: List comments for reconciliation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Comments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReconciliationComment"
+    post:
+      operationId: addReconciliationComment
+      tags: [reconciliations]
+      summary: Add comment to reconciliation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReconciliationCommentInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReconciliationComment"
+
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [dashboard]
+      summary: Get dashboard statistics
+      parameters:
+        - name: dateFrom
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: dateTo
+          in: query
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardData"
+
+  /audit-log:
+    get:
+      operationId: listAuditLog
+      tags: [audit]
+      summary: List audit log entries
+      parameters:
+        - name: module
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: recordId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: userId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: dateFrom
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: dateTo
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: page
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: limit
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Audit log
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogPage"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +850,553 @@ components:
       required:
         - status
 
+    LoginInput:
+      type: object
+      required: [identifier, password]
+      properties:
+        identifier:
+          type: string
+          description: Email or username
+        password:
+          type: string
+
+    AuthUser:
+      type: object
+      required: [id, username, email, role, isActive]
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [comet_admin, comet_leitstand, comet_lager, comet_viewer, speditions_admin, speditions_bearbeiter, speditions_viewer]
+        speditionId:
+          type: ["integer", "null"]
+        speditionName:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+
+    User:
+      type: object
+      required: [id, username, email, role, isActive, createdAt]
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [comet_admin, comet_leitstand, comet_lager, comet_viewer, speditions_admin, speditions_bearbeiter, speditions_viewer]
+        speditionId:
+          type: ["integer", "null"]
+        speditionName:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+
+    UserInput:
+      type: object
+      required: [username, email, password, role]
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+        role:
+          type: string
+          enum: [comet_admin, comet_leitstand, comet_lager, comet_viewer, speditions_admin, speditions_bearbeiter, speditions_viewer]
+        speditionId:
+          type: ["integer", "null"]
+        isActive:
+          type: boolean
+
+    UserUpdate:
+      type: object
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+        password:
+          type: ["string", "null"]
+        role:
+          type: string
+          enum: [comet_admin, comet_leitstand, comet_lager, comet_viewer, speditions_admin, speditions_bearbeiter, speditions_viewer]
+        speditionId:
+          type: ["integer", "null"]
+        isActive:
+          type: boolean
+
+    Spedition:
+      type: object
+      required: [id, name, kuerzel, status, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        kuerzel:
+          type: string
+        ansprechpartner:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        telefon:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [aktiv, inaktiv]
+        bemerkungen:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    SpeditionInput:
+      type: object
+      required: [name, kuerzel]
+      properties:
+        name:
+          type: string
+        kuerzel:
+          type: string
+        ansprechpartner:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        telefon:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [aktiv, inaktiv]
+        bemerkungen:
+          type: ["string", "null"]
+
+    SpeditionUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        kuerzel:
+          type: string
+        ansprechpartner:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        telefon:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [aktiv, inaktiv]
+        bemerkungen:
+          type: ["string", "null"]
+
+    SpeditionPermission:
+      type: object
+      required: [grantingSpeditionId, receivingSpeditionId, permissionLevel]
+      properties:
+        grantingSpeditionId:
+          type: integer
+        receivingSpeditionId:
+          type: integer
+        receivingSpeditionName:
+          type: ["string", "null"]
+        permissionLevel:
+          type: string
+          enum: [view, edit]
+
+    SpeditionPermissionInput:
+      type: object
+      required: [receivingSpeditionId, permissionLevel]
+      properties:
+        receivingSpeditionId:
+          type: integer
+        permissionLevel:
+          type: string
+          enum: [view, edit]
+
+    Shipment:
+      type: object
+      required: [id, status, createdAt, updatedAt, cometBearbeitet, gesperrtFuerSpedition]
+      properties:
+        id:
+          type: integer
+        bezeichnung:
+          type: ["string", "null"]
+        kennzeichen:
+          type: ["string", "null"]
+        relation:
+          type: ["string", "null"]
+        speditionId:
+          type: ["integer", "null"]
+        speditionName:
+          type: ["string", "null"]
+        subSpeditionId:
+          type: ["integer", "null"]
+        subSpeditionName:
+          type: ["string", "null"]
+        bemerkungen:
+          type: ["string", "null"]
+        telefon:
+          type: ["string", "null"]
+        etaDate:
+          type: ["string", "null"]
+        etaTime:
+          type: ["string", "null"]
+        ataDate:
+          type: ["string", "null"]
+        ataTime:
+          type: ["string", "null"]
+        lkwArt:
+          type: ["string", "null"]
+          enum: [Container, Anlieferung, Abholung, Retoure, Sonstiges, null]
+        status:
+          type: string
+          enum: [Angemeldet, Erwartet, Angekommen, Verladen, Abgefertigt, Storniert]
+        tor:
+          type: ["string", "null"]
+        cometBearbeitet:
+          type: boolean
+        gesperrtFuerSpedition:
+          type: boolean
+        createdBy:
+          type: ["integer", "null"]
+        createdByName:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedBy:
+          type: ["integer", "null"]
+        updatedByName:
+          type: ["string", "null"]
+        updatedAt:
+          type: string
+
+    ShipmentInput:
+      type: object
+      properties:
+        bezeichnung:
+          type: ["string", "null"]
+        kennzeichen:
+          type: ["string", "null"]
+        relation:
+          type: ["string", "null"]
+        speditionId:
+          type: ["integer", "null"]
+        subSpeditionId:
+          type: ["integer", "null"]
+        bemerkungen:
+          type: ["string", "null"]
+        telefon:
+          type: ["string", "null"]
+        etaDate:
+          type: ["string", "null"]
+        etaTime:
+          type: ["string", "null"]
+        ataDate:
+          type: ["string", "null"]
+        ataTime:
+          type: ["string", "null"]
+        lkwArt:
+          type: ["string", "null"]
+          enum: [Container, Anlieferung, Abholung, Retoure, Sonstiges, null]
+        status:
+          type: string
+          enum: [Angemeldet, Erwartet, Angekommen, Verladen, Abgefertigt, Storniert]
+        tor:
+          type: ["string", "null"]
+
+    ShipmentUpdate:
+      type: object
+      properties:
+        bezeichnung:
+          type: ["string", "null"]
+        kennzeichen:
+          type: ["string", "null"]
+        relation:
+          type: ["string", "null"]
+        speditionId:
+          type: ["integer", "null"]
+        subSpeditionId:
+          type: ["integer", "null"]
+        bemerkungen:
+          type: ["string", "null"]
+        telefon:
+          type: ["string", "null"]
+        etaDate:
+          type: ["string", "null"]
+        etaTime:
+          type: ["string", "null"]
+        ataDate:
+          type: ["string", "null"]
+        ataTime:
+          type: ["string", "null"]
+        lkwArt:
+          type: ["string", "null"]
+          enum: [Container, Anlieferung, Abholung, Retoure, Sonstiges, null]
+        status:
+          type: string
+          enum: [Angemeldet, Erwartet, Angekommen, Verladen, Abgefertigt, Storniert]
+        tor:
+          type: ["string", "null"]
+
+    BulkShipmentInput:
+      type: object
+      required: [shipments]
+      properties:
+        shipments:
+          type: array
+          items:
+            $ref: "#/components/schemas/ShipmentInput"
+
+    PalletMovement:
+      type: object
+      required: [id, speditionId, movementType, movementDate, amount, createdAt]
+      properties:
+        id:
+          type: integer
+        speditionId:
+          type: integer
+        speditionName:
+          type: ["string", "null"]
+        shipmentId:
+          type: ["integer", "null"]
+        shipmentBezeichnung:
+          type: ["string", "null"]
+        movementType:
+          type: string
+          enum: [eingang, ausgang, korrektur, abstimmung]
+        movementDate:
+          type: string
+        amount:
+          type: integer
+        bemerkungen:
+          type: ["string", "null"]
+        createdBy:
+          type: ["integer", "null"]
+        createdByName:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    PalletMovementInput:
+      type: object
+      required: [speditionId, movementType, movementDate, amount]
+      properties:
+        speditionId:
+          type: integer
+        shipmentId:
+          type: ["integer", "null"]
+        movementType:
+          type: string
+          enum: [eingang, ausgang, korrektur, abstimmung]
+        movementDate:
+          type: string
+        amount:
+          type: integer
+        bemerkungen:
+          type: ["string", "null"]
+
+    PalletMovementUpdate:
+      type: object
+      properties:
+        movementType:
+          type: string
+          enum: [eingang, ausgang, korrektur, abstimmung]
+        movementDate:
+          type: string
+        amount:
+          type: integer
+        bemerkungen:
+          type: ["string", "null"]
+
+    PalletBalance:
+      type: object
+      required: [speditionId, speditionName, balance]
+      properties:
+        speditionId:
+          type: integer
+        speditionName:
+          type: string
+        kuerzel:
+          type: string
+        balance:
+          type: integer
+        lastMovementDate:
+          type: ["string", "null"]
+
+    Reconciliation:
+      type: object
+      required: [id, speditionId, dateFrom, dateTo, status, createdAt]
+      properties:
+        id:
+          type: integer
+        speditionId:
+          type: integer
+        speditionName:
+          type: ["string", "null"]
+        dateFrom:
+          type: string
+        dateTo:
+          type: string
+        status:
+          type: string
+          enum: [offen, in_pruefung, bestaetigt, abweichung, abgeschlossen]
+        cometBalance:
+          type: ["integer", "null"]
+        speditionBalance:
+          type: ["integer", "null"]
+        createdBy:
+          type: ["integer", "null"]
+        createdByName:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    ReconciliationInput:
+      type: object
+      required: [speditionId, dateFrom, dateTo]
+      properties:
+        speditionId:
+          type: integer
+        dateFrom:
+          type: string
+        dateTo:
+          type: string
+        cometBalance:
+          type: ["integer", "null"]
+
+    ReconciliationUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [offen, in_pruefung, bestaetigt, abweichung, abgeschlossen]
+        speditionBalance:
+          type: ["integer", "null"]
+        cometBalance:
+          type: ["integer", "null"]
+
+    ReconciliationComment:
+      type: object
+      required: [id, reconciliationId, userId, comment, createdAt]
+      properties:
+        id:
+          type: integer
+        reconciliationId:
+          type: integer
+        userId:
+          type: integer
+        username:
+          type: string
+        role:
+          type: string
+        comment:
+          type: string
+        createdAt:
+          type: string
+
+    ReconciliationCommentInput:
+      type: object
+      required: [comment]
+      properties:
+        comment:
+          type: string
+
+    DashboardData:
+      type: object
+      required: [totalShipments, expectedShipments, arrivedShipments, openShipments, lateShipments, byStatus, bySpedition, palletBalances, openReconciliations]
+      properties:
+        totalShipments:
+          type: integer
+        expectedShipments:
+          type: integer
+        arrivedShipments:
+          type: integer
+        openShipments:
+          type: integer
+        lateShipments:
+          type: integer
+        byStatus:
+          type: array
+          items:
+            $ref: "#/components/schemas/StatusCount"
+        bySpedition:
+          type: array
+          items:
+            $ref: "#/components/schemas/SpeditionCount"
+        palletBalances:
+          type: array
+          items:
+            $ref: "#/components/schemas/PalletBalance"
+        openReconciliations:
+          type: integer
+
+    StatusCount:
+      type: object
+      required: [status, count]
+      properties:
+        status:
+          type: string
+        count:
+          type: integer
+
+    SpeditionCount:
+      type: object
+      required: [speditionId, speditionName, count]
+      properties:
+        speditionId:
+          type: integer
+        speditionName:
+          type: string
+        count:
+          type: integer
+
+    AuditEntry:
+      type: object
+      required: [id, module, recordId, changedAt]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: ["integer", "null"]
+        username:
+          type: ["string", "null"]
+        module:
+          type: string
+        recordId:
+          type: integer
+        field:
+          type: ["string", "null"]
+        oldValue:
+          type: ["string", "null"]
+        newValue:
+          type: ["string", "null"]
+        changedAt:
+          type: string
+
+    AuditLogPage:
+      type: object
+      required: [entries, total, page, limit]
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditEntry"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer

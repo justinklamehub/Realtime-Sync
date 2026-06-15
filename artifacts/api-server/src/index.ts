@@ -1,3 +1,5 @@
+import { createServer } from "node:http";
+import { Server as SocketIOServer } from "socket.io";
 import app from "./app";
 import { logger } from "./lib/logger";
 
@@ -15,11 +17,32 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-app.listen(port, (err) => {
+const httpServer = createServer(app);
+
+const io = new SocketIOServer(httpServer, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
+  path: "/api/socket.io",
+});
+
+// Store io on app so routes can access it
+app.set("io", io);
+
+io.on("connection", (socket) => {
+  logger.info({ socketId: socket.id }, "Socket.IO client connected");
+
+  socket.on("disconnect", () => {
+    logger.info({ socketId: socket.id }, "Socket.IO client disconnected");
+  });
+});
+
+httpServer.listen(port, (err?: Error) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
     process.exit(1);
   }
-
-  logger.info({ port }, "Server listening");
+  logger.info({ port }, "Server listening with Socket.IO");
 });
