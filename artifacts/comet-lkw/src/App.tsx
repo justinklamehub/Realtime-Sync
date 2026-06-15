@@ -1,7 +1,6 @@
 import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
-import { Toaster as ShadcnToaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/auth-context";
 import { AppLayout } from "@/components/layout/app-layout";
@@ -84,8 +83,7 @@ function App() {
             <Router />
           </AuthProvider>
         </WouterRouter>
-        <Toaster richColors />
-        <ShadcnToaster />
+        <Toaster richColors position="top-right" duration={10000} />
       </TooltipProvider>
     </QueryClientProvider>
   );

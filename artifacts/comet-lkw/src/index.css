@@ -222,3 +222,40 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
 }
+
+/* Sonner toast progress bar */
+@keyframes toast-progress {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+
+[data-sonner-toast] {
+  overflow: hidden;
+}
+
+[data-sonner-toast]::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  width: 100%;
+  transform-origin: left center;
+  background-color: currentColor;
+  opacity: 0.35;
+  animation: toast-progress 10s linear forwards;
+}
+
+[data-sonner-toast][data-type="success"]::after {
+  background-color: #16a34a;
+  opacity: 0.6;
+}
+
+[data-sonner-toast][data-type="error"]::after {
+  background-color: #dc2626;
+  opacity: 0.6;
+}
+
+[data-sonner-toast]:hover::after {
+  animation-play-state: paused;
+}
