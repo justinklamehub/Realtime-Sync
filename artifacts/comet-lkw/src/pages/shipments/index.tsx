@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Search, Loader2, Plus, Lock, ArrowRight, ArrowUp, ArrowDown, ChevronsUpDown, X } from "lucide-react";
 import { ShipmentDrawer } from "./components/shipment-drawer";
+import { BulkCreateDialog } from "./components/bulk-create-dialog";
 import { useAuth } from "@/contexts/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
@@ -60,6 +61,7 @@ export default function ShipmentsPage() {
   const [bulkStatus, setBulkStatus] = useState("__none__");
   const [selectedShipmentId, setSelectedShipmentId] = useState<number | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isBulkOpen, setIsBulkOpen] = useState(false);
 
   const queryParams = {
     search: search.length > 2 ? search : undefined,
@@ -161,10 +163,16 @@ export default function ShipmentsPage() {
           <p className="text-sm text-slate-500">Verwalten und verfolgen Sie alle LKW-Bewegungen.</p>
         </div>
         {!isViewer && (
-          <Button onClick={() => { setSelectedShipmentId(null); setIsDrawerOpen(true); }}>
-            <Plus className="w-4 h-4 mr-2" />
-            Neue Verladung
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setIsBulkOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Massenanlage
+            </Button>
+            <Button onClick={() => { setSelectedShipmentId(null); setIsDrawerOpen(true); }}>
+              <Plus className="w-4 h-4 mr-2" />
+              Neue Verladung
+            </Button>
+          </div>
         )}
       </div>
 
@@ -409,6 +417,7 @@ export default function ShipmentsPage() {
         open={isDrawerOpen}
         onOpenChange={setIsDrawerOpen}
       />
+      <BulkCreateDialog open={isBulkOpen} onOpenChange={setIsBulkOpen} />
     </div>
   );
 }
