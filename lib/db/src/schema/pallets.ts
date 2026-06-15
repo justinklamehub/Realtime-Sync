@@ -10,6 +10,13 @@ export const palletMovementsTable = pgTable("pallet_movements", {
   movementDate: date("movement_date").notNull(),
   amount: integer("amount").notNull(),
   bemerkungen: text("bemerkungen"),
+  palettenscheinnummer: text("palettenscheinnummer"),
+  vonCometEuropaletten: integer("von_comet_europaletten").default(0),
+  vonCometLadungssicherung: integer("von_comet_ladungssicherung").default(0),
+  vonDefektePaletten: integer("von_defekte_paletten").default(0),
+  anCometEuropaletten: integer("an_comet_europaletten").default(0),
+  anCometLadungssicherung: integer("an_comet_ladungssicherung").default(0),
+  anDefektePaletten: integer("an_defekte_paletten").default(0),
   createdBy: integer("created_by"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });

@@ -80,7 +80,12 @@ router.post("/pallet-movements", requireAuth, async (req, res) => {
       return res.status(403).json({ error: "Forbidden" });
     }
 
-    const { speditionId, shipmentId, movementType, movementDate, amount, bemerkungen } = req.body;
+    const {
+      speditionId, shipmentId, movementType, movementDate, amount, bemerkungen,
+      palettenscheinnummer,
+      vonCometEuropaletten, vonCometLadungssicherung, vonDefektePaletten,
+      anCometEuropaletten, anCometLadungssicherung, anDefektePaletten,
+    } = req.body;
 
     if (SPED_ROLES.includes(role) && speditionId !== sessionSpeditionId) {
       return res.status(403).json({ error: "Forbidden: can only create movements for own spedition" });
@@ -89,6 +94,10 @@ router.post("/pallet-movements", requireAuth, async (req, res) => {
     const absAmount = Math.abs(Number(amount));
     if (!absAmount || absAmount <= 0) {
       return res.status(400).json({ error: "Amount must be a positive number" });
+    }
+
+    if (movementType !== "abstimmung" && !palettenscheinnummer) {
+      return res.status(400).json({ error: "Palettenscheinnummer ist erforderlich" });
     }
 
     const [movement] = await db
@@ -100,6 +109,13 @@ router.post("/pallet-movements", requireAuth, async (req, res) => {
         movementDate,
         amount: absAmount,
         bemerkungen,
+        palettenscheinnummer: palettenscheinnummer || null,
+        vonCometEuropaletten: Number(vonCometEuropaletten) || 0,
+        vonCometLadungssicherung: Number(vonCometLadungssicherung) || 0,
+        vonDefektePaletten: Number(vonDefektePaletten) || 0,
+        anCometEuropaletten: Number(anCometEuropaletten) || 0,
+        anCometLadungssicherung: Number(anCometLadungssicherung) || 0,
+        anDefektePaletten: Number(anDefektePaletten) || 0,
         createdBy: req.session.userId,
       })
       .returning();

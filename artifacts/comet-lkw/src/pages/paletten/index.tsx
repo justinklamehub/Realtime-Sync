@@ -174,8 +174,12 @@ export default function PalettenPage() {
                       {movement.movementType}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-slate-600">
-                    {movement.shipmentBezeichnung || "—"}
+                  <TableCell className="text-slate-600 text-sm">
+                    {movement.shipmentBezeichnung && <div>{movement.shipmentBezeichnung}</div>}
+                    {(movement as any).palettenscheinnummer && (
+                      <div className="text-xs text-slate-400">PS: {(movement as any).palettenscheinnummer}</div>
+                    )}
+                    {!movement.shipmentBezeichnung && !(movement as any).palettenscheinnummer && "—"}
                   </TableCell>
                   <TableCell className="text-slate-500 truncate max-w-[200px]" title={movement.bemerkungen || ""}>
                     {movement.bemerkungen || "—"}
