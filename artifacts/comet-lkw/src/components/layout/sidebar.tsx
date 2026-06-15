@@ -4,14 +4,12 @@ import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, 
   Truck, 
-  KanbanSquare, 
   Building2, 
   Users, 
   PackageSearch, 
   FileCheck2, 
   History,
   LogOut,
-  Settings
 } from "lucide-react";
 import { useLogout } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -40,7 +38,6 @@ export function AppSidebar() {
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, show: true },
     { name: "Verladungen", href: "/shipments", icon: Truck, show: true },
-    { name: "Kanban", href: "/shipments/kanban", icon: KanbanSquare, show: true },
     { name: "Speditionen", href: "/speditionen", icon: Building2, show: canManageSpeditionen },
     { name: "Benutzer", href: "/users", icon: Users, show: canManageUsers },
     { name: "Palettenkonto", href: "/paletten", icon: PackageSearch, show: true },
@@ -60,21 +57,21 @@ export function AppSidebar() {
       </div>
       
       <div className="flex-1 overflow-y-auto py-4">
-        <nav className="px-3 space-y-1">
+        <nav className="px-3 space-y-0.5">
           {navigation.filter(item => item.show).map((item) => {
-            const isActive = location === item.href || (item.href !== "/dashboard" && location.startsWith(item.href + "/"));
+            const isActive = location === item.href || (item.href !== "/dashboard" && item.href !== "/shipments" && location.startsWith(item.href + "/")) || (item.href === "/shipments" && (location === "/shipments" || location.startsWith("/shipments/")));
             return (
               <Link
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                  "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-all duration-150",
                   isActive
-                    ? "bg-primary/10 text-primary"
-                    : "text-slate-400 hover:text-slate-100 hover:bg-slate-900"
+                    ? "bg-primary text-white shadow-sm"
+                    : "text-slate-400 hover:text-slate-100 hover:bg-slate-800"
                 )}
               >
-                <item.icon className={cn("w-4 h-4", isActive ? "text-primary" : "text-slate-500")} />
+                <item.icon className={cn("w-4 h-4 shrink-0", isActive ? "text-white" : "text-slate-500")} />
                 {item.name}
               </Link>
             );
