@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useCreatePalletMovement, useListSpeditionen, getListPalletMovementsQueryKey, getListPalletBalancesQueryKey } from "@workspace/api-client-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -33,12 +33,26 @@ export function MovementDialog({ open, onOpenChange }: { open: boolean, onOpenCh
     !isCometUser && user?.speditionId ? String(user.speditionId) : ""
   );
   const [movementType, setMovementType] = useState("eingang");
-  const [amount, setAmount] = useState("");
   const [movementDate, setMovementDate] = useState(new Date().toISOString().slice(0, 10));
   const [bemerkungen, setBemerkungen] = useState("");
   const [palletForm, setPalletForm] = useState(emptyForm());
 
   const requiresSchein = movementType !== "abstimmung";
+
+  // Auto-calculated: (Von Euro + Von Ladung - Von Defekt) - (An Euro + An Ladung - An Defekt)
+  const calculatedAmount = useMemo(() => {
+    const von = palletForm.vonCometEuropaletten + palletForm.vonCometLadungssicherung - palletForm.vonDefektePaletten;
+    const an  = palletForm.anCometEuropaletten  + palletForm.anCometLadungssicherung  - palletForm.anDefektePaletten;
+    return von - an;
+  }, [palletForm]);
+
+  const absAmount = Math.abs(calculatedAmount);
+
+  const handleReset = () => {
+    setBemerkungen("");
+    setMovementType("eingang");
+    setPalletForm(emptyForm());
+  };
 
   const createMutation = useCreatePalletMovement({
     mutation: {
@@ -47,10 +61,7 @@ export function MovementDialog({ open, onOpenChange }: { open: boolean, onOpenCh
         queryClient.invalidateQueries({ queryKey: getListPalletBalancesQueryKey() });
         toast({ title: "Buchung erfasst" });
         onOpenChange(false);
-        setAmount("");
-        setBemerkungen("");
-        setMovementType("eingang");
-        setPalletForm(emptyForm());
+        handleReset();
       },
       onError: (err: any) => {
         const msg = err?.response?.data?.error ?? "Fehler beim Speichern";
@@ -60,11 +71,6 @@ export function MovementDialog({ open, onOpenChange }: { open: boolean, onOpenCh
   });
 
   const handleSave = () => {
-    const parsedAmount = parseInt(amount);
-    if (!parsedAmount || parsedAmount <= 0) {
-      toast({ title: "Bitte eine positive Anzahl eingeben", variant: "destructive" });
-      return;
-    }
     if (requiresSchein && !palletForm.palettenscheinnummer.trim()) {
       toast({ title: "Palettenscheinnummer ist erforderlich", variant: "destructive" });
       return;
@@ -74,7 +80,7 @@ export function MovementDialog({ open, onOpenChange }: { open: boolean, onOpenCh
         speditionId: parseInt(speditionId),
         movementType: movementType as any,
         movementDate,
-        amount: parsedAmount,
+        amount: absAmount,
         bemerkungen: bemerkungen || undefined,
         palettenscheinnummer: palletForm.palettenscheinnummer || undefined,
         vonCometEuropaletten: palletForm.vonCometEuropaletten,
@@ -93,6 +99,10 @@ export function MovementDialog({ open, onOpenChange }: { open: boolean, onOpenCh
   const availableSpeditionen = isCometUser
     ? speditionen
     : speditionen?.filter(s => s.id === user?.speditionId);
+
+  const amountColor = absAmount > 0
+    ? movementType === "ausgang" ? "text-red-600" : "text-green-600"
+    : "text-slate-400";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -135,25 +145,7 @@ export function MovementDialog({ open, onOpenChange }: { open: boolean, onOpenCh
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Anzahl Paletten</Label>
-              <Input
-                type="number"
-                min="1"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="z.B. 10"
-              />
-              <p className="text-xs text-slate-500">
-                {movementType === "ausgang"
-                  ? "Positive Zahl — Ausgang wird vom Saldo abgezogen."
-                  : movementType === "eingang"
-                  ? "Positive Zahl — wird zum Saldo addiert."
-                  : "Anzahl als positive Zahl eingeben."}
-              </p>
-            </div>
-
-            {/* Palettenscheinnummer — required for all except Abstimmung */}
+            {/* Palettenscheinnummer */}
             <div className="space-y-2">
               <Label>
                 Palettenscheinnummer
@@ -173,27 +165,21 @@ export function MovementDialog({ open, onOpenChange }: { open: boolean, onOpenCh
               <div className="grid grid-cols-3 gap-2">
                 <div className="space-y-1">
                   <Label className="text-xs text-slate-500">Europaletten</Label>
-                  <Input
-                    type="number" min={0} className="h-8 text-sm"
+                  <Input type="number" min={0} className="h-8 text-sm"
                     value={palletForm.vonCometEuropaletten}
-                    onChange={e => setPallet("vonCometEuropaletten", Number(e.target.value))}
-                  />
+                    onChange={e => setPallet("vonCometEuropaletten", Number(e.target.value))} />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-slate-500">Ladungssich.</Label>
-                  <Input
-                    type="number" min={0} className="h-8 text-sm"
+                  <Input type="number" min={0} className="h-8 text-sm"
                     value={palletForm.vonCometLadungssicherung}
-                    onChange={e => setPallet("vonCometLadungssicherung", Number(e.target.value))}
-                  />
+                    onChange={e => setPallet("vonCometLadungssicherung", Number(e.target.value))} />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-amber-600">davon defekt</Label>
-                  <Input
-                    type="number" min={0} className="h-8 text-sm"
+                  <Input type="number" min={0} className="h-8 text-sm"
                     value={palletForm.vonDefektePaletten}
-                    onChange={e => setPallet("vonDefektePaletten", Number(e.target.value))}
-                  />
+                    onChange={e => setPallet("vonDefektePaletten", Number(e.target.value))} />
                 </div>
               </div>
             </div>
@@ -204,29 +190,45 @@ export function MovementDialog({ open, onOpenChange }: { open: boolean, onOpenCh
               <div className="grid grid-cols-3 gap-2">
                 <div className="space-y-1">
                   <Label className="text-xs text-slate-500">Europaletten</Label>
-                  <Input
-                    type="number" min={0} className="h-8 text-sm"
+                  <Input type="number" min={0} className="h-8 text-sm"
                     value={palletForm.anCometEuropaletten}
-                    onChange={e => setPallet("anCometEuropaletten", Number(e.target.value))}
-                  />
+                    onChange={e => setPallet("anCometEuropaletten", Number(e.target.value))} />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-slate-500">Ladungssich.</Label>
-                  <Input
-                    type="number" min={0} className="h-8 text-sm"
+                  <Input type="number" min={0} className="h-8 text-sm"
                     value={palletForm.anCometLadungssicherung}
-                    onChange={e => setPallet("anCometLadungssicherung", Number(e.target.value))}
-                  />
+                    onChange={e => setPallet("anCometLadungssicherung", Number(e.target.value))} />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-amber-600">davon defekt</Label>
-                  <Input
-                    type="number" min={0} className="h-8 text-sm"
+                  <Input type="number" min={0} className="h-8 text-sm"
                     value={palletForm.anDefektePaletten}
-                    onChange={e => setPallet("anDefektePaletten", Number(e.target.value))}
-                  />
+                    onChange={e => setPallet("anDefektePaletten", Number(e.target.value))} />
                 </div>
               </div>
+            </div>
+
+            {/* Auto-calculated amount */}
+            <div className="rounded-md border-2 border-dashed border-slate-200 p-4 bg-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs text-slate-400 uppercase tracking-wide font-medium mb-0.5">Berechnete Menge</div>
+                  <div className="text-xs text-slate-400">
+                    (Von: {palletForm.vonCometEuropaletten}+{palletForm.vonCometLadungssicherung}−{palletForm.vonDefektePaletten})
+                    {" − "}
+                    (An: {palletForm.anCometEuropaletten}+{palletForm.anCometLadungssicherung}−{palletForm.anDefektePaletten})
+                  </div>
+                </div>
+                <div className={`text-3xl font-bold tabular-nums ${amountColor}`}>
+                  {absAmount}
+                </div>
+              </div>
+              {calculatedAmount < 0 && (
+                <p className="text-xs text-amber-600 mt-2">
+                  Hinweis: An COMET übersteigt Von COMET — Betrag wird als Absolutwert gespeichert.
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -237,7 +239,7 @@ export function MovementDialog({ open, onOpenChange }: { open: boolean, onOpenCh
         </ScrollArea>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Abbrechen</Button>
-          <Button onClick={handleSave} disabled={createMutation.isPending || !speditionId || !amount}>
+          <Button onClick={handleSave} disabled={createMutation.isPending || !speditionId}>
             {createMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             Speichern
           </Button>

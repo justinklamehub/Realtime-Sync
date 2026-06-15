@@ -91,10 +91,11 @@ router.post("/pallet-movements", requireAuth, async (req, res) => {
       return res.status(403).json({ error: "Forbidden: can only create movements for own spedition" });
     }
 
-    const absAmount = Math.abs(Number(amount));
-    if (!absAmount || absAmount <= 0) {
-      return res.status(400).json({ error: "Amount must be a positive number" });
+    const parsedAmount = Number(amount);
+    if (isNaN(parsedAmount) || parsedAmount < 0) {
+      return res.status(400).json({ error: "Ungültige Menge" });
     }
+    const absAmount = parsedAmount;
 
     if (movementType !== "abstimmung" && !palettenscheinnummer) {
       return res.status(400).json({ error: "Palettenscheinnummer ist erforderlich" });
