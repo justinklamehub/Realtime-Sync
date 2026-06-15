@@ -14,8 +14,6 @@ import {
   Share2,
   Settings,
   ShieldCheck,
-  PanelLeftClose,
-  PanelLeftOpen,
 } from "lucide-react";
 import { useLogout } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -31,10 +29,9 @@ const ROLES_WITH_SPEDITION_ACCESS = ["comet_admin", "comet_leitstand"];
 
 interface AppSidebarProps {
   collapsed: boolean;
-  onToggle: () => void;
 }
 
-export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
+export function AppSidebar({ collapsed }: AppSidebarProps) {
   const { user, refetch } = useAuth();
   const [location, setLocation] = useLocation();
   const logoutMutation = useLogout({
@@ -92,21 +89,6 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
               <span className="font-semibold text-slate-100 tracking-tight truncate">Easy-Verladung</span>
             </div>
           )}
-        </div>
-
-        {/* Toggle button */}
-        <div className={cn("flex shrink-0 pt-2 pb-1", collapsed ? "justify-center px-0" : "px-3 justify-end")}>
-          <button
-            onClick={onToggle}
-            className="p-1.5 rounded-md text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-colors"
-            title={collapsed ? "Menü ausklappen" : "Menü einklappen"}
-          >
-            {collapsed ? (
-              <PanelLeftOpen className="w-4 h-4" />
-            ) : (
-              <PanelLeftClose className="w-4 h-4" />
-            )}
-          </button>
         </div>
 
         {/* Navigation */}
