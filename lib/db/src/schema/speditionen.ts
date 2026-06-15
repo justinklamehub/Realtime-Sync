@@ -23,6 +23,18 @@ export const speditionPermissionsTable = pgTable("spedition_permissions", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [unique("uq_sped_permissions").on(t.grantingSpeditionId, t.receivingSpeditionId)]);
 
+export const speditionContactsTable = pgTable("spedition_contacts", {
+  id: serial("id").primaryKey(),
+  speditionId: integer("spedition_id").notNull().references(() => speditionenTable.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  bereich: text("bereich"),
+  telefon: text("telefon"),
+  email: text("email"),
+  bemerkungen: text("bemerkungen"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const insertSpeditionSchema = createInsertSchema(speditionenTable).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertSpedition = z.infer<typeof insertSpeditionSchema>;
 export type Spedition = typeof speditionenTable.$inferSelect;
+export type SpeditionContact = typeof speditionContactsTable.$inferSelect;

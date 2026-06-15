@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { speditionenTable, speditionPermissionsTable } from "@workspace/db";
+import { speditionenTable, speditionPermissionsTable, speditionContactsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { logAudit } from "../lib/audit";
@@ -230,6 +230,88 @@ router.delete("/speditionen/:id/permissions/:receivingId", requireAuth, async (r
 
     await logAudit(req.session.userId!, "spedition", grantingId, "permission_removed", null, String(receivingId));
     emit(req, "permission.updated", { grantingSpeditionId: grantingId, receivingSpeditionId: receivingId, permissionLevel: null }, grantingId, [receivingId]);
+    return res.json({ ok: true });
+  } catch (err) {
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── Ansprechpartner (Contacts) ────────────────────────────────────────────────
+
+router.get("/speditionen/:id/contacts", requireAuth, async (req, res) => {
+  try {
+    const role = req.session.role!;
+    const id = Number(req.params.id);
+    const allowed = ["comet_admin", "comet_leitstand", "comet_lager", "comet_viewer",
+                     "speditions_admin", "speditions_bearbeiter", "speditions_viewer"];
+    if (!allowed.includes(role)) return res.status(403).json({ error: "Forbidden" });
+    const contacts = await db
+      .select()
+      .from(speditionContactsTable)
+      .where(eq(speditionContactsTable.speditionId, id))
+      .orderBy(speditionContactsTable.createdAt);
+    return res.json(contacts);
+  } catch (err) {
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/speditionen/:id/contacts", requireAuth, async (req, res) => {
+  try {
+    if (req.session.role !== "comet_admin") {
+      return res.status(403).json({ error: "Nur COMET Admin kann Ansprechpartner anlegen" });
+    }
+    const speditionId = Number(req.params.id);
+    const { name, bereich, telefon, email, bemerkungen } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: "Name ist erforderlich" });
+    const [contact] = await db
+      .insert(speditionContactsTable)
+      .values({ speditionId, name: name.trim(), bereich: bereich || null, telefon: telefon || null, email: email || null, bemerkungen: bemerkungen || null })
+      .returning();
+    await logAudit(req.session.userId!, "spedition", speditionId, "contact_created", null, name);
+    return res.status(201).json(contact);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.patch("/speditionen/:id/contacts/:contactId", requireAuth, async (req, res) => {
+  try {
+    if (req.session.role !== "comet_admin") {
+      return res.status(403).json({ error: "Nur COMET Admin kann Ansprechpartner bearbeiten" });
+    }
+    const speditionId = Number(req.params.id);
+    const contactId = Number(req.params.contactId);
+    const { name, bereich, telefon, email, bemerkungen } = req.body;
+    const updates: any = {};
+    if (name !== undefined) updates.name = name.trim();
+    if (bereich !== undefined) updates.bereich = bereich || null;
+    if (telefon !== undefined) updates.telefon = telefon || null;
+    if (email !== undefined) updates.email = email || null;
+    if (bemerkungen !== undefined) updates.bemerkungen = bemerkungen || null;
+    const [contact] = await db
+      .update(speditionContactsTable)
+      .set(updates)
+      .where(and(eq(speditionContactsTable.id, contactId), eq(speditionContactsTable.speditionId, speditionId)))
+      .returning();
+    if (!contact) return res.status(404).json({ error: "Nicht gefunden" });
+    return res.json(contact);
+  } catch (err) {
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.delete("/speditionen/:id/contacts/:contactId", requireAuth, async (req, res) => {
+  try {
+    if (req.session.role !== "comet_admin") {
+      return res.status(403).json({ error: "Nur COMET Admin kann Ansprechpartner löschen" });
+    }
+    const speditionId = Number(req.params.id);
+    const contactId = Number(req.params.contactId);
+    await db
+      .delete(speditionContactsTable)
+      .where(and(eq(speditionContactsTable.id, contactId), eq(speditionContactsTable.speditionId, speditionId)));
     return res.json({ ok: true });
   } catch (err) {
     return res.status(500).json({ error: "Internal server error" });

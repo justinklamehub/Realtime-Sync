@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Trash2, Plus } from "lucide-react";
+import { ContactsTab } from "./contacts-tab";
 
 interface Spedition {
   id: number;
@@ -292,6 +293,7 @@ export function SpeditionDialog({ open, onOpenChange, editSpedition, permissions
         <Tabs defaultValue="stamm">
           <TabsList className="mb-4 w-full">
             <TabsTrigger value="stamm" className="flex-1">Stammdaten</TabsTrigger>
+            {isEditing && <TabsTrigger value="kontakte" className="flex-1">Ansprechpartner</TabsTrigger>}
             {isEditing && <TabsTrigger value="rechte" className="flex-1">Zugriffsrechte</TabsTrigger>}
           </TabsList>
 
@@ -333,6 +335,15 @@ export function SpeditionDialog({ open, onOpenChange, editSpedition, permissions
               </div>
             </div>
           </TabsContent>
+
+          {isEditing && (
+            <TabsContent value="kontakte" className="space-y-3 min-h-[200px]">
+              <p className="text-sm text-slate-500">
+                Hinterlegen Sie Ansprechpartner für verschiedene Bereiche (Paletten, Verladungen, Buchhaltung …).
+              </p>
+              <ContactsTab speditionId={editSpedition!.id} />
+            </TabsContent>
+          )}
 
           {isEditing && permissionsTab}
         </Tabs>
