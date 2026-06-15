@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { Server as SocketIOServer } from "socket.io";
-import app from "./app";
+import app, { sessionMiddleware } from "./app";
 import { logger } from "./lib/logger";
 
 const rawPort = process.env["PORT"];
@@ -28,11 +28,28 @@ const io = new SocketIOServer(httpServer, {
   path: "/api/socket.io",
 });
 
-// Store io on app so routes can access it
 app.set("io", io);
 
+io.use((socket, next) => {
+  sessionMiddleware(socket.request as any, {} as any, next as any);
+});
+
 io.on("connection", (socket) => {
-  logger.info({ socketId: socket.id }, "Socket.IO client connected");
+  const sess = (socket.request as any).session;
+  const role: string | undefined = sess?.role;
+  const speditionId: number | undefined = sess?.speditionId;
+
+  const isCometRole =
+    role !== undefined &&
+    ["comet_admin", "comet_leitstand", "comet_lager", "comet_viewer"].includes(role);
+
+  if (isCometRole) {
+    socket.join("comet");
+  } else if (speditionId) {
+    socket.join(`spedition:${speditionId}`);
+  }
+
+  logger.info({ socketId: socket.id, role, speditionId }, "Socket.IO client connected");
 
   socket.on("disconnect", () => {
     logger.info({ socketId: socket.id }, "Socket.IO client disconnected");

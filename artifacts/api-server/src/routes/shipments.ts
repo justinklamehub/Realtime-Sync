@@ -7,9 +7,10 @@ import {
   speditionPermissionsTable,
   auditLogTable,
 } from "@workspace/db";
-import { eq, and, or, gte, lte, ilike, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { logAudit } from "../lib/audit";
+import { emitToRooms } from "../lib/socket-emit";
 import type { Server as IOServer } from "socket.io";
 
 const router = Router();
@@ -18,37 +19,49 @@ function getIO(req: any): IOServer | null {
   return req.app.get("io") || null;
 }
 
-function emit(req: any, event: string, data: any) {
+function emit(req: any, event: string, data: any, speditionId?: number | null) {
   const io = getIO(req);
-  if (io) io.emit(event, data);
+  if (io) emitToRooms(io, event, data, speditionId);
 }
 
 const COMET_OPERATIVE_FIELDS = ["status", "tor", "ataDate", "ataTime", "gesperrtFuerSpedition", "cometBearbeitet"];
+const COMET_ROLES = ["comet_admin", "comet_leitstand", "comet_lager", "comet_viewer"];
+const SPED_ROLES = ["speditions_admin", "speditions_bearbeiter", "speditions_viewer"];
+
+async function getAllowedSpeditionIds(
+  role: string,
+  sessionSpeditionId: number | null,
+): Promise<number[] | "all"> {
+  if (COMET_ROLES.includes(role)) return "all";
+  if (!sessionSpeditionId) return [];
+  const permissions = await db
+    .select()
+    .from(speditionPermissionsTable)
+    .where(eq(speditionPermissionsTable.receivingSpeditionId, sessionSpeditionId));
+  return [sessionSpeditionId, ...permissions.map((p) => p.grantingSpeditionId)];
+}
+
+function isShipmentAllowed(speditionId: number | null, allowed: number[] | "all"): boolean {
+  if (allowed === "all") return true;
+  if (speditionId === null) return false;
+  return (allowed as number[]).includes(speditionId);
+}
 
 async function buildShipmentResponse(shipment: any) {
-  let speditionName: string | null = null;
-  let subSpeditionName: string | null = null;
-  let createdByName: string | null = null;
-  let updatedByName: string | null = null;
+  const speds = await db.select().from(speditionenTable);
+  const users = await db.select().from(usersTable);
+  const spedMap: Record<number, string> = {};
+  const userMap: Record<number, string> = {};
+  for (const s of speds) spedMap[s.id] = s.name;
+  for (const u of users) userMap[u.id] = u.username;
 
-  if (shipment.speditionId) {
-    const [s] = await db.select().from(speditionenTable).where(eq(speditionenTable.id, shipment.speditionId)).limit(1);
-    speditionName = s?.name ?? null;
-  }
-  if (shipment.subSpeditionId) {
-    const [s] = await db.select().from(speditionenTable).where(eq(speditionenTable.id, shipment.subSpeditionId)).limit(1);
-    subSpeditionName = s?.name ?? null;
-  }
-  if (shipment.createdBy) {
-    const [u] = await db.select().from(usersTable).where(eq(usersTable.id, shipment.createdBy)).limit(1);
-    createdByName = u?.username ?? null;
-  }
-  if (shipment.updatedBy) {
-    const [u] = await db.select().from(usersTable).where(eq(usersTable.id, shipment.updatedBy)).limit(1);
-    updatedByName = u?.username ?? null;
-  }
-
-  return { ...shipment, speditionName, subSpeditionName, createdByName, updatedByName };
+  return {
+    ...shipment,
+    speditionName: shipment.speditionId ? spedMap[shipment.speditionId] ?? null : null,
+    subSpeditionName: shipment.subSpeditionId ? spedMap[shipment.subSpeditionId] ?? null : null,
+    createdByName: shipment.createdBy ? userMap[shipment.createdBy] ?? null : null,
+    updatedByName: shipment.updatedBy ? userMap[shipment.updatedBy] ?? null : null,
+  };
 }
 
 router.get("/shipments", requireAuth, async (req, res) => {
@@ -67,40 +80,25 @@ router.get("/shipments", requireAuth, async (req, res) => {
       search,
     } = req.query as Record<string, string>;
 
-    // Build conditions
     let rows = await db.select().from(shipmentsTable);
 
-    // Permission filtering for spedition users
-    if (["speditions_admin", "speditions_bearbeiter", "speditions_viewer"].includes(role)) {
+    if (SPED_ROLES.includes(role)) {
       if (!sessionSpeditionId) return res.json([]);
-
-      // Get speditions this user's spedition has view/edit permission for
       const permissions = await db
         .select()
         .from(speditionPermissionsTable)
         .where(eq(speditionPermissionsTable.receivingSpeditionId, sessionSpeditionId));
-
       const allowedSpeditionIds = [
         sessionSpeditionId,
         ...permissions.map((p) => p.grantingSpeditionId),
       ];
-
       rows = rows.filter(
-        (s) => s.speditionId !== null && allowedSpeditionIds.includes(s.speditionId)
+        (s) => s.speditionId !== null && allowedSpeditionIds.includes(s.speditionId),
       );
     }
 
-    // Apply filters
-    if (dateFrom) {
-      rows = rows.filter(
-        (s) => (s.etaDate && s.etaDate >= dateFrom) || (s.ataDate && s.ataDate >= dateFrom)
-      );
-    }
-    if (dateTo) {
-      rows = rows.filter(
-        (s) => (s.etaDate && s.etaDate <= dateTo) || (s.ataDate && s.ataDate <= dateTo)
-      );
-    }
+    if (dateFrom) rows = rows.filter((s) => (s.etaDate && s.etaDate >= dateFrom) || (s.ataDate && s.ataDate >= dateFrom));
+    if (dateTo) rows = rows.filter((s) => (s.etaDate && s.etaDate <= dateTo) || (s.ataDate && s.ataDate <= dateTo));
     if (speditionId) rows = rows.filter((s) => s.speditionId === Number(speditionId));
     if (status) rows = rows.filter((s) => s.status === status);
     if (lkwArt) rows = rows.filter((s) => s.lkwArt === lkwArt);
@@ -113,18 +111,16 @@ router.get("/shipments", requireAuth, async (req, res) => {
         (s) =>
           s.bezeichnung?.toLowerCase().includes(q) ||
           s.kennzeichen?.toLowerCase().includes(q) ||
-          s.relation?.toLowerCase().includes(q)
+          s.relation?.toLowerCase().includes(q),
       );
     }
 
-    // Sort: ataTime first, then etaTime
     rows.sort((a, b) => {
       const aTime = a.ataTime || a.etaTime || "99:99";
       const bTime = b.ataTime || b.etaTime || "99:99";
       return aTime.localeCompare(bTime);
     });
 
-    // Build responses with names
     const speds = await db.select().from(speditionenTable);
     const users = await db.select().from(usersTable);
     const spedMap: Record<number, string> = {};
@@ -139,7 +135,7 @@ router.get("/shipments", requireAuth, async (req, res) => {
         subSpeditionName: s.subSpeditionId ? spedMap[s.subSpeditionId] ?? null : null,
         createdByName: s.createdBy ? userMap[s.createdBy] ?? null : null,
         updatedByName: s.updatedBy ? userMap[s.updatedBy] ?? null : null,
-      }))
+      })),
     );
   } catch (err) {
     console.error(err);
@@ -152,18 +148,22 @@ router.post("/shipments", requireAuth, async (req, res) => {
     const role = req.session.role!;
     const sessionSpeditionId = req.session.speditionId;
 
-    if (
-      ["comet_viewer", "speditions_viewer"].includes(role)
-    ) {
+    if (["comet_viewer", "speditions_viewer"].includes(role)) {
       return res.status(403).json({ error: "Forbidden" });
     }
 
     const body = req.body;
+    const targetSpeditionId = body.speditionId || sessionSpeditionId || null;
+
+    if (SPED_ROLES.includes(role) && targetSpeditionId !== sessionSpeditionId) {
+      return res.status(403).json({ error: "Forbidden: cannot create shipment for another spedition" });
+    }
+
     const [shipment] = await db
       .insert(shipmentsTable)
       .values({
         ...body,
-        speditionId: body.speditionId || sessionSpeditionId || null,
+        speditionId: targetSpeditionId,
         createdBy: req.session.userId,
         updatedBy: req.session.userId,
         status: body.status || "Angemeldet",
@@ -171,7 +171,7 @@ router.post("/shipments", requireAuth, async (req, res) => {
       .returning();
 
     await logAudit(req.session.userId!, "shipment", shipment.id, "created", null, shipment.bezeichnung);
-    emit(req, "shipment.created", { id: shipment.id });
+    emit(req, "shipment.created", { id: shipment.id }, shipment.speditionId);
 
     return res.status(201).json(await buildShipmentResponse(shipment));
   } catch (err) {
@@ -202,13 +202,13 @@ router.post("/shipments/bulk", requireAuth, async (req, res) => {
           createdBy: req.session.userId,
           updatedBy: req.session.userId,
           status: s.status || "Angemeldet",
-        }))
+        })),
       )
       .returning();
 
     for (const s of inserted) {
       await logAudit(req.session.userId!, "shipment", s.id, "bulk_created", null, s.bezeichnung);
-      emit(req, "shipment.created", { id: s.id });
+      emit(req, "shipment.created", { id: s.id }, s.speditionId);
     }
 
     return res.status(201).json(inserted);
@@ -220,12 +220,23 @@ router.post("/shipments/bulk", requireAuth, async (req, res) => {
 
 router.get("/shipments/:id", requireAuth, async (req, res) => {
   try {
+    const role = req.session.role!;
+    const sessionSpeditionId = req.session.speditionId;
+
     const [shipment] = await db
       .select()
       .from(shipmentsTable)
       .where(eq(shipmentsTable.id, Number(req.params.id)))
       .limit(1);
     if (!shipment) return res.status(404).json({ error: "Not found" });
+
+    if (SPED_ROLES.includes(role)) {
+      const allowed = await getAllowedSpeditionIds(role, sessionSpeditionId ?? null);
+      if (!isShipmentAllowed(shipment.speditionId, allowed)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+    }
+
     return res.json(await buildShipmentResponse(shipment));
   } catch (err) {
     return res.status(500).json({ error: "Internal server error" });
@@ -245,15 +256,19 @@ router.patch("/shipments/:id", requireAuth, async (req, res) => {
     const [existing] = await db.select().from(shipmentsTable).where(eq(shipmentsTable.id, id)).limit(1);
     if (!existing) return res.status(404).json({ error: "Not found" });
 
-    // Spedition lock check
-    if (["speditions_admin", "speditions_bearbeiter"].includes(role) && existing.gesperrtFuerSpedition) {
-      return res.status(403).json({ error: "Shipment is locked for editing by Spedition" });
+    if (SPED_ROLES.includes(role)) {
+      const allowed = await getAllowedSpeditionIds(role, sessionSpeditionId ?? null);
+      if (!isShipmentAllowed(existing.speditionId, allowed)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      if (existing.gesperrtFuerSpedition) {
+        return res.status(403).json({ error: "Shipment is locked for editing by Spedition" });
+      }
     }
 
     const updates = { ...req.body };
     const isCometUser = ["comet_admin", "comet_leitstand", "comet_lager"].includes(role);
 
-    // Locking logic: if COMET user edits operative fields, lock for Spedition
     if (isCometUser) {
       const editingOperative = COMET_OPERATIVE_FIELDS.some((f) => updates[f] !== undefined);
       if (editingOperative) {
@@ -271,7 +286,6 @@ router.patch("/shipments/:id", requireAuth, async (req, res) => {
       .where(eq(shipmentsTable.id, id))
       .returning();
 
-    // Log field-level changes
     for (const [field, newVal] of Object.entries(updates)) {
       if (field === "updatedAt" || field === "updatedBy") continue;
       const oldVal = (existing as any)[field];
@@ -281,7 +295,7 @@ router.patch("/shipments/:id", requireAuth, async (req, res) => {
     }
 
     const isStatusChange = updates.status && updates.status !== existing.status;
-    emit(req, isStatusChange ? "shipment.status_changed" : "shipment.updated", { id });
+    emit(req, isStatusChange ? "shipment.status_changed" : "shipment.updated", { id }, existing.speditionId);
 
     return res.json(await buildShipmentResponse(shipment));
   } catch (err) {
@@ -297,9 +311,11 @@ router.delete("/shipments/:id", requireAuth, async (req, res) => {
       return res.status(403).json({ error: "Forbidden" });
     }
     const id = Number(req.params.id);
+    const [existing] = await db.select().from(shipmentsTable).where(eq(shipmentsTable.id, id)).limit(1);
+    if (!existing) return res.status(404).json({ error: "Not found" });
     await db.delete(shipmentsTable).where(eq(shipmentsTable.id, id));
-    await logAudit(req.session.userId!, "shipment", id, "deleted", null, null);
-    emit(req, "shipment.updated", { id });
+    await logAudit(req.session.userId!, "shipment", id, "deleted", existing.bezeichnung ?? null, null);
+    emit(req, "shipment.deleted", { id }, existing.speditionId);
     return res.json({ ok: true });
   } catch (err) {
     return res.status(500).json({ error: "Internal server error" });
@@ -313,14 +329,15 @@ router.post("/shipments/:id/lock", requireAuth, async (req, res) => {
       return res.status(403).json({ error: "Forbidden" });
     }
     const id = Number(req.params.id);
+    const [existing] = await db.select().from(shipmentsTable).where(eq(shipmentsTable.id, id)).limit(1);
+    if (!existing) return res.status(404).json({ error: "Not found" });
     const [shipment] = await db
       .update(shipmentsTable)
       .set({ gesperrtFuerSpedition: true, cometBearbeitet: true, updatedAt: new Date() })
       .where(eq(shipmentsTable.id, id))
       .returning();
-    if (!shipment) return res.status(404).json({ error: "Not found" });
     await logAudit(req.session.userId!, "shipment", id, "locked", "false", "true");
-    emit(req, "shipment.locked", { id });
+    emit(req, "shipment.locked", { id }, existing.speditionId);
     return res.json(await buildShipmentResponse(shipment));
   } catch (err) {
     return res.status(500).json({ error: "Internal server error" });
@@ -334,14 +351,15 @@ router.post("/shipments/:id/unlock", requireAuth, async (req, res) => {
       return res.status(403).json({ error: "Forbidden" });
     }
     const id = Number(req.params.id);
+    const [existing] = await db.select().from(shipmentsTable).where(eq(shipmentsTable.id, id)).limit(1);
+    if (!existing) return res.status(404).json({ error: "Not found" });
     const [shipment] = await db
       .update(shipmentsTable)
       .set({ gesperrtFuerSpedition: false, updatedAt: new Date() })
       .where(eq(shipmentsTable.id, id))
       .returning();
-    if (!shipment) return res.status(404).json({ error: "Not found" });
     await logAudit(req.session.userId!, "shipment", id, "unlocked", "true", "false");
-    emit(req, "shipment.unlocked", { id });
+    emit(req, "shipment.unlocked", { id }, existing.speditionId);
     return res.json(await buildShipmentResponse(shipment));
   } catch (err) {
     return res.status(500).json({ error: "Internal server error" });
@@ -350,7 +368,20 @@ router.post("/shipments/:id/unlock", requireAuth, async (req, res) => {
 
 router.get("/shipments/:id/history", requireAuth, async (req, res) => {
   try {
+    const role = req.session.role!;
+    const sessionSpeditionId = req.session.speditionId;
     const id = Number(req.params.id);
+
+    const [shipment] = await db.select().from(shipmentsTable).where(eq(shipmentsTable.id, id)).limit(1);
+    if (!shipment) return res.status(404).json({ error: "Not found" });
+
+    if (SPED_ROLES.includes(role)) {
+      const allowed = await getAllowedSpeditionIds(role, sessionSpeditionId ?? null);
+      if (!isShipmentAllowed(shipment.speditionId, allowed)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+    }
+
     const entries = await db
       .select()
       .from(auditLogTable)
@@ -371,7 +402,7 @@ router.get("/shipments/:id/history", requireAuth, async (req, res) => {
         oldValue: e.oldValue,
         newValue: e.newValue,
         changedAt: e.changedAt,
-      }))
+      })),
     );
   } catch (err) {
     return res.status(500).json({ error: "Internal server error" });

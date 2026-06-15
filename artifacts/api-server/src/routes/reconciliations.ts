@@ -6,11 +6,41 @@ import {
   speditionenTable,
   usersTable,
 } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { logAudit } from "../lib/audit";
+import { emitToRooms } from "../lib/socket-emit";
+import type { Server as IOServer } from "socket.io";
 
 const router = Router();
+
+const COMET_ROLES = ["comet_admin", "comet_leitstand", "comet_lager", "comet_viewer"];
+const SPED_ROLES = ["speditions_admin", "speditions_bearbeiter", "speditions_viewer"];
+
+function getIO(req: any): IOServer | null {
+  return req.app.get("io") || null;
+}
+
+function emit(req: any, event: string, data: any, speditionId?: number | null) {
+  const io = getIO(req);
+  if (io) emitToRooms(io, event, data, speditionId);
+}
+
+async function getRecWithScope(id: number, role: string, sessionSpeditionId: number | null | undefined) {
+  const [rec] = await db
+    .select()
+    .from(palletReconciliationsTable)
+    .where(eq(palletReconciliationsTable.id, id))
+    .limit(1);
+
+  if (!rec) return null;
+
+  if (SPED_ROLES.includes(role)) {
+    if (!sessionSpeditionId || rec.speditionId !== sessionSpeditionId) return "forbidden" as const;
+  }
+
+  return rec;
+}
 
 router.get("/reconciliations", requireAuth, async (req, res) => {
   try {
@@ -20,7 +50,7 @@ router.get("/reconciliations", requireAuth, async (req, res) => {
 
     let rows = await db.select().from(palletReconciliationsTable);
 
-    if (["speditions_admin", "speditions_bearbeiter", "speditions_viewer"].includes(role)) {
+    if (SPED_ROLES.includes(role)) {
       if (!sessionSpeditionId) return res.json([]);
       rows = rows.filter((r) => r.speditionId === sessionSpeditionId);
     } else if (speditionId) {
@@ -40,7 +70,7 @@ router.get("/reconciliations", requireAuth, async (req, res) => {
         ...r,
         speditionName: spedMap[r.speditionId] ?? null,
         createdByName: r.createdBy ? userMap[r.createdBy] ?? null : null,
-      }))
+      })),
     );
   } catch (err) {
     return res.status(500).json({ error: "Internal server error" });
@@ -68,6 +98,7 @@ router.post("/reconciliations", requireAuth, async (req, res) => {
       .returning();
 
     await logAudit(req.session.userId!, "reconciliation", rec.id, "created", null, `${dateFrom} - ${dateTo}`);
+    emit(req, "reconciliation.created", { id: rec.id }, speditionId);
 
     const [sped] = await db.select().from(speditionenTable).where(eq(speditionenTable.id, speditionId)).limit(1);
     const [creator] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!)).limit(1);
@@ -86,12 +117,13 @@ router.post("/reconciliations", requireAuth, async (req, res) => {
 router.get("/reconciliations/:id", requireAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const [rec] = await db
-      .select()
-      .from(palletReconciliationsTable)
-      .where(eq(palletReconciliationsTable.id, id))
-      .limit(1);
-    if (!rec) return res.status(404).json({ error: "Not found" });
+    const role = req.session.role!;
+    const sessionSpeditionId = req.session.speditionId;
+
+    const result = await getRecWithScope(id, role, sessionSpeditionId);
+    if (result === null) return res.status(404).json({ error: "Not found" });
+    if (result === "forbidden") return res.status(403).json({ error: "Forbidden" });
+    const rec = result;
 
     const [sped] = await db.select().from(speditionenTable).where(eq(speditionenTable.id, rec.speditionId)).limit(1);
     const creator = rec.createdBy
@@ -112,18 +144,27 @@ router.patch("/reconciliations/:id", requireAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
     const role = req.session.role!;
+    const sessionSpeditionId = req.session.speditionId;
+
+    if (["comet_lager", "comet_viewer", "speditions_bearbeiter", "speditions_viewer"].includes(role)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const result = await getRecWithScope(id, role, sessionSpeditionId);
+    if (result === null) return res.status(404).json({ error: "Not found" });
+    if (result === "forbidden") return res.status(403).json({ error: "Forbidden" });
+    const existing = result;
+
     const { status, speditionBalance, cometBalance } = req.body;
-
-    const [existing] = await db
-      .select()
-      .from(palletReconciliationsTable)
-      .where(eq(palletReconciliationsTable.id, id))
-      .limit(1);
-    if (!existing) return res.status(404).json({ error: "Not found" });
-
     const updates: any = { updatedAt: new Date() };
-    if (status !== undefined) updates.status = status;
-    if (speditionBalance !== undefined && ["speditions_admin"].includes(role)) {
+
+    if (status !== undefined) {
+      if (!["comet_admin", "comet_leitstand"].includes(role)) {
+        return res.status(403).json({ error: "Only COMET can change reconciliation status" });
+      }
+      updates.status = status;
+    }
+    if (speditionBalance !== undefined && role === "speditions_admin") {
       updates.speditionBalance = speditionBalance;
     }
     if (cometBalance !== undefined && ["comet_admin", "comet_leitstand"].includes(role)) {
@@ -136,9 +177,29 @@ router.patch("/reconciliations/:id", requireAuth, async (req, res) => {
       .where(eq(palletReconciliationsTable.id, id))
       .returning();
 
-    await logAudit(req.session.userId!, "reconciliation", id, "updated", existing.status, status ?? existing.status);
+    for (const [field, newVal] of Object.entries(updates)) {
+      if (field === "updatedAt") continue;
+      const oldVal = (existing as any)[field];
+      if (String(oldVal) !== String(newVal)) {
+        await logAudit(
+          req.session.userId!,
+          "reconciliation",
+          id,
+          field,
+          String(oldVal ?? ""),
+          String(newVal ?? ""),
+        );
+      }
+    }
 
-    return res.json({ ...rec, speditionName: null, createdByName: null });
+    emit(req, "reconciliation.updated", { id }, existing.speditionId);
+
+    const [sped] = await db.select().from(speditionenTable).where(eq(speditionenTable.id, rec.speditionId)).limit(1);
+    const creator = rec.createdBy
+      ? (await db.select().from(usersTable).where(eq(usersTable.id, rec.createdBy)).limit(1))[0]
+      : null;
+
+    return res.json({ ...rec, speditionName: sped?.name ?? null, createdByName: creator?.username ?? null });
   } catch (err) {
     return res.status(500).json({ error: "Internal server error" });
   }
@@ -147,6 +208,13 @@ router.patch("/reconciliations/:id", requireAuth, async (req, res) => {
 router.get("/reconciliations/:id/comments", requireAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
+    const role = req.session.role!;
+    const sessionSpeditionId = req.session.speditionId;
+
+    const result = await getRecWithScope(id, role, sessionSpeditionId);
+    if (result === null) return res.status(404).json({ error: "Not found" });
+    if (result === "forbidden") return res.status(403).json({ error: "Forbidden" });
+
     const comments = await db
       .select()
       .from(reconciliationCommentsTable)
@@ -165,7 +233,7 @@ router.get("/reconciliations/:id/comments", requireAuth, async (req, res) => {
         role: userMap[c.userId]?.role ?? "unknown",
         comment: c.comment,
         createdAt: c.createdAt,
-      }))
+      })),
     );
   } catch (err) {
     return res.status(500).json({ error: "Internal server error" });
@@ -175,6 +243,18 @@ router.get("/reconciliations/:id/comments", requireAuth, async (req, res) => {
 router.post("/reconciliations/:id/comments", requireAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
+    const role = req.session.role!;
+    const sessionSpeditionId = req.session.speditionId;
+
+    if (role === "comet_viewer" || role === "speditions_viewer") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const result = await getRecWithScope(id, role, sessionSpeditionId);
+    if (result === null) return res.status(404).json({ error: "Not found" });
+    if (result === "forbidden") return res.status(403).json({ error: "Forbidden" });
+    const rec = result;
+
     const { comment } = req.body;
     if (!comment) return res.status(400).json({ error: "Comment required" });
 
@@ -182,6 +262,9 @@ router.post("/reconciliations/:id/comments", requireAuth, async (req, res) => {
       .insert(reconciliationCommentsTable)
       .values({ reconciliationId: id, userId: req.session.userId!, comment })
       .returning();
+
+    await logAudit(req.session.userId!, "reconciliation", id, "comment_added", null, comment.slice(0, 100));
+    emit(req, "reconciliation.comment_added", { id }, rec.speditionId);
 
     const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!)).limit(1);
 
