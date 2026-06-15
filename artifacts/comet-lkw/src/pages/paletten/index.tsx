@@ -16,7 +16,7 @@ export default function PalettenPage() {
   const isCometUser = user?.role && ["comet_admin", "comet_leitstand", "comet_lager", "comet_viewer"].includes(user.role);
   const canWrite = user?.role && ["comet_admin", "comet_leitstand", "comet_lager", "speditions_admin", "speditions_bearbeiter"].includes(user.role);
 
-  const [filterSpeditionId, setFilterSpeditionId] = useState<string>("");
+  const [filterSpeditionId, setFilterSpeditionId] = useState<string>("__all__");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -24,14 +24,14 @@ export default function PalettenPage() {
   const { data: speditionen } = useListSpeditionen();
   const { data: balances, isLoading: loadingBalances } = useListPalletBalances();
   const { data: movements, isLoading: loadingMovements } = useListPalletMovements({
-    speditionId: filterSpeditionId ? Number(filterSpeditionId) : undefined,
+    speditionId: (filterSpeditionId && filterSpeditionId !== "__all__") ? Number(filterSpeditionId) : undefined,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
   });
 
   const handleExport = () => {
     const params = new URLSearchParams();
-    if (filterSpeditionId) params.set("speditionId", filterSpeditionId);
+    if (filterSpeditionId && filterSpeditionId !== "__all__") params.set("speditionId", filterSpeditionId);
     if (dateFrom) params.set("dateFrom", dateFrom);
     if (dateTo) params.set("dateTo", dateTo);
     window.open(`/api/pallet-export?${params.toString()}`, "_blank");
@@ -108,7 +108,7 @@ export default function PalettenPage() {
                 <SelectValue placeholder="Alle" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Alle</SelectItem>
+                <SelectItem value="__all__">Alle</SelectItem>
                 {speditionen?.map(s => (
                   <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
                 ))}
@@ -123,8 +123,8 @@ export default function PalettenPage() {
             <label className="text-xs font-medium text-slate-500">Bis</label>
             <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-9 w-36 bg-white" />
           </div>
-          {(filterSpeditionId || dateFrom || dateTo) && (
-            <Button variant="ghost" size="sm" onClick={() => { setFilterSpeditionId(""); setDateFrom(""); setDateTo(""); }}>
+          {(filterSpeditionId !== "__all__" || dateFrom || dateTo) && (
+            <Button variant="ghost" size="sm" onClick={() => { setFilterSpeditionId("__all__"); setDateFrom(""); setDateTo(""); }}>
               Zurücksetzen
             </Button>
           )}

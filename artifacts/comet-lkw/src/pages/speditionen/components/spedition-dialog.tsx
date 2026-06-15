@@ -1,21 +1,76 @@
-import { useState } from "react";
-import { useCreateSpedition, getListSpeditionenQueryKey } from "@workspace/api-client-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { useState, useEffect } from "react";
+import {
+  useCreateSpedition,
+  useUpdateSpedition,
+  useListSpeditionen,
+  useListSpeditionPermissions,
+  useSetSpeditionPermission,
+  useRevokeSpeditionPermission,
+  getListSpeditionenQueryKey,
+  getListSpeditionPermissionsQueryKey,
+} from "@workspace/api-client-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Trash2, Plus } from "lucide-react";
 
-export function SpeditionDialog({ open, onOpenChange }: { open: boolean, onOpenChange: (open: boolean) => void }) {
+interface Spedition {
+  id: number;
+  name: string;
+  kuerzel?: string | null;
+  ansprechpartner?: string | null;
+  email?: string | null;
+  telefon?: string | null;
+  status?: string;
+  bemerkungen?: string | null;
+}
+
+interface SpeditionDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  editSpedition?: Spedition | null;
+}
+
+export function SpeditionDialog({ open, onOpenChange, editSpedition }: SpeditionDialogProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  
-  const [name, setName] = useState("");
-  const [kuerzel, setKuerzel] = useState("");
-  const [ansprechpartner, setAnsprechpartner] = useState("");
-  const [email, setEmail] = useState("");
+  const { data: allSpeditionen } = useListSpeditionen();
+  const isEditing = !!editSpedition;
+
+  const [form, setForm] = useState({
+    name: "", kuerzel: "", ansprechpartner: "", email: "", telefon: "", status: "aktiv", bemerkungen: "",
+  });
+
+  useEffect(() => {
+    if (open) {
+      if (editSpedition) {
+        setForm({
+          name: editSpedition.name || "",
+          kuerzel: editSpedition.kuerzel || "",
+          ansprechpartner: editSpedition.ansprechpartner || "",
+          email: editSpedition.email || "",
+          telefon: editSpedition.telefon || "",
+          status: editSpedition.status || "aktiv",
+          bemerkungen: editSpedition.bemerkungen || "",
+        });
+      } else {
+        setForm({ name: "", kuerzel: "", ansprechpartner: "", email: "", telefon: "", status: "aktiv", bemerkungen: "" });
+      }
+    }
+  }, [open, editSpedition]);
+
+  const { data: permissions } = useListSpeditionPermissions(editSpedition?.id || 0, {
+    query: { enabled: isEditing && open, queryKey: getListSpeditionPermissionsQueryKey(editSpedition?.id || 0) },
+  });
+
+  const [newReceivingId, setNewReceivingId] = useState("__none__");
+  const [newLevel, setNewLevel] = useState("view");
 
   const createMutation = useCreateSpedition({
     mutation: {
@@ -23,51 +78,190 @@ export function SpeditionDialog({ open, onOpenChange }: { open: boolean, onOpenC
         queryClient.invalidateQueries({ queryKey: getListSpeditionenQueryKey() });
         toast({ title: "Spedition erstellt" });
         onOpenChange(false);
-      }
-    }
+      },
+      onError: (e: any) => toast({ title: e?.response?.data?.error ?? "Fehler", variant: "destructive" }),
+    },
+  });
+
+  const updateMutation = useUpdateSpedition({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListSpeditionenQueryKey() });
+        toast({ title: "Spedition gespeichert" });
+        onOpenChange(false);
+      },
+      onError: (e: any) => toast({ title: e?.response?.data?.error ?? "Fehler", variant: "destructive" }),
+    },
+  });
+
+  const setPermMutation = useSetSpeditionPermission({
+    mutation: {
+      onSuccess: () => {
+        if (editSpedition) queryClient.invalidateQueries({ queryKey: getListSpeditionPermissionsQueryKey(editSpedition.id) });
+        toast({ title: "Berechtigung gesetzt" });
+        setNewReceivingId("__none__"); setNewLevel("view");
+      },
+      onError: (e: any) => toast({ title: e?.response?.data?.error ?? "Fehler", variant: "destructive" }),
+    },
+  });
+
+  const delPermMutation = useRevokeSpeditionPermission({
+    mutation: {
+      onSuccess: () => {
+        if (editSpedition) queryClient.invalidateQueries({ queryKey: getListSpeditionPermissionsQueryKey(editSpedition.id) });
+        toast({ title: "Berechtigung entfernt" });
+      },
+      onError: () => toast({ title: "Fehler beim Entfernen", variant: "destructive" }),
+    },
   });
 
   const handleSave = () => {
-    createMutation.mutate({
-      data: {
-        name,
-        kuerzel,
-        ansprechpartner,
-        email,
-        status: "aktiv"
-      }
+    if (!form.name.trim()) {
+      toast({ title: "Name erforderlich", variant: "destructive" });
+      return;
+    }
+    if (isEditing && editSpedition) {
+      updateMutation.mutate({ id: editSpedition.id, data: form as any });
+    } else {
+      createMutation.mutate({ data: { ...form, status: form.status as any } });
+    }
+  };
+
+  const handleAddPermission = () => {
+    if (!editSpedition || newReceivingId === "__none__") return;
+    setPermMutation.mutate({
+      id: editSpedition.id,
+      data: { receivingSpeditionId: parseInt(newReceivingId), permissionLevel: newLevel as any },
     });
   };
 
+  const isSaving = createMutation.isPending || updateMutation.isPending;
+
+  const otherSpeditionen = allSpeditionen?.filter(s =>
+    s.id !== editSpedition?.id && !(permissions ?? []).some(p => p.receivingSpeditionId === s.id)
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Neue Spedition</DialogTitle>
-          <DialogDescription>Fügen Sie einen neuen Logistikpartner hinzu.</DialogDescription>
+          <DialogTitle>{isEditing ? `${editSpedition!.name} bearbeiten` : "Neue Spedition"}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label>Name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>Kürzel</Label>
-            <Input value={kuerzel} onChange={(e) => setKuerzel(e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>Ansprechpartner</Label>
-            <Input value={ansprechpartner} onChange={(e) => setAnsprechpartner(e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>E-Mail</Label>
-            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          </div>
-        </div>
+
+        <Tabs defaultValue="stamm">
+          <TabsList className="mb-4 w-full">
+            <TabsTrigger value="stamm" className="flex-1">Stammdaten</TabsTrigger>
+            {isEditing && <TabsTrigger value="rechte" className="flex-1">Zugriffsrechte</TabsTrigger>}
+          </TabsList>
+
+          <TabsContent value="stamm" className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1 col-span-2">
+                <Label>Name *</Label>
+                <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label>Kürzel</Label>
+                <Input value={form.kuerzel} onChange={e => setForm(f => ({ ...f, kuerzel: e.target.value }))} placeholder="MTG" />
+              </div>
+              <div className="space-y-1">
+                <Label>Status</Label>
+                <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="aktiv">Aktiv</SelectItem>
+                    <SelectItem value="inaktiv">Inaktiv</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Ansprechpartner</Label>
+                <Input value={form.ansprechpartner} onChange={e => setForm(f => ({ ...f, ansprechpartner: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label>Telefon</Label>
+                <Input value={form.telefon} onChange={e => setForm(f => ({ ...f, telefon: e.target.value }))} />
+              </div>
+              <div className="space-y-1 col-span-2">
+                <Label>E-Mail</Label>
+                <Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
+              </div>
+              <div className="space-y-1 col-span-2">
+                <Label>Bemerkungen</Label>
+                <Input value={form.bemerkungen} onChange={e => setForm(f => ({ ...f, bemerkungen: e.target.value }))} />
+              </div>
+            </div>
+          </TabsContent>
+
+          {isEditing && (
+            <TabsContent value="rechte" className="space-y-4">
+              <p className="text-sm text-slate-500">
+                Legen Sie fest, welche anderen Speditionen die Sendungen dieser Spedition einsehen oder bearbeiten dürfen.
+              </p>
+
+              <div className="space-y-2">
+                {!permissions || permissions.length === 0 ? (
+                  <p className="text-sm text-slate-400 text-center py-3">Keine Berechtigungen vergeben.</p>
+                ) : permissions.map(p => (
+                  <div key={p.receivingSpeditionId} className="flex items-center justify-between border border-slate-200 rounded-md px-3 py-2 bg-slate-50">
+                    <span className="text-sm font-medium text-slate-700">{p.receivingSpeditionName}</span>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className={p.permissionLevel === "edit" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-slate-100 text-slate-600"}>
+                        {p.permissionLevel === "edit" ? "Bearbeiten" : "Ansehen"}
+                      </Badge>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-red-400 hover:text-red-600 hover:bg-red-50"
+                        onClick={() => delPermMutation.mutate({ id: editSpedition!.id, receivingId: p.receivingSpeditionId })}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {otherSpeditionen && otherSpeditionen.length > 0 && (
+                <div className="flex gap-2 items-end pt-2 border-t border-slate-100">
+                  <div className="flex-1 space-y-1">
+                    <Label className="text-xs">Spedition</Label>
+                    <Select value={newReceivingId} onValueChange={setNewReceivingId}>
+                      <SelectTrigger className="h-9"><SelectValue placeholder="Wählen..." /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">— Wählen —</SelectItem>
+                        {otherSpeditionen.map(s => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="w-36 space-y-1">
+                    <Label className="text-xs">Niveau</Label>
+                    <Select value={newLevel} onValueChange={setNewLevel}>
+                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="view">Ansehen</SelectItem>
+                        <SelectItem value="edit">Bearbeiten</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="h-9"
+                    onClick={handleAddPermission}
+                    disabled={newReceivingId === "__none__" || setPermMutation.isPending}
+                  >
+                    {setPermMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                  </Button>
+                </div>
+              )}
+            </TabsContent>
+          )}
+        </Tabs>
+
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Abbrechen</Button>
-          <Button onClick={handleSave} disabled={createMutation.isPending}>
-            {createMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Schließen</Button>
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             Speichern
           </Button>
         </DialogFooter>

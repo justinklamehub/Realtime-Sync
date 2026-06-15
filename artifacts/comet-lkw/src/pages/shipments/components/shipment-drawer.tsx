@@ -155,7 +155,7 @@ export function ShipmentDrawer({ shipmentId, open, onOpenChange }: ShipmentDrawe
     if (isCometUser) {
       data.ataDate = form.ataDate || undefined;
       data.ataTime = form.ataTime || undefined;
-      data.tor = form.tor || undefined;
+      data.tor = (form.tor && form.tor !== "__none__") ? form.tor : undefined;
       data.status = form.status;
     }
 
@@ -290,7 +290,7 @@ export function ShipmentDrawer({ shipmentId, open, onOpenChange }: ShipmentDrawe
                     <Select value={form.tor} onValueChange={v => setForm(f => ({ ...f, tor: v }))} disabled={!isCometUser}>
                       <SelectTrigger className="h-9"><SelectValue placeholder="—" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">—</SelectItem>
+                        <SelectItem value="__none__">—</SelectItem>
                         {TOR_OPTIONS.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
                       </SelectContent>
                     </Select>

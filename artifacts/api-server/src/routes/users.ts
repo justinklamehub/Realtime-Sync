@@ -80,12 +80,11 @@ router.post("/users", requireAuth, async (req, res) => {
       if (!["speditions_admin", "speditions_bearbeiter", "speditions_viewer"].includes(newRole)) {
         return res.status(403).json({ error: "Cannot create COMET roles" });
       }
-      if (speditionId && speditionId !== sessionSpeditionId) {
-        return res.status(403).json({ error: "Can only create users in own spedition" });
-      }
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
+    const resolvedSpeditionId = role === "speditions_admin" ? sessionSpeditionId ?? null : speditionId ?? null;
+
     const [user] = await db
       .insert(usersTable)
       .values({
@@ -93,7 +92,7 @@ router.post("/users", requireAuth, async (req, res) => {
         email,
         passwordHash,
         role: newRole,
-        speditionId: speditionId || null,
+        speditionId: resolvedSpeditionId,
         isActive: isActive !== false,
       })
       .returning();
@@ -189,7 +188,7 @@ router.patch("/users/:id", requireAuth, async (req, res) => {
     if (username !== undefined) updates.username = username;
     if (email !== undefined) updates.email = email;
     if (newRole !== undefined) updates.role = newRole;
-    if (speditionId !== undefined) updates.speditionId = speditionId;
+    if (role === "comet_admin" && speditionId !== undefined) updates.speditionId = speditionId;
     if (isActive !== undefined) updates.isActive = isActive;
     if (password) updates.passwordHash = await bcrypt.hash(password, 12);
     updates.updatedAt = new Date();

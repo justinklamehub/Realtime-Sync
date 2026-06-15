@@ -294,13 +294,13 @@ export default function AbstimmungenPage() {
   const role = user?.role ?? "";
   const isCometAdmin = ["comet_admin", "comet_leitstand"].includes(role);
 
-  const [filterStatus, setFilterStatus] = useState<string>("");
+  const [filterStatus, setFilterStatus] = useState<string>("__all__");
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
   const { data: reconciliations, isLoading } = useListReconciliations(
-    filterStatus ? { status: filterStatus } : undefined
+    (filterStatus && filterStatus !== "__all__") ? { status: filterStatus } : undefined
   );
 
   const handleRowClick = (id: number) => {
@@ -331,13 +331,13 @@ export default function AbstimmungenPage() {
               <SelectValue placeholder="Alle Status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Alle</SelectItem>
+              <SelectItem value="__all__">Alle</SelectItem>
               {STATUS_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
-        {filterStatus && (
-          <Button variant="ghost" size="sm" className="self-end" onClick={() => setFilterStatus("")}>Zurücksetzen</Button>
+        {filterStatus !== "__all__" && (
+          <Button variant="ghost" size="sm" className="self-end" onClick={() => setFilterStatus("__all__")}>Zurücksetzen</Button>
         )}
       </div>
 

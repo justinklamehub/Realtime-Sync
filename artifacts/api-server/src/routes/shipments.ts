@@ -257,8 +257,18 @@ router.patch("/shipments/:id", requireAuth, async (req, res) => {
       }
     }
 
-    const updates = { ...req.body };
     const isCometUser = ["comet_admin", "comet_leitstand", "comet_lager"].includes(role);
+
+    const SPED_ALLOWED = ["bezeichnung", "kennzeichen", "relation", "lkwArt", "etaDate", "etaTime", "bemerkungen", "telefon"];
+    const COMET_ALLOWED = [...SPED_ALLOWED, "status", "tor", "ataDate", "ataTime", "gesperrtFuerSpedition", "cometBearbeitet", "speditionId", "subSpeditionId"];
+    const allowedFields = isCometUser ? COMET_ALLOWED : SPED_ALLOWED;
+
+    const updates: Record<string, any> = {};
+    for (const field of allowedFields) {
+      if ((req.body as Record<string, any>)[field] !== undefined) {
+        updates[field] = (req.body as Record<string, any>)[field];
+      }
+    }
 
     if (isCometUser) {
       const editingOperative = COMET_OPERATIVE_FIELDS.some((f) => updates[f] !== undefined);

@@ -49,7 +49,11 @@ export const sessionMiddleware = session({
     tableName: "session",
     createTableIfMissing: true,
   }),
-  secret: process.env.SESSION_SECRET || "comet-lkw-secret-2024-change-in-production",
+  secret: (() => {
+    const s = process.env.SESSION_SECRET;
+    if (!s) throw new Error("SESSION_SECRET environment variable is required but not set.");
+    return s;
+  })(),
   resave: false,
   saveUninitialized: false,
   cookie: {
