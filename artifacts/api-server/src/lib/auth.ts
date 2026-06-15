@@ -27,6 +27,7 @@ declare module "express-session" {
     userId: number;
     role: Role;
     speditionId: number | null;
+    username: string;
   }
 }
 

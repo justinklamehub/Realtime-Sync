@@ -32,6 +32,7 @@ router.post("/auth/login", async (req, res) => {
     req.session.userId = user.id;
     req.session.role = user.role as any;
     req.session.speditionId = user.speditionId;
+    req.session.username = user.username;
 
     let speditionName: string | null = null;
     if (user.speditionId) {

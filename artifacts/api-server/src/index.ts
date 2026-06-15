@@ -19,9 +19,13 @@ if (Number.isNaN(port) || port <= 0) {
 
 const httpServer = createServer(app);
 
+const allowedOrigin = process.env["REPLIT_DEV_DOMAIN"]
+  ? `https://${process.env["REPLIT_DEV_DOMAIN"]}`
+  : process.env["FRONTEND_URL"] ?? false;
+
 const io = new SocketIOServer(httpServer, {
   cors: {
-    origin: "*",
+    origin: allowedOrigin,
     methods: ["GET", "POST"],
     credentials: true,
   },
