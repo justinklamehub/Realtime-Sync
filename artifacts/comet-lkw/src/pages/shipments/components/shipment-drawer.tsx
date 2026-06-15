@@ -12,6 +12,11 @@ import {
   getGetShipmentQueryKey,
   getListShipmentsQueryKey,
   getGetShipmentHistoryQueryKey,
+  useListLkwAustraege,
+  useCreateLkwAustrag,
+  useDeleteLkwAustrag,
+  getListLkwAustraegeQueryKey,
+  type LkwAustragInput,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Lock, LockOpen, AlertCircle, Pencil } from "lucide-react";
+import { Loader2, Lock, LockOpen, AlertCircle, Pencil, Trash2, ClipboardCheck, Plus } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
@@ -65,6 +70,9 @@ export function ShipmentDrawer({ shipmentId, open, onOpenChange }: ShipmentDrawe
   );
 
   const { data: speditionen } = useListSpeditionen();
+  const { data: austraege } = useListLkwAustraege(shipmentId || undefined, {
+    query: { enabled: !!shipmentId && open && isCometUser, queryKey: getListLkwAustraegeQueryKey(shipmentId || undefined) },
+  });
 
   useEffect(() => {
     if (!shipmentId || !open) {
@@ -91,6 +99,58 @@ export function ShipmentDrawer({ shipmentId, open, onOpenChange }: ShipmentDrawe
   const isLocked = !!shipment?.gesperrtFuerSpedition;
   const canEdit = !isViewer && (!isLocked || isCometUser);
   const spedCanEdit = isSpedUser && !isLocked;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const emptyAustrag = (): LkwAustragInput => ({
+    shipmentId: shipmentId ?? undefined,
+    ladelistennummer: "",
+    palettenscheinnummer: "",
+    datum: today,
+    kennzeichen: "",
+    beauftragteSpeditionId: null,
+    subSpedition: "",
+    vonCometEuropaletten: 0,
+    vonCometLadungssicherung: 0,
+    vonDefektePaletten: 0,
+    anCometEuropaletten: 0,
+    anCometLadungssicherung: 0,
+    anDefektePaletten: 0,
+  });
+  const [austragForm, setAustragForm] = useState<LkwAustragInput>(emptyAustrag());
+  const [showAustragForm, setShowAustragForm] = useState(false);
+
+  const createAustragMutation = useCreateLkwAustrag({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListLkwAustraegeQueryKey(shipmentId || undefined) });
+        toast({ title: "Austrag erfasst" });
+        setShowAustragForm(false);
+        setAustragForm(emptyAustrag());
+      },
+      onError: (e: any) => toast({ title: e?.response?.data?.error ?? "Fehler", variant: "destructive" }),
+    },
+  });
+
+  const deleteAustragMutation = useDeleteLkwAustrag({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListLkwAustraegeQueryKey(shipmentId || undefined) });
+        toast({ title: "Austrag gelöscht" });
+      },
+      onError: () => toast({ title: "Fehler beim Löschen", variant: "destructive" }),
+    },
+  });
+
+  useEffect(() => {
+    if (open && shipment) {
+      setAustragForm(f => ({
+        ...f,
+        shipmentId: shipmentId ?? undefined,
+        kennzeichen: shipment.kennzeichen || "",
+        beauftragteSpeditionId: shipment.speditionId ?? null,
+      }));
+    }
+  }, [open, shipment, shipmentId]);
 
   const [form, setForm] = useState({
     bezeichnung: "",
@@ -247,6 +307,7 @@ export function ShipmentDrawer({ shipmentId, open, onOpenChange }: ShipmentDrawe
               <TabsTrigger value="details" className="flex-1">Details</TabsTrigger>
               {isEditing && <TabsTrigger value="history" className="flex-1">Verlauf</TabsTrigger>}
               {isEditing && <TabsTrigger value="paletten" className="flex-1">Paletten</TabsTrigger>}
+              {isEditing && isCometUser && <TabsTrigger value="austragen" className="flex-1">Austragen</TabsTrigger>}
             </TabsList>
 
             <TabsContent value="details" className="space-y-4">
@@ -406,6 +467,149 @@ export function ShipmentDrawer({ shipmentId, open, onOpenChange }: ShipmentDrawe
                       </div>
                     ))}
                   </div>
+                )}
+              </TabsContent>
+            )}
+            {isEditing && isCometUser && (
+              <TabsContent value="austragen" className="space-y-4">
+
+                {/* Existing Austraege list */}
+                {austraege && austraege.length > 0 && (
+                  <div className="space-y-2">
+                    {austraege.map(a => (
+                      <div key={a.id} className="border border-slate-200 rounded-md p-3 bg-slate-50 text-sm">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <span className="font-medium text-slate-800">{format(new Date(a.datum), "dd.MM.yyyy")}</span>
+                            {a.ladelistennummer && <span className="ml-2 text-slate-500">LL: {a.ladelistennummer}</span>}
+                            {a.palettenscheinnummer && <span className="ml-2 text-slate-500">PS: {a.palettenscheinnummer}</span>}
+                          </div>
+                          {isCometAdmin && (
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-red-400 hover:text-red-600" onClick={() => deleteAustragMutation.mutate(a.id)}>
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-600">
+                          {a.kennzeichen && <div><span className="text-slate-400">Kennzeichen:</span> {a.kennzeichen}</div>}
+                          {a.beauftragteSpeditionName && <div><span className="text-slate-400">Sped.:</span> {a.beauftragteSpeditionName}</div>}
+                          {a.subSpedition && <div className="col-span-2"><span className="text-slate-400">Sub-Sped.:</span> {a.subSpedition}</div>}
+                        </div>
+                        <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                          <div className="bg-white border border-slate-200 rounded p-1.5">
+                            <div className="text-slate-400 mb-0.5">Von COMET</div>
+                            <div>Europal.: <b>{a.vonCometEuropaletten}</b></div>
+                            <div>Lasich.: <b>{a.vonCometLadungssicherung}</b></div>
+                            <div className="text-amber-600">Defekt: <b>{a.vonDefektePaletten}</b></div>
+                          </div>
+                          <div className="bg-white border border-slate-200 rounded p-1.5">
+                            <div className="text-slate-400 mb-0.5">An COMET</div>
+                            <div>Europal.: <b>{a.anCometEuropaletten}</b></div>
+                            <div>Lasich.: <b>{a.anCometLadungssicherung}</b></div>
+                            <div className="text-amber-600">Defekt: <b>{a.anDefektePaletten}</b></div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* New Austrag form */}
+                {showAustragForm ? (
+                  <div className="border border-blue-200 rounded-lg p-4 bg-blue-50/30 space-y-3">
+                    <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                      <ClipboardCheck className="w-4 h-4 text-primary" />
+                      Neuer Austrag
+                    </h4>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-slate-500">Ladelistennummer</Label>
+                        <Input className="h-8 text-sm" value={austragForm.ladelistennummer ?? ""} onChange={e => setAustragForm(f => ({ ...f, ladelistennummer: e.target.value }))} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-slate-500">Palettenscheinnummer</Label>
+                        <Input className="h-8 text-sm" value={austragForm.palettenscheinnummer ?? ""} onChange={e => setAustragForm(f => ({ ...f, palettenscheinnummer: e.target.value }))} />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-500">Datum</Label>
+                      <Input type="date" className="h-8 text-sm" value={austragForm.datum} onChange={e => setAustragForm(f => ({ ...f, datum: e.target.value }))} />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-500">KFZ Kennzeichen</Label>
+                      <Input className="h-8 text-sm" value={austragForm.kennzeichen ?? ""} onChange={e => setAustragForm(f => ({ ...f, kennzeichen: e.target.value }))} />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-500">Beauftragte Spedition</Label>
+                      <Select value={austragForm.beauftragteSpeditionId ? String(austragForm.beauftragteSpeditionId) : "__none__"} onValueChange={v => setAustragForm(f => ({ ...f, beauftragteSpeditionId: v === "__none__" ? null : Number(v) }))}>
+                        <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Wählen..." /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">—</SelectItem>
+                          {speditionen?.map(s => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-500">Sub-Spedition</Label>
+                      <Input className="h-8 text-sm" value={austragForm.subSpedition ?? ""} onChange={e => setAustragForm(f => ({ ...f, subSpedition: e.target.value }))} placeholder="Optional" />
+                    </div>
+
+                    {/* Von COMET */}
+                    <div className="rounded-md border border-slate-200 p-3 bg-white space-y-2">
+                      <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Von COMET</div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-slate-500">Europaletten</Label>
+                          <Input type="number" min={0} className="h-8 text-sm" value={austragForm.vonCometEuropaletten ?? 0} onChange={e => setAustragForm(f => ({ ...f, vonCometEuropaletten: Number(e.target.value) }))} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-slate-500">Ladungssich.</Label>
+                          <Input type="number" min={0} className="h-8 text-sm" value={austragForm.vonCometLadungssicherung ?? 0} onChange={e => setAustragForm(f => ({ ...f, vonCometLadungssicherung: Number(e.target.value) }))} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-slate-500 text-amber-600">davon defekt</Label>
+                          <Input type="number" min={0} className="h-8 text-sm" value={austragForm.vonDefektePaletten ?? 0} onChange={e => setAustragForm(f => ({ ...f, vonDefektePaletten: Number(e.target.value) }))} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* An COMET */}
+                    <div className="rounded-md border border-slate-200 p-3 bg-white space-y-2">
+                      <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">An COMET</div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-slate-500">Europaletten</Label>
+                          <Input type="number" min={0} className="h-8 text-sm" value={austragForm.anCometEuropaletten ?? 0} onChange={e => setAustragForm(f => ({ ...f, anCometEuropaletten: Number(e.target.value) }))} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-slate-500">Ladungssich.</Label>
+                          <Input type="number" min={0} className="h-8 text-sm" value={austragForm.anCometLadungssicherung ?? 0} onChange={e => setAustragForm(f => ({ ...f, anCometLadungssicherung: Number(e.target.value) }))} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-slate-500 text-amber-600">davon defekt</Label>
+                          <Input type="number" min={0} className="h-8 text-sm" value={austragForm.anDefektePaletten ?? 0} onChange={e => setAustragForm(f => ({ ...f, anDefektePaletten: Number(e.target.value) }))} />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-1">
+                      <Button variant="outline" size="sm" onClick={() => { setShowAustragForm(false); setAustragForm(emptyAustrag()); }}>Abbrechen</Button>
+                      <Button size="sm" onClick={() => createAustragMutation.mutate(austragForm)} disabled={createAustragMutation.isPending}>
+                        {createAustragMutation.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : null}
+                        Speichern
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button size="sm" variant="outline" className="w-full" onClick={() => setShowAustragForm(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Neuer Austrag
+                  </Button>
                 )}
               </TabsContent>
             )}
