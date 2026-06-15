@@ -11,6 +11,7 @@ import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { logAudit } from "../lib/audit";
 import { emitToRooms } from "../lib/socket-emit";
+import { can } from "../lib/permissions";
 import type { Server as IOServer } from "socket.io";
 
 const router = Router();
@@ -135,8 +136,8 @@ router.post("/shipments", requireAuth, async (req, res) => {
     const role = req.session.role!;
     const sessionSpeditionId = req.session.speditionId;
 
-    if (["comet_viewer", "speditions_viewer"].includes(role)) {
-      return res.status(403).json({ error: "Forbidden" });
+    if (!(await can(role, "shipment.create"))) {
+      return res.status(403).json({ error: "Keine Berechtigung zum Erstellen von Sendungen" });
     }
 
     const body = req.body;
@@ -170,8 +171,8 @@ router.post("/shipments", requireAuth, async (req, res) => {
 router.post("/shipments/bulk", requireAuth, async (req, res) => {
   try {
     const role = req.session.role!;
-    if (["comet_viewer", "speditions_viewer"].includes(role)) {
-      return res.status(403).json({ error: "Forbidden" });
+    if (!(await can(role, "shipment.create"))) {
+      return res.status(403).json({ error: "Keine Berechtigung" });
     }
 
     const { shipments } = req.body;
@@ -246,8 +247,8 @@ router.patch("/shipments/:id", requireAuth, async (req, res) => {
     const sessionSpeditionId = req.session.speditionId;
     const id = Number(req.params.id);
 
-    if (["comet_viewer", "speditions_viewer"].includes(role)) {
-      return res.status(403).json({ error: "Forbidden" });
+    if (!(await can(role, "shipment.edit"))) {
+      return res.status(403).json({ error: "Keine Berechtigung" });
     }
 
     const [existing] = await db.select().from(shipmentsTable).where(eq(shipmentsTable.id, id)).limit(1);
@@ -320,8 +321,8 @@ router.patch("/shipments/:id", requireAuth, async (req, res) => {
 router.delete("/shipments/:id", requireAuth, async (req, res) => {
   try {
     const role = req.session.role!;
-    if (!["comet_admin", "comet_leitstand"].includes(role)) {
-      return res.status(403).json({ error: "Forbidden" });
+    if (!(await can(role, "shipment.delete"))) {
+      return res.status(403).json({ error: "Keine Berechtigung" });
     }
     const id = Number(req.params.id);
     const [existing] = await db.select().from(shipmentsTable).where(eq(shipmentsTable.id, id)).limit(1);
@@ -338,8 +339,8 @@ router.delete("/shipments/:id", requireAuth, async (req, res) => {
 router.post("/shipments/:id/lock", requireAuth, async (req, res) => {
   try {
     const role = req.session.role!;
-    if (!["comet_admin", "comet_leitstand"].includes(role)) {
-      return res.status(403).json({ error: "Forbidden" });
+    if (!(await can(role, "shipment.lock"))) {
+      return res.status(403).json({ error: "Keine Berechtigung" });
     }
     const id = Number(req.params.id);
     const [existing] = await db.select().from(shipmentsTable).where(eq(shipmentsTable.id, id)).limit(1);
@@ -360,8 +361,8 @@ router.post("/shipments/:id/lock", requireAuth, async (req, res) => {
 router.post("/shipments/:id/unlock", requireAuth, async (req, res) => {
   try {
     const role = req.session.role!;
-    if (!["comet_admin", "comet_leitstand"].includes(role)) {
-      return res.status(403).json({ error: "Forbidden" });
+    if (!(await can(role, "shipment.lock"))) {
+      return res.status(403).json({ error: "Keine Berechtigung" });
     }
     const id = Number(req.params.id);
     const [existing] = await db.select().from(shipmentsTable).where(eq(shipmentsTable.id, id)).limit(1);

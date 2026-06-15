@@ -5,11 +5,11 @@ import { eq } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { logAudit } from "../lib/audit";
 import { emitToRooms } from "../lib/socket-emit";
+import { can } from "../lib/permissions";
 import type { Server as IOServer } from "socket.io";
 
 const router = Router();
 
-const COMET_WRITE_ROLES = ["comet_admin", "comet_leitstand", "comet_lager"];
 const COMET_ALL_ROLES = ["comet_admin", "comet_leitstand", "comet_lager", "comet_viewer"];
 
 function getIO(req: any): IOServer | null {
@@ -55,8 +55,8 @@ router.get("/austraege", requireAuth, async (req, res) => {
 router.post("/austraege", requireAuth, async (req, res) => {
   try {
     const role = req.session.role!;
-    if (!COMET_WRITE_ROLES.includes(role)) {
-      return res.status(403).json({ error: "Keine Berechtigung" });
+    if (!(await can(role, "austrag.create"))) {
+      return res.status(403).json({ error: "Keine Berechtigung für Austragen" });
     }
 
     const {
@@ -169,7 +169,7 @@ router.post("/austraege", requireAuth, async (req, res) => {
 router.delete("/austraege/:id", requireAuth, async (req, res) => {
   try {
     const role = req.session.role!;
-    if (!["comet_admin", "comet_leitstand"].includes(role)) {
+    if (!(await can(role, "austrag.delete"))) {
       return res.status(403).json({ error: "Keine Berechtigung" });
     }
 

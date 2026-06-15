@@ -10,6 +10,7 @@ import { eq } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { logAudit } from "../lib/audit";
 import { emitToRooms } from "../lib/socket-emit";
+import { can } from "../lib/permissions";
 import type { Server as IOServer } from "socket.io";
 
 const router = Router();
@@ -76,8 +77,8 @@ router.post("/pallet-movements", requireAuth, async (req, res) => {
     if (SPED_ROLES.includes(role)) {
       return res.status(403).json({ error: "Speditionen können keine Palettenbuchungen erstellen" });
     }
-    if (role === "comet_viewer") {
-      return res.status(403).json({ error: "Forbidden" });
+    if (!(await can(role, "pallet.create"))) {
+      return res.status(403).json({ error: "Keine Berechtigung für Palettenbuchungen" });
     }
 
     const {
@@ -135,8 +136,8 @@ router.post("/pallet-movements", requireAuth, async (req, res) => {
 router.patch("/pallet-movements/:id", requireAuth, async (req, res) => {
   try {
     const role = req.session.role!;
-    if (!["comet_admin", "comet_leitstand"].includes(role)) {
-      return res.status(403).json({ error: "Forbidden" });
+    if (!(await can(role, "pallet.edit"))) {
+      return res.status(403).json({ error: "Keine Berechtigung" });
     }
     const id = Number(req.params.id);
     const [existing] = await db.select().from(palletMovementsTable).where(eq(palletMovementsTable.id, id)).limit(1);
@@ -167,8 +168,8 @@ router.patch("/pallet-movements/:id", requireAuth, async (req, res) => {
 router.delete("/pallet-movements/:id", requireAuth, async (req, res) => {
   try {
     const role = req.session.role!;
-    if (!["comet_admin", "comet_leitstand"].includes(role)) {
-      return res.status(403).json({ error: "Forbidden" });
+    if (!(await can(role, "pallet.delete"))) {
+      return res.status(403).json({ error: "Keine Berechtigung" });
     }
     const id = Number(req.params.id);
     const [m] = await db.select().from(palletMovementsTable).where(eq(palletMovementsTable.id, id)).limit(1);

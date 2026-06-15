@@ -10,6 +10,7 @@ import { eq } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { logAudit } from "../lib/audit";
 import { emitToRooms } from "../lib/socket-emit";
+import { can } from "../lib/permissions";
 import type { Server as IOServer } from "socket.io";
 
 const router = Router();
@@ -80,8 +81,8 @@ router.get("/reconciliations", requireAuth, async (req, res) => {
 router.post("/reconciliations", requireAuth, async (req, res) => {
   try {
     const role = req.session.role!;
-    if (!["comet_admin", "comet_leitstand"].includes(role)) {
-      return res.status(403).json({ error: "Only COMET can start reconciliations" });
+    if (!(await can(role, "reconciliation.create"))) {
+      return res.status(403).json({ error: "Keine Berechtigung für Abstimmungen" });
     }
 
     const { speditionId, dateFrom, dateTo, cometBalance } = req.body;
@@ -146,8 +147,8 @@ router.patch("/reconciliations/:id", requireAuth, async (req, res) => {
     const role = req.session.role!;
     const sessionSpeditionId = req.session.speditionId;
 
-    if (["comet_lager", "comet_viewer", "speditions_bearbeiter", "speditions_viewer"].includes(role)) {
-      return res.status(403).json({ error: "Forbidden" });
+    if (!(await can(role, "reconciliation.sign"))) {
+      return res.status(403).json({ error: "Keine Berechtigung" });
     }
 
     const result = await getRecWithScope(id, role, sessionSpeditionId);

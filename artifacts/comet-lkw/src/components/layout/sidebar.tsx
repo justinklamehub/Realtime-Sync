@@ -12,6 +12,7 @@ import {
   LogOut,
   Share2,
   Settings,
+  ShieldCheck,
 } from "lucide-react";
 import { useLogout } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,7 @@ export function AppSidebar() {
     { name: "Änderungslog", href: "/auditlog", icon: History, show: isCometUser },
     { name: "Speditionsfreigabe", href: "/speditionsfreigabe", icon: Share2, show: user.role === "speditions_admin" },
     { name: "Einstellungen", href: "/settings", icon: Settings, show: user.role === "comet_admin" },
+    { name: "Berechtigungen", href: "/berechtigungen", icon: ShieldCheck, show: user.role === "comet_admin" },
   ];
 
   return (

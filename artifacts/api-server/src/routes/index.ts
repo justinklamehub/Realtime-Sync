@@ -10,6 +10,7 @@ import dashboardRouter from "./dashboard";
 import auditRouter from "./audit";
 import austraegeRouter from "./austraege";
 import settingsRouter from "./settings";
+import permissionsRouter from "./permissions";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(dashboardRouter);
 router.use(auditRouter);
 router.use(austraegeRouter);
 router.use(settingsRouter);
+router.use(permissionsRouter);
 
 export default router;
