@@ -1,0 +1,37 @@
+Live-Updates / Echtzeit-Synchronisation:
+
+Die Anwendung soll Live-Updates unterstützen.
+
+Wenn ein Benutzer eine Verladung, einen Status, eine Ankunftszeit, ein Tor, eine Bemerkung, eine Telefonnummer, eine Palettenbewegung oder eine Berechtigung ändert, sollen alle anderen angemeldeten Benutzer diese Änderung automatisch sehen, ohne die Seite neu laden zu müssen.
+
+Anforderungen:
+
+* Nutze WebSockets oder eine vergleichbare Echtzeit-Technologie.
+* Änderungen an Verladungen sollen sofort in Tabellenansicht, Kanban-Ansicht, Detail-Drawer und Dashboard aktualisiert werden.
+* Wenn ein LKW von einem Benutzer bearbeitet wird, sollen andere Benutzer sehen können, dass dieser Datensatz gerade bearbeitet wird.
+* Optional: Datensatz kurzzeitig sperren oder Warnung anzeigen, wenn mehrere Benutzer denselben LKW gleichzeitig bearbeiten.
+* Bei Statusänderungen sollen die Kanban-Spalten live aktualisiert werden.
+* Bei Änderungen an Palettenbewegungen sollen Salden und Dashboards automatisch neu berechnet und live aktualisiert werden.
+* Bei neuen Verladungen sollen diese sofort bei allen berechtigten Benutzern erscheinen.
+* Bei gelöschten oder stornierten Verladungen sollen diese sofort aus den Ansichten verschwinden oder als storniert markiert werden.
+* Jede Live-Aktualisierung muss weiterhin die Berechtigungen des jeweiligen Benutzers beachten.
+* Benutzer dürfen nur Live-Daten sehen, für die sie berechtigt sind.
+* Bei Verbindungsabbruch soll eine Meldung angezeigt werden.
+* Nach Wiederverbindung sollen die Daten automatisch synchronisiert werden.
+
+Technische Empfehlung:
+
+* Verwende WebSockets, Socket.IO oder Server-Sent Events.
+* Backend soll Events auslösen wie:
+
+  * shipment.created
+  * shipment.updated
+  * shipment.deleted
+  * shipment.locked
+  * shipment.unlocked
+  * shipment.status_changed
+  * pallet_movement.created
+  * pallet_balance.updated
+  * permission.updated
+  * user.updated
+* Frontend soll diese Events empfangen und die betroffenen Ansichten aktualisieren.

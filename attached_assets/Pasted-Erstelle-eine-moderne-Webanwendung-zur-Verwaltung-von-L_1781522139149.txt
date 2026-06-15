@@ -1,0 +1,281 @@
+Erstelle eine moderne Webanwendung zur Verwaltung von LKW-Verladungen für COMET und verschiedene Speditionen.
+
+Die Anwendung soll als produktionsnahes internes Verladetool aufgebaut werden und eine bestehende Live-Anwendung funktional ersetzen bzw. verbessern.
+
+Technologie:
+
+* Nutze eine saubere Web-App-Architektur mit Frontend, Backend und Datenbank.
+* Verwende eine relationale Datenbank.
+* Lege alle notwendigen Tabellen, Beziehungen, Rollen und Berechtigungen sauber an.
+* Die Anwendung soll responsiv, übersichtlich und professionell gestaltet sein.
+
+Grundidee:
+Es gibt mehrere Speditionen. Jede Spedition kann eigene LKW-Verladungen anlegen und verwalten. Speditionen können anderen Speditionen Einsichtsrechte oder Bearbeitungsrechte für ihre eigenen LKWs erteilen. COMET hat immer übergeordnete Rechte, jedoch mit abgestuften Rollen.
+
+Benutzer und Rollen:
+
+COMET-Rollen:
+
+* COMET Admin:
+
+  * Vollzugriff auf alles.
+  * Darf Speditionen anlegen, bearbeiten und deaktivieren.
+  * Darf alle Benutzer anlegen, bearbeiten und deaktivieren.
+  * Darf alle Berechtigungen vergeben.
+  * Darf alle Verladungen bearbeiten.
+  * Darf Palettenkonten und Salden vollständig verwalten.
+
+* COMET Leitstand:
+
+  * Darf alle Verladungen sehen und bearbeiten.
+  * Darf LKWs für Speditionen sperren oder wieder freigeben.
+  * Darf Status, Zeiten, Tor, Bemerkungen und operative Daten ändern.
+  * Darf Palettenbewegungen und Abstimmungen einsehen und bearbeiten.
+
+* COMET Lager:
+
+  * Darf alle Verladungen sehen.
+  * Darf operative Statuswerte, tatsächliche Ankunftszeit, Tor, Ladefortschritt und Lagerinformationen bearbeiten.
+  * Darf keine Benutzer oder Speditionen verwalten.
+
+* COMET Viewer:
+
+  * Darf alle Verladungen sehen.
+  * Darf keine Daten bearbeiten.
+
+Speditionsrollen:
+
+* Speditionsadmin:
+
+  * Darf Benutzer der eigenen Spedition anlegen, bearbeiten und deaktivieren.
+  * Darf Rollen innerhalb der eigenen Spedition vergeben.
+  * Darf eigene Verladungen anlegen und bearbeiten.
+  * Darf anderen Speditionen Einsichtsrechte oder Bearbeitungsrechte auf die eigenen LKWs geben.
+  * Darf das eigene Palettenkonto einsehen.
+  * Darf Palettenabstimmungen mit COMET einsehen und kommentieren.
+
+* Speditionsbearbeiter:
+
+  * Darf eigene Verladungen anlegen und bearbeiten.
+  * Darf Verladungen bearbeiten, für die die eigene Spedition Bearbeitungsrechte erhalten hat.
+  * Darf keine Benutzer verwalten.
+  * Darf keine Berechtigungen vergeben.
+
+* Speditionsviewer:
+
+  * Darf eigene Verladungen sehen.
+  * Darf Verladungen sehen, für die die eigene Spedition Einsichtsrechte erhalten hat.
+  * Darf nichts bearbeiten.
+
+Login:
+
+* Es soll keine öffentliche Registrierung geben.
+* Benutzer werden manuell durch COMET Admin oder durch berechtigte Speditionsadmins angelegt.
+* Login soll per E-Mail oder Benutzername möglich sein.
+* Passwortgeschützter Login mit Session-Handling.
+* Benutzer können aktiv/deaktiviert werden.
+
+Speditionen:
+
+* Speditionen dürfen nur durch COMET Admin angelegt werden.
+* Jede Spedition hat Name, Kürzel, Ansprechpartner, E-Mail, Telefon, Status und optionale Bemerkungen.
+* Speditionen können anderen Speditionen Rechte geben:
+
+  * Nur ansehen
+  * Bearbeiten
+* Diese Rechte gelten nur für die eigenen LKW-Verladungen der freigebenden Spedition.
+
+Verladungen:
+Verladungen sollen einzeln und in Masse anlegbar sein.
+
+Wichtige Felder:
+
+* ID
+* Name / Bezeichnung
+* Kennzeichen
+* Relation / Leitgebiet
+* Spedition
+* Sub-Spedition
+* Bemerkungen
+* Telefonnummer
+* Voraussichtliches Ankunftsdatum
+* Voraussichtliche Ankunftszeit
+* Tatsächliches Ankunftsdatum
+* Tatsächliche Ankunftszeit
+* Art des LKWs, z. B. Container, Anlieferung, Abholung, Retoure, Sonstiges
+* Status
+* Tor / Rampe
+* Erstellt von
+* Erstellt am
+* Zuletzt geändert von
+* Zuletzt geändert am
+* Von COMET bearbeitet: ja/nein
+* Für Spedition gesperrt: ja/nein
+
+Bearbeitungslogik:
+
+* Speditionen dürfen eigene LKWs bearbeiten, solange noch kein COMET-Mitarbeiter den LKW operativ bearbeitet hat.
+* Sobald ein COMET-Mitarbeiter relevante operative Felder ändert, wird der LKW für die Spedition gesperrt.
+* COMET Leitstand und COMET Admin dürfen einen LKW wieder für die Spedition freigeben.
+* COMET darf unabhängig davon immer alles bearbeiten.
+* Jede Änderung soll in einem Änderungslog gespeichert werden.
+
+Ansichten:
+Es soll mehrere Ansichten geben:
+
+1. Tabellenansicht
+
+   * Filterbar
+   * Sortierbar
+   * Suchfunktion
+   * Inline-Bearbeitung oder Detail-Drawer
+   * Massenaktionen, sofern berechtigt
+
+2. Kanban-Ansicht
+
+   * Gruppierung nach Status
+   * LKWs können per Drag & Drop verschoben werden, wenn der Benutzer berechtigt ist
+   * Statusänderungen werden gespeichert und geloggt
+
+3. Detailansicht / Drawer
+
+   * Alle Details einer Verladung anzeigen
+   * Bearbeiten je nach Berechtigung
+   * Änderungsverlauf anzeigen
+   * Bemerkungen und Telefonnummern anzeigen und bearbeiten
+   * Palettenbewegungen zur Verladung anzeigen, falls vorhanden
+
+Filter und Sortierung:
+
+* Standardmäßig soll immer das heutige Datum gefiltert sein.
+* Es muss einen Datumsfilter von/bis geben.
+* Gefiltert werden soll nach voraussichtlichem und tatsächlichem Ankunftsdatum.
+* Sortierung:
+
+  1. Wenn tatsächliche Ankunftszeit vorhanden ist, danach sortieren.
+  2. Sonst nach voraussichtlicher Ankunftszeit sortieren.
+* Zusätzlich Filter nach:
+
+  * Spedition
+  * Sub-Spedition
+  * Status
+  * LKW-Art
+  * Relation / Leitgebiet
+  * Kennzeichen
+  * Tor / Rampe
+
+Palettenkonto:
+Es soll ein detailliertes Palettenkonto pro Spedition geben.
+
+Funktionen:
+
+* Palettenbewegungen erfassen
+* Eingang / Ausgang / Korrektur / Abstimmung
+* Datum
+* Spedition
+* Bezug zu Verladung optional
+* Anzahl Paletten
+* Bewegungsart
+* Bemerkung
+* Erfasst von
+* Erfasst am
+* Saldo automatisch berechnen
+* Historie aller Bewegungen anzeigen
+* Export möglich, z. B. CSV oder Excel
+* Saldenübersicht pro Spedition
+* Zeitraumfilter von/bis
+* Abstimmungen mit Speditionen ermöglichen
+
+Palettenabstimmung:
+
+* COMET kann eine Abstimmung für eine Spedition und einen Zeitraum starten.
+* Die Spedition kann den Saldo prüfen.
+* Spedition kann bestätigen oder eine Abweichung melden.
+* Kommentare sollen möglich sein.
+* Status der Abstimmung:
+
+  * Offen
+  * In Prüfung
+  * Bestätigt
+  * Abweichung gemeldet
+  * Abgeschlossen
+* Alle Aktionen werden historisiert.
+
+Dashboard:
+Erstelle ein übersichtliches Dashboard mit:
+
+* Anzahl heutiger Verladungen
+* Anzahl erwarteter LKWs
+* Anzahl tatsächlich angekommener LKWs
+* Offene LKWs
+* LKWs je Status
+* LKWs je Spedition
+* Verspätete LKWs
+* Palettensalden je Spedition
+* Offene Palettenabstimmungen
+* Schnellfilter für Heute, Morgen, Woche, Benutzerdefiniert
+
+Rechteprüfung:
+
+* Jede Backend-Aktion muss serverseitig auf Berechtigungen geprüft werden.
+* Frontend darf Buttons ausblenden, aber Sicherheit muss im Backend liegen.
+* Jede kritische Aktion muss geloggt werden.
+
+Audit-Log:
+Speichere:
+
+* Wer hat etwas geändert?
+* Was wurde geändert?
+* Alter Wert
+* Neuer Wert
+* Zeitpunkt
+* Modul, z. B. Verladung, Benutzer, Spedition, Palettenkonto, Berechtigung
+
+Design:
+
+* Modernes, professionelles Dashboard-Design.
+* Klare Navigation:
+
+  * Dashboard
+  * Verladungen
+  * Kanban
+  * Palettenkonto
+  * Palettenabstimmungen
+  * Speditionen
+  * Benutzerverwaltung
+  * Berechtigungen
+  * Änderungslog
+* Tabellen sollen sauber lesbar sein.
+* Status sollen farblich dargestellt werden.
+* Toast-Benachrichtigungen für Erfolg und Fehler.
+* Modale oder Drawer für Details und Bearbeitung.
+* Responsiv für Desktop, Tablet und mobile Nutzung.
+
+Wichtig:
+Bitte erstelle zuerst eine saubere Datenbankstruktur mit allen Tabellen und Beziehungen.
+Danach erstelle Login, Rollen- und Rechteverwaltung.
+Danach erstelle die Verladungsverwaltung.
+Danach Palettenkonto und Abstimmungen.
+Danach Dashboard und Kanban.
+Achte auf sauberen, wartbaren Code und klare Dateistruktur.
+
+Erstelle außerdem Beispieldaten:
+
+* COMET Admin
+* COMET Leitstand
+* COMET Lager
+* COMET Viewer
+* 3 Beispiel-Speditionen
+* je Spedition mehrere Benutzer
+* Beispiel-Verladungen für heute und die nächsten Tage
+* Beispiel-Palettenbewegungen
+* Beispiel-Abstimmungen
+
+Bitte dokumentiere am Ende:
+
+* Welche Tabellen erstellt wurden
+* Welche Rollen es gibt
+* Welche Berechtigungen jede Rolle hat
+* Wie neue Benutzer angelegt werden
+* Wie Speditionen Rechte an andere Speditionen vergeben
+* Wie die Sperrlogik funktioniert, sobald COMET einen LKW bearbeitet
