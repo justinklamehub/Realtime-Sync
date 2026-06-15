@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { Loader2, Plus, Download } from "lucide-react";
 import { MovementDialog } from "./components/movement-dialog";
+import { MovementDetailSheet } from "./components/movement-detail-sheet";
 import { useAuth } from "@/contexts/auth-context";
 
 export default function PalettenPage() {
@@ -20,6 +21,8 @@ export default function PalettenPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedMovement, setSelectedMovement] = useState<any | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   const { data: speditionen } = useListSpeditionen();
   const { data: balances, isLoading: loadingBalances } = useListPalletBalances();
@@ -37,6 +40,11 @@ export default function PalettenPage() {
     window.open(`/api/pallet-export?${params.toString()}`, "_blank");
   };
 
+  const handleRowClick = (movement: any) => {
+    setSelectedMovement(movement);
+    setIsDetailOpen(true);
+  };
+
   const getMovementColor = (type: string) => {
     switch (type) {
       case "eingang": return "bg-green-100 text-green-800 hover:bg-green-100 border-transparent";
@@ -51,6 +59,8 @@ export default function PalettenPage() {
     const sign = m.movementType === "ausgang" ? "-" : m.movementType === "eingang" ? "+" : "";
     return `${sign}${m.amount}`;
   };
+
+  const colSpan = isCometUser ? 7 : 6;
 
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto">
@@ -142,7 +152,8 @@ export default function PalettenPage() {
               <TableHead>Datum</TableHead>
               {isCometUser && <TableHead>Spedition</TableHead>}
               <TableHead>Art</TableHead>
-              <TableHead>Referenz</TableHead>
+              <TableHead>Palettenschein-Nr.</TableHead>
+              <TableHead>Verladung</TableHead>
               <TableHead>Bemerkung</TableHead>
               <TableHead className="text-right">Anzahl</TableHead>
             </TableRow>
@@ -150,19 +161,23 @@ export default function PalettenPage() {
           <TableBody>
             {loadingMovements ? (
               <TableRow>
-                <TableCell colSpan={isCometUser ? 6 : 5} className="text-center py-8">
+                <TableCell colSpan={colSpan} className="text-center py-8">
                   <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
                 </TableCell>
               </TableRow>
             ) : !movements || movements.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={isCometUser ? 6 : 5} className="text-center py-8 text-slate-500">
+                <TableCell colSpan={colSpan} className="text-center py-8 text-slate-500">
                   Keine Buchungen gefunden.
                 </TableCell>
               </TableRow>
             ) : (
               movements.map((movement) => (
-                <TableRow key={movement.id}>
+                <TableRow
+                  key={movement.id}
+                  className="cursor-pointer hover:bg-slate-50 transition-colors"
+                  onClick={() => handleRowClick(movement)}
+                >
                   <TableCell className="whitespace-nowrap text-slate-600">
                     {format(new Date(movement.movementDate), "dd.MM.yyyy")}
                   </TableCell>
@@ -174,15 +189,16 @@ export default function PalettenPage() {
                       {movement.movementType}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-slate-600 text-sm">
-                    {movement.shipmentBezeichnung && <div>{movement.shipmentBezeichnung}</div>}
-                    {(movement as any).palettenscheinnummer && (
-                      <div className="text-xs text-slate-400">PS: {(movement as any).palettenscheinnummer}</div>
+                  <TableCell className="font-mono text-sm text-slate-700">
+                    {(movement as any).palettenscheinnummer || (
+                      <span className="text-slate-300">—</span>
                     )}
-                    {!movement.shipmentBezeichnung && !(movement as any).palettenscheinnummer && "—"}
                   </TableCell>
-                  <TableCell className="text-slate-500 truncate max-w-[200px]" title={movement.bemerkungen || ""}>
-                    {movement.bemerkungen || "—"}
+                  <TableCell className="text-slate-600 text-sm">
+                    {movement.shipmentBezeichnung || <span className="text-slate-300">—</span>}
+                  </TableCell>
+                  <TableCell className="text-slate-500 truncate max-w-[180px]" title={movement.bemerkungen || ""}>
+                    {movement.bemerkungen || <span className="text-slate-300">—</span>}
                   </TableCell>
                   <TableCell className={`text-right font-bold ${movement.movementType === "ausgang" ? 'text-red-600' : 'text-green-600'}`}>
                     {displayAmount(movement)}
@@ -195,6 +211,11 @@ export default function PalettenPage() {
       </div>
 
       <MovementDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} />
+      <MovementDetailSheet
+        movement={selectedMovement}
+        open={isDetailOpen}
+        onOpenChange={setIsDetailOpen}
+      />
     </div>
   );
 }
