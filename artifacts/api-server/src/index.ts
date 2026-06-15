@@ -34,6 +34,14 @@ io.use((socket, next) => {
   sessionMiddleware(socket.request as any, {} as any, next as any);
 });
 
+io.use((socket, next) => {
+  const sess = (socket.request as any).session;
+  if (!sess?.userId) {
+    return next(new Error("unauthorized"));
+  }
+  return next();
+});
+
 io.on("connection", (socket) => {
   const sess = (socket.request as any).session;
   const role: string | undefined = sess?.role;

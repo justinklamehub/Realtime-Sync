@@ -2,28 +2,28 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import {
   palletMovementsTable,
-  palletReconciliationsTable,
-  reconciliationCommentsTable,
   speditionenTable,
   usersTable,
   shipmentsTable,
 } from "@workspace/db";
-import { eq, and, gte, lte } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { logAudit } from "../lib/audit";
+import { emitToRooms } from "../lib/socket-emit";
+import type { Server as IOServer } from "socket.io";
 
 const router = Router();
 
-function getIO(req: any) {
+const SPED_ROLES = ["speditions_admin", "speditions_bearbeiter", "speditions_viewer"];
+
+function getIO(req: any): IOServer | null {
   return req.app.get("io") || null;
 }
 
-function emit(req: any, event: string, data: any) {
+function emit(req: any, event: string, data: any, speditionId?: number | null) {
   const io = getIO(req);
-  if (io) io.emit(event, data);
+  if (io) emitToRooms(io, event, data, speditionId);
 }
-
-// ---- Pallet Movements ----
 
 router.get("/pallet-movements", requireAuth, async (req, res) => {
   try {
@@ -33,8 +33,7 @@ router.get("/pallet-movements", requireAuth, async (req, res) => {
 
     let rows = await db.select().from(palletMovementsTable);
 
-    // Spedition users only see their own
-    if (["speditions_admin", "speditions_bearbeiter", "speditions_viewer"].includes(role)) {
+    if (SPED_ROLES.includes(role)) {
       if (!sessionSpeditionId) return res.json([]);
       rows = rows.filter((m) => m.speditionId === sessionSpeditionId);
     } else if (speditionId) {
@@ -61,7 +60,7 @@ router.get("/pallet-movements", requireAuth, async (req, res) => {
         speditionName: spedMap[m.speditionId] ?? null,
         shipmentBezeichnung: m.shipmentId ? shipMap[m.shipmentId] ?? null : null,
         createdByName: m.createdBy ? userMap[m.createdBy] ?? null : null,
-      }))
+      })),
     );
   } catch (err) {
     console.error(err);
@@ -72,11 +71,23 @@ router.get("/pallet-movements", requireAuth, async (req, res) => {
 router.post("/pallet-movements", requireAuth, async (req, res) => {
   try {
     const role = req.session.role!;
+    const sessionSpeditionId = req.session.speditionId;
+
     if (["comet_viewer", "speditions_viewer"].includes(role)) {
       return res.status(403).json({ error: "Forbidden" });
     }
 
     const { speditionId, shipmentId, movementType, movementDate, amount, bemerkungen } = req.body;
+
+    if (SPED_ROLES.includes(role) && speditionId !== sessionSpeditionId) {
+      return res.status(403).json({ error: "Forbidden: can only create movements for own spedition" });
+    }
+
+    const absAmount = Math.abs(Number(amount));
+    if (!absAmount || absAmount <= 0) {
+      return res.status(400).json({ error: "Amount must be a positive number" });
+    }
+
     const [movement] = await db
       .insert(palletMovementsTable)
       .values({
@@ -84,15 +95,15 @@ router.post("/pallet-movements", requireAuth, async (req, res) => {
         shipmentId: shipmentId || null,
         movementType,
         movementDate,
-        amount,
+        amount: absAmount,
         bemerkungen,
         createdBy: req.session.userId,
       })
       .returning();
 
-    await logAudit(req.session.userId!, "pallet_movement", movement.id, "created", null, `${movementType}:${amount}`);
-    emit(req, "pallet_movement.created", { id: movement.id, speditionId });
-    emit(req, "pallet_balance.updated", { speditionId });
+    await logAudit(req.session.userId!, "pallet_movement", movement.id, "created", null, `${movementType}:${absAmount}`);
+    emit(req, "pallet_movement.created", { id: movement.id, speditionId }, speditionId);
+    emit(req, "pallet_balance.updated", { speditionId }, speditionId);
 
     return res.status(201).json({ ...movement, speditionName: null, shipmentBezeichnung: null, createdByName: null });
   } catch (err) {
@@ -108,16 +119,24 @@ router.patch("/pallet-movements/:id", requireAuth, async (req, res) => {
       return res.status(403).json({ error: "Forbidden" });
     }
     const id = Number(req.params.id);
+    const [existing] = await db.select().from(palletMovementsTable).where(eq(palletMovementsTable.id, id)).limit(1);
+    if (!existing) return res.status(404).json({ error: "Not found" });
+
     const { movementType, movementDate, amount, bemerkungen } = req.body;
     const updates: any = {};
     if (movementType !== undefined) updates.movementType = movementType;
     if (movementDate !== undefined) updates.movementDate = movementDate;
-    if (amount !== undefined) updates.amount = amount;
+    if (amount !== undefined) updates.amount = Math.abs(Number(amount));
     if (bemerkungen !== undefined) updates.bemerkungen = bemerkungen;
 
-    const [movement] = await db.update(palletMovementsTable).set(updates).where(eq(palletMovementsTable.id, id)).returning();
+    const [movement] = await db
+      .update(palletMovementsTable)
+      .set(updates)
+      .where(eq(palletMovementsTable.id, id))
+      .returning();
     if (!movement) return res.status(404).json({ error: "Not found" });
-    emit(req, "pallet_balance.updated", { speditionId: movement.speditionId });
+
+    emit(req, "pallet_balance.updated", { speditionId: movement.speditionId }, movement.speditionId);
     return res.json({ ...movement, speditionName: null, shipmentBezeichnung: null, createdByName: null });
   } catch (err) {
     return res.status(500).json({ error: "Internal server error" });
@@ -132,15 +151,15 @@ router.delete("/pallet-movements/:id", requireAuth, async (req, res) => {
     }
     const id = Number(req.params.id);
     const [m] = await db.select().from(palletMovementsTable).where(eq(palletMovementsTable.id, id)).limit(1);
+    if (!m) return res.status(404).json({ error: "Not found" });
     await db.delete(palletMovementsTable).where(eq(palletMovementsTable.id, id));
-    if (m) emit(req, "pallet_balance.updated", { speditionId: m.speditionId });
+    await logAudit(req.session.userId!, "pallet_movement", id, "deleted", `${m.movementType}:${m.amount}`, null);
+    emit(req, "pallet_balance.updated", { speditionId: m.speditionId }, m.speditionId);
     return res.json({ ok: true });
   } catch (err) {
     return res.status(500).json({ error: "Internal server error" });
   }
 });
-
-// ---- Pallet Balances ----
 
 router.get("/pallet-balances", requireAuth, async (req, res) => {
   try {
@@ -152,9 +171,7 @@ router.get("/pallet-balances", requireAuth, async (req, res) => {
 
     const balances = speds
       .filter((s) => {
-        if (["speditions_admin", "speditions_bearbeiter", "speditions_viewer"].includes(role)) {
-          return s.id === sessionSpeditionId;
-        }
+        if (SPED_ROLES.includes(role)) return s.id === sessionSpeditionId;
         return true;
       })
       .map((s) => {
@@ -182,22 +199,23 @@ router.get("/pallet-balances", requireAuth, async (req, res) => {
   }
 });
 
-// ---- CSV Export ----
-
 router.get("/pallet-export", requireAuth, async (req, res) => {
   try {
     const { speditionId, dateFrom, dateTo } = req.query as Record<string, string>;
-    let rows = await db.select().from(palletMovementsTable);
     const sessionSpeditionId = req.session.speditionId;
     const role = req.session.role!;
 
-    if (["speditions_admin", "speditions_bearbeiter", "speditions_viewer"].includes(role)) {
+    let rows = await db.select().from(palletMovementsTable);
+
+    if (SPED_ROLES.includes(role)) {
       rows = rows.filter((m) => m.speditionId === sessionSpeditionId);
     } else if (speditionId) {
       rows = rows.filter((m) => m.speditionId === Number(speditionId));
     }
     if (dateFrom) rows = rows.filter((m) => m.movementDate >= dateFrom);
     if (dateTo) rows = rows.filter((m) => m.movementDate <= dateTo);
+
+    rows.sort((a, b) => a.movementDate.localeCompare(b.movementDate));
 
     const speds = await db.select().from(speditionenTable);
     const spedMap: Record<number, string> = {};
@@ -207,11 +225,11 @@ router.get("/pallet-export", requireAuth, async (req, res) => {
       "ID,Datum,Spedition,Art,Menge,Bemerkungen",
       ...rows.map(
         (m) =>
-          `${m.id},${m.movementDate},${spedMap[m.speditionId] ?? m.speditionId},${m.movementType},${m.amount},"${m.bemerkungen ?? ""}"`
+          `${m.id},${m.movementDate},"${spedMap[m.speditionId] ?? m.speditionId}",${m.movementType},${m.amount},"${(m.bemerkungen ?? "").replace(/"/g, '""')}"`,
       ),
     ];
 
-    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="paletten-export.csv"`);
     return res.send(lines.join("\n"));
   } catch (err) {

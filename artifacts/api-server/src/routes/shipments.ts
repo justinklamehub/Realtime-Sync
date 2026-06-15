@@ -28,23 +28,20 @@ const COMET_OPERATIVE_FIELDS = ["status", "tor", "ataDate", "ataTime", "gesperrt
 const COMET_ROLES = ["comet_admin", "comet_leitstand", "comet_lager", "comet_viewer"];
 const SPED_ROLES = ["speditions_admin", "speditions_bearbeiter", "speditions_viewer"];
 
-async function getAllowedSpeditionIds(
-  role: string,
-  sessionSpeditionId: number | null,
-): Promise<number[] | "all"> {
-  if (COMET_ROLES.includes(role)) return "all";
-  if (!sessionSpeditionId) return [];
+interface SpedAccess {
+  readIds: number[];
+  writeIds: number[];
+}
+
+async function getSpeditionAccess(sessionSpeditionId: number | null): Promise<SpedAccess> {
+  if (!sessionSpeditionId) return { readIds: [], writeIds: [] };
   const permissions = await db
     .select()
     .from(speditionPermissionsTable)
     .where(eq(speditionPermissionsTable.receivingSpeditionId, sessionSpeditionId));
-  return [sessionSpeditionId, ...permissions.map((p) => p.grantingSpeditionId)];
-}
-
-function isShipmentAllowed(speditionId: number | null, allowed: number[] | "all"): boolean {
-  if (allowed === "all") return true;
-  if (speditionId === null) return false;
-  return (allowed as number[]).includes(speditionId);
+  const readIds = [sessionSpeditionId, ...permissions.map((p) => p.grantingSpeditionId)];
+  const writeIds = [sessionSpeditionId, ...permissions.filter((p) => p.permissionLevel === "edit").map((p) => p.grantingSpeditionId)];
+  return { readIds, writeIds };
 }
 
 async function buildShipmentResponse(shipment: any) {
@@ -54,7 +51,6 @@ async function buildShipmentResponse(shipment: any) {
   const userMap: Record<number, string> = {};
   for (const s of speds) spedMap[s.id] = s.name;
   for (const u of users) userMap[u.id] = u.username;
-
   return {
     ...shipment,
     speditionName: shipment.speditionId ? spedMap[shipment.speditionId] ?? null : null,
@@ -68,33 +64,15 @@ router.get("/shipments", requireAuth, async (req, res) => {
   try {
     const role = req.session.role!;
     const sessionSpeditionId = req.session.speditionId;
-    const {
-      dateFrom,
-      dateTo,
-      speditionId,
-      status,
-      lkwArt,
-      relation,
-      kennzeichen,
-      tor,
-      search,
-    } = req.query as Record<string, string>;
+    const { dateFrom, dateTo, speditionId, status, lkwArt, relation, kennzeichen, tor, search } =
+      req.query as Record<string, string>;
 
     let rows = await db.select().from(shipmentsTable);
 
     if (SPED_ROLES.includes(role)) {
       if (!sessionSpeditionId) return res.json([]);
-      const permissions = await db
-        .select()
-        .from(speditionPermissionsTable)
-        .where(eq(speditionPermissionsTable.receivingSpeditionId, sessionSpeditionId));
-      const allowedSpeditionIds = [
-        sessionSpeditionId,
-        ...permissions.map((p) => p.grantingSpeditionId),
-      ];
-      rows = rows.filter(
-        (s) => s.speditionId !== null && allowedSpeditionIds.includes(s.speditionId),
-      );
+      const { readIds } = await getSpeditionAccess(sessionSpeditionId);
+      rows = rows.filter((s) => s.speditionId !== null && readIds.includes(s.speditionId));
     }
 
     if (dateFrom) rows = rows.filter((s) => (s.etaDate && s.etaDate >= dateFrom) || (s.ataDate && s.ataDate >= dateFrom));
@@ -193,6 +171,16 @@ router.post("/shipments/bulk", requireAuth, async (req, res) => {
     }
 
     const sessionSpeditionId = req.session.speditionId;
+
+    if (SPED_ROLES.includes(role)) {
+      const invalid = shipments.some(
+        (s: any) => s.speditionId && s.speditionId !== sessionSpeditionId,
+      );
+      if (invalid) {
+        return res.status(403).json({ error: "Forbidden: spedition users can only bulk-create for own spedition" });
+      }
+    }
+
     const inserted = await db
       .insert(shipmentsTable)
       .values(
@@ -231,8 +219,8 @@ router.get("/shipments/:id", requireAuth, async (req, res) => {
     if (!shipment) return res.status(404).json({ error: "Not found" });
 
     if (SPED_ROLES.includes(role)) {
-      const allowed = await getAllowedSpeditionIds(role, sessionSpeditionId ?? null);
-      if (!isShipmentAllowed(shipment.speditionId, allowed)) {
+      const { readIds } = await getSpeditionAccess(sessionSpeditionId ?? null);
+      if (!shipment.speditionId || !readIds.includes(shipment.speditionId)) {
         return res.status(403).json({ error: "Forbidden" });
       }
     }
@@ -257,9 +245,12 @@ router.patch("/shipments/:id", requireAuth, async (req, res) => {
     if (!existing) return res.status(404).json({ error: "Not found" });
 
     if (SPED_ROLES.includes(role)) {
-      const allowed = await getAllowedSpeditionIds(role, sessionSpeditionId ?? null);
-      if (!isShipmentAllowed(existing.speditionId, allowed)) {
+      const { readIds, writeIds } = await getSpeditionAccess(sessionSpeditionId ?? null);
+      if (!existing.speditionId || !readIds.includes(existing.speditionId)) {
         return res.status(403).json({ error: "Forbidden" });
+      }
+      if (!writeIds.includes(existing.speditionId)) {
+        return res.status(403).json({ error: "Forbidden: view-only access to this spedition's shipments" });
       }
       if (existing.gesperrtFuerSpedition) {
         return res.status(403).json({ error: "Shipment is locked for editing by Spedition" });
@@ -376,8 +367,8 @@ router.get("/shipments/:id/history", requireAuth, async (req, res) => {
     if (!shipment) return res.status(404).json({ error: "Not found" });
 
     if (SPED_ROLES.includes(role)) {
-      const allowed = await getAllowedSpeditionIds(role, sessionSpeditionId ?? null);
-      if (!isShipmentAllowed(shipment.speditionId, allowed)) {
+      const { readIds } = await getSpeditionAccess(sessionSpeditionId ?? null);
+      if (!shipment.speditionId || !readIds.includes(shipment.speditionId)) {
         return res.status(403).json({ error: "Forbidden" });
       }
     }

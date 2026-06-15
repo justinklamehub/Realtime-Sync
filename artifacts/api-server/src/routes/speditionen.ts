@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { speditionenTable, speditionPermissionsTable, usersTable } from "@workspace/db";
+import { speditionenTable, speditionPermissionsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { logAudit } from "../lib/audit";
@@ -19,7 +19,7 @@ router.get("/speditionen", requireAuth, async (req, res) => {
 router.post("/speditionen", requireAuth, async (req, res) => {
   try {
     if (req.session.role !== "comet_admin") {
-      return res.status(403).json({ error: "Only COMET Admin can create Speditionen" });
+      return res.status(403).json({ error: "Nur COMET Admin kann Speditionen anlegen" });
     }
     const { name, kuerzel, ansprechpartner, email, telefon, status, bemerkungen } = req.body;
     const [sped] = await db
@@ -50,17 +50,11 @@ router.get("/speditionen/:id", requireAuth, async (req, res) => {
 
 router.patch("/speditionen/:id", requireAuth, async (req, res) => {
   try {
-    const role = req.session.role!;
+    if (req.session.role !== "comet_admin") {
+      return res.status(403).json({ error: "Nur COMET Admin kann Speditionen bearbeiten" });
+    }
+
     const id = Number(req.params.id);
-    const sessionSpeditionId = req.session.speditionId;
-
-    if (role === "speditions_admin" && sessionSpeditionId !== id) {
-      return res.status(403).json({ error: "Forbidden" });
-    }
-    if (!["comet_admin", "comet_leitstand", "speditions_admin"].includes(role)) {
-      return res.status(403).json({ error: "Forbidden" });
-    }
-
     const { name, kuerzel, ansprechpartner, email, telefon, status, bemerkungen } = req.body;
     const updates: any = {};
     if (name !== undefined) updates.name = name;
@@ -84,6 +78,10 @@ router.patch("/speditionen/:id", requireAuth, async (req, res) => {
 
 router.get("/speditionen/:id/permissions", requireAuth, async (req, res) => {
   try {
+    const role = req.session.role!;
+    if (!["comet_admin", "comet_leitstand"].includes(role)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
     const id = Number(req.params.id);
     const perms = await db
       .select()
@@ -100,7 +98,7 @@ router.get("/speditionen/:id/permissions", requireAuth, async (req, res) => {
         receivingSpeditionId: p.receivingSpeditionId,
         receivingSpeditionName: spedMap[p.receivingSpeditionId] ?? null,
         permissionLevel: p.permissionLevel,
-      }))
+      })),
     );
   } catch (err) {
     return res.status(500).json({ error: "Internal server error" });
@@ -109,28 +107,21 @@ router.get("/speditionen/:id/permissions", requireAuth, async (req, res) => {
 
 router.post("/speditionen/:id/permissions", requireAuth, async (req, res) => {
   try {
+    if (req.session.role !== "comet_admin") {
+      return res.status(403).json({ error: "Nur COMET Admin kann Zugriffsrechte verwalten" });
+    }
+
     const grantingId = Number(req.params.id);
-    const role = req.session.role!;
-    const sessionSpeditionId = req.session.speditionId;
-
-    if (role === "speditions_admin" && sessionSpeditionId !== grantingId) {
-      return res.status(403).json({ error: "Forbidden" });
-    }
-    if (!["comet_admin", "speditions_admin"].includes(role)) {
-      return res.status(403).json({ error: "Forbidden" });
-    }
-
     const { receivingSpeditionId, permissionLevel } = req.body;
 
-    // Upsert
     const existing = await db
       .select()
       .from(speditionPermissionsTable)
       .where(
         and(
           eq(speditionPermissionsTable.grantingSpeditionId, grantingId),
-          eq(speditionPermissionsTable.receivingSpeditionId, receivingSpeditionId)
-        )
+          eq(speditionPermissionsTable.receivingSpeditionId, receivingSpeditionId),
+        ),
       )
       .limit(1);
 
@@ -142,8 +133,8 @@ router.post("/speditionen/:id/permissions", requireAuth, async (req, res) => {
         .where(
           and(
             eq(speditionPermissionsTable.grantingSpeditionId, grantingId),
-            eq(speditionPermissionsTable.receivingSpeditionId, receivingSpeditionId)
-          )
+            eq(speditionPermissionsTable.receivingSpeditionId, receivingSpeditionId),
+          ),
         )
         .returning();
     } else {
@@ -152,6 +143,8 @@ router.post("/speditionen/:id/permissions", requireAuth, async (req, res) => {
         .values({ grantingSpeditionId: grantingId, receivingSpeditionId, permissionLevel })
         .returning();
     }
+
+    await logAudit(req.session.userId!, "spedition", grantingId, "permission_set", null, `${receivingSpeditionId}:${permissionLevel}`);
 
     const [receivingSped] = await db
       .select({ name: speditionenTable.name })
@@ -173,26 +166,23 @@ router.post("/speditionen/:id/permissions", requireAuth, async (req, res) => {
 
 router.delete("/speditionen/:id/permissions/:receivingId", requireAuth, async (req, res) => {
   try {
+    if (req.session.role !== "comet_admin") {
+      return res.status(403).json({ error: "Nur COMET Admin kann Zugriffsrechte entfernen" });
+    }
+
     const grantingId = Number(req.params.id);
     const receivingId = Number(req.params.receivingId);
-    const role = req.session.role!;
-    const sessionSpeditionId = req.session.speditionId;
-
-    if (role === "speditions_admin" && sessionSpeditionId !== grantingId) {
-      return res.status(403).json({ error: "Forbidden" });
-    }
-    if (!["comet_admin", "speditions_admin"].includes(role)) {
-      return res.status(403).json({ error: "Forbidden" });
-    }
 
     await db
       .delete(speditionPermissionsTable)
       .where(
         and(
           eq(speditionPermissionsTable.grantingSpeditionId, grantingId),
-          eq(speditionPermissionsTable.receivingSpeditionId, receivingId)
-        )
+          eq(speditionPermissionsTable.receivingSpeditionId, receivingId),
+        ),
       );
+
+    await logAudit(req.session.userId!, "spedition", grantingId, "permission_removed", null, String(receivingId));
     return res.json({ ok: true });
   } catch (err) {
     return res.status(500).json({ error: "Internal server error" });
