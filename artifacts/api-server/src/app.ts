@@ -13,6 +13,10 @@ const PgSession = connectPgSimple(session);
 
 const app: Express = express();
 
+// Trust the first proxy (Apache/Nginx) so X-Forwarded-* headers are respected.
+// Required for correct IP logging and secure-cookie detection behind a reverse proxy.
+app.set("trust proxy", 1);
+
 app.use(
   pinoHttp({
     logger,
@@ -57,7 +61,9 @@ export const sessionMiddleware = session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === "production",
+    // Set COOKIE_SECURE=true in .env only after HTTPS is fully configured.
+    // Leave unset (or false) when running on plain HTTP.
+    secure: process.env.COOKIE_SECURE === "true",
     httpOnly: true,
     maxAge: 1000 * 60 * 60 * 24 * 7,
     sameSite: "lax",

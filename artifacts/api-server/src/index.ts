@@ -20,9 +20,12 @@ if (Number.isNaN(port) || port <= 0) {
 
 const httpServer = createServer(app);
 
+// In development (Replit): restrict to the Replit dev domain.
+// In production behind a reverse proxy (Apache/Nginx): allow same-origin requests.
+// Set FRONTEND_URL explicitly if you need to restrict to a specific domain.
 const allowedOrigin = process.env["REPLIT_DEV_DOMAIN"]
   ? `https://${process.env["REPLIT_DEV_DOMAIN"]}`
-  : process.env["FRONTEND_URL"] ?? false;
+  : process.env["FRONTEND_URL"] ?? true;
 
 const io = new SocketIOServer(httpServer, {
   cors: {
