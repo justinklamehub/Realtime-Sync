@@ -77,14 +77,15 @@ export async function printDeckblatt(data: DeckblattData) {
   const lkwId = formatLkwId(data.shipmentId);
   const eta = formatEta(data.etaDate, data.etaTime);
 
+  const codeValue = String(data.shipmentId);
   const [qrDataUrl, barcodeDataUrl] = await Promise.all([
-    QRCode.toDataURL(lkwId, {
+    QRCode.toDataURL(codeValue, {
       width: 200,
       margin: 1,
       color: { dark: "#0f172a", light: "#ffffff" },
       errorCorrectionLevel: "M",
     }),
-    Promise.resolve(generateBarcodeDataUrl(lkwId)),
+    Promise.resolve(generateBarcodeDataUrl(codeValue)),
   ]);
 
   const html = `<!DOCTYPE html>
@@ -467,8 +468,8 @@ export async function printDeckblatt(data: DeckblattData) {
     <div class="codes-section">
       <div class="barcode-wrap">
         <div class="barcode-label">Barcode</div>
-        <img class="barcode-img" src="${barcodeDataUrl}" alt="Barcode ${lkwId}" />
-        <div class="barcode-id">${escHtml(lkwId)}</div>
+        <img class="barcode-img" src="${barcodeDataUrl}" alt="Barcode ${codeValue}" />
+        <div class="barcode-id">${escHtml(codeValue)}</div>
       </div>
       <div class="qr-wrap">
         <div class="qr-label">QR-Code</div>
