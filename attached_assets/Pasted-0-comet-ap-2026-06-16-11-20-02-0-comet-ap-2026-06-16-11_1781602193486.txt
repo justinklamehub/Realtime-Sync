@@ -1,0 +1,20 @@
+0|comet-ap | 2026-06-16 11:20:02:
+0|comet-ap | 2026-06-16 11:20:02: Node.js v22.22.3
+0|comet-ap | 2026-06-16 11:20:19: Error: DATABASE_URL must be set. Did you forget to provision a database?
+0|comet-ap | 2026-06-16 11:20:19:     at ../../lib/db/src/index.ts (/opt/comet/app/lib/db/src/index.ts:8:9)
+0|comet-ap | 2026-06-16 11:20:19:     at __init (file:///opt/comet/app/artifacts/api-server/dist/index.mjs:22:56)
+0|comet-ap | 2026-06-16 11:20:19:     at <anonymous> (/opt/comet/app/artifacts/api-server/src/routes/auth.ts:3:1)
+0|comet-ap | 2026-06-16 11:20:19:     at ModuleJob.run (node:internal/modules/esm/module_job:329:25)
+0|comet-ap | 2026-06-16 11:20:19:     at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:26)
+0|comet-ap | 2026-06-16 11:25:10: Error: DATABASE_URL must be set. Did you forget to provision a database?
+0|comet-ap | 2026-06-16 11:25:10:     at ../../lib/db/src/index.ts (/opt/comet/app/lib/db/src/index.ts:8:9)
+0|comet-ap | 2026-06-16 11:25:10:     at __init (file:///opt/comet/app/artifacts/api-server/dist/index.mjs:22:56)
+0|comet-ap | 2026-06-16 11:25:10:     at <anonymous> (/opt/comet/app/artifacts/api-server/src/routes/auth.ts:3:1)
+0|comet-ap | 2026-06-16 11:25:10:     at ModuleJob.run (node:internal/modules/esm/module_job:329:25)
+0|comet-ap | 2026-06-16 11:25:10:     at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:26)
+0|comet-ap | 2026-06-16 11:27:23: Error: DATABASE_URL must be set. Did you forget to provision a database?
+0|comet-ap | 2026-06-16 11:27:23:     at ../../lib/db/src/index.ts (/opt/comet/app/lib/db/src/index.ts:8:9)
+0|comet-ap | 2026-06-16 11:27:23:     at __init (file:///opt/comet/app/artifacts/api-server/dist/index.mjs:22:56)
+0|comet-ap | 2026-06-16 11:27:23:     at <anonymous> (/opt/comet/app/artifacts/api-server/src/routes/auth.ts:3:1)
+0|comet-ap | 2026-06-16 11:27:23:     at ModuleJob.run (node:internal/modules/esm/module_job:329:25)
+0|comet-ap | 2026-06-16 11:27:23:     at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:26)
