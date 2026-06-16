@@ -90,7 +90,9 @@ router.post("/austraege", requireAuth, async (req, res) => {
       Number(anCometLadungssicherung ?? 0) -
       Number(anDefektePaletten ?? 0);
 
-    // Net pallet exchange: positive = COMET gave more (eingang), negative = COMET received more (ausgang)
+    // Net pallet exchange from COMET's perspective:
+    // vonNet > anNet → COMET gave out more than received back → Ausgang (net loss)
+    // anNet > vonNet → COMET received more back than gave out  → Eingang (net gain)
     const netAmount = vonNet - anNet;
 
     const [row] = await db
@@ -119,7 +121,7 @@ router.post("/austraege", requireAuth, async (req, res) => {
     // Auto-book a single net pallet movement if a spedition is assigned
     const spedId = beauftragteSpeditionId ? Number(beauftragteSpeditionId) : null;
     if (spedId && netAmount !== 0) {
-      const movementType = netAmount > 0 ? "eingang" : "ausgang";
+      const movementType = netAmount > 0 ? "ausgang" : "eingang";
       const absNet = Math.abs(netAmount);
       await db.insert(palletMovementsTable).values({
         speditionId: spedId,
