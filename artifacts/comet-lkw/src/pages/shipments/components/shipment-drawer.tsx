@@ -272,16 +272,10 @@ export function ShipmentDrawer({ shipmentId, open, onOpenChange }: ShipmentDrawe
 
   const isSaving = updateMutation.isPending || createMutation.isPending;
 
-  const palletBalance = palletMovements
-    ? palletMovements.reduce((sum, m) => {
-        return m.movementType === "ausgang" ? sum - (m.amount ?? 0) : sum + (m.amount ?? 0);
-      }, 0)
-    : null;
-
-  function handlePrintDeckblatt() {
+  async function handlePrintDeckblatt() {
     if (!shipment) return;
     const sped = speditionen?.find((s) => s.id === shipment.speditionId);
-    printDeckblatt({
+    await printDeckblatt({
       shipmentId: shipment.id,
       bezeichnung: shipment.bezeichnung,
       kennzeichen: shipment.kennzeichen,
@@ -293,7 +287,6 @@ export function ShipmentDrawer({ shipmentId, open, onOpenChange }: ShipmentDrawe
       status: shipment.status,
       bemerkungen: shipment.bemerkungen,
       speditionName: (shipment as any).speditionName ?? sped?.name ?? null,
-      palletBalance,
       username: user?.username ?? user?.email ?? "—",
     });
   }
