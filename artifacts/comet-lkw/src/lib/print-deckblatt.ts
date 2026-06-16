@@ -1,7 +1,6 @@
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import QRCode from "qrcode";
-import JsBarcode from "jsbarcode";
 
 export interface DeckblattData {
   shipmentId: number;
@@ -57,19 +56,6 @@ function statusDotClass(status?: string | null): string {
   }
 }
 
-function generateBarcodeDataUrl(value: string): string {
-  const canvas = document.createElement("canvas");
-  JsBarcode(canvas, value, {
-    format: "CODE128",
-    width: 2.5,
-    height: 70,
-    displayValue: false,
-    margin: 6,
-    background: "#ffffff",
-    lineColor: "#0f172a",
-  });
-  return canvas.toDataURL("image/png");
-}
 
 export async function printDeckblatt(data: DeckblattData) {
   const now = new Date();
@@ -78,15 +64,12 @@ export async function printDeckblatt(data: DeckblattData) {
   const eta = formatEta(data.etaDate, data.etaTime);
 
   const codeValue = String(data.shipmentId);
-  const [qrDataUrl, barcodeDataUrl] = await Promise.all([
-    QRCode.toDataURL(codeValue, {
-      width: 200,
-      margin: 1,
-      color: { dark: "#0f172a", light: "#ffffff" },
-      errorCorrectionLevel: "M",
-    }),
-    Promise.resolve(generateBarcodeDataUrl(codeValue)),
-  ]);
+  const qrDataUrl = await QRCode.toDataURL(codeValue, {
+    width: 200,
+    margin: 1,
+    color: { dark: "#0f172a", light: "#ffffff" },
+    errorCorrectionLevel: "M",
+  });
 
   const html = `<!DOCTYPE html>
 <html lang="de">
@@ -120,8 +103,8 @@ export async function printDeckblatt(data: DeckblattData) {
 
     /* ── HEADER ─────────────────────────────────────── */
     .header {
-      background: #0f172a;
-      color: #fff;
+      background: #f1f5f9;
+      color: #1e293b;
       padding: 14mm 14mm 10mm 14mm;
       display: flex;
       align-items: flex-start;
@@ -141,14 +124,14 @@ export async function printDeckblatt(data: DeckblattData) {
     .doc-title {
       font-size: 24pt;
       font-weight: 900;
-      color: #fff;
+      color: #1e293b;
       letter-spacing: -0.01em;
       line-height: 1.1;
     }
 
     .doc-subtitle {
       font-size: 9pt;
-      color: #94a3b8;
+      color: #475569;
       margin-top: 1.5mm;
       letter-spacing: 0.02em;
     }
@@ -385,9 +368,15 @@ export async function printDeckblatt(data: DeckblattData) {
       <div class="doc-title">Verladungs&shy;deckblatt</div>
       <div class="doc-subtitle">${data.bezeichnung ? escHtml(data.bezeichnung) : "&nbsp;"}</div>
     </div>
-    <div class="lkw-id-badge">
-      <div class="lkw-id-label">LKW-ID</div>
-      <div class="lkw-id-value">${escHtml(codeValue)}</div>
+    <div style="display:flex;align-items:flex-start;gap:4mm;">
+      <div class="lkw-id-badge">
+        <div class="lkw-id-label">LKW-ID</div>
+        <div class="lkw-id-value">${escHtml(codeValue)}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:1mm;">
+        <div style="font-size:5.5pt;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#64748b;">QR</div>
+        <img src="${qrDataUrl}" alt="QR ${lkwId}" style="width:22mm;height:22mm;display:block;" />
+      </div>
     </div>
   </div>
 
@@ -468,18 +457,6 @@ export async function printDeckblatt(data: DeckblattData) {
       </div>
     </div>
 
-    <!-- Codes: Barcode + QR -->
-    <div class="codes-section">
-      <div class="barcode-wrap">
-        <div class="barcode-label">Barcode</div>
-        <img class="barcode-img" src="${barcodeDataUrl}" alt="Barcode ${codeValue}" />
-        <div class="barcode-id">${escHtml(codeValue)}</div>
-      </div>
-      <div class="qr-wrap">
-        <div class="qr-label">QR-Code</div>
-        <img class="qr-img" src="${qrDataUrl}" alt="QR ${lkwId}" />
-      </div>
-    </div>
 
   </div><!-- /content -->
 

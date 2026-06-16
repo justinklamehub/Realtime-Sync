@@ -413,23 +413,39 @@ export function ShipmentDrawer({ shipmentId, open, onOpenChange }: ShipmentDrawe
                   <div className="flex items-center justify-between">
                     <Label className="text-xs text-slate-500">ATA <span className="text-slate-400">(COMET)</span></Label>
                     {isCometUser && isEditing && shipmentId && (
-                      <button
-                        type="button"
-                        disabled={quickUpdateMutation.isPending}
-                        onClick={() => {
-                          const now = new Date();
-                          const date = now.toISOString().slice(0, 10);
-                          const time = now.toTimeString().slice(0, 5);
-                          setForm(f => ({ ...f, ataDate: date, ataTime: time }));
-                          quickUpdateMutation.mutate({ id: shipmentId, data: { ataDate: date, ataTime: time } });
-                        }}
-                        className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium transition-colors disabled:opacity-50"
-                      >
-                        {quickUpdateMutation.isPending
-                          ? <Loader2 className="w-3 h-3 animate-spin" />
-                          : <Clock className="w-3 h-3" />}
-                        Jetzt eintragen
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          disabled={quickUpdateMutation.isPending}
+                          onClick={() => {
+                            const now = new Date();
+                            const date = now.toISOString().slice(0, 10);
+                            const time = now.toTimeString().slice(0, 5);
+                            setForm(f => ({ ...f, ataDate: date, ataTime: time }));
+                            quickUpdateMutation.mutate({ id: shipmentId, data: { ataDate: date, ataTime: time } });
+                          }}
+                          className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium transition-colors disabled:opacity-50"
+                        >
+                          {quickUpdateMutation.isPending
+                            ? <Loader2 className="w-3 h-3 animate-spin" />
+                            : <Clock className="w-3 h-3" />}
+                          Jetzt eintragen
+                        </button>
+                        {(form.ataDate || form.ataTime) && (
+                          <button
+                            type="button"
+                            disabled={quickUpdateMutation.isPending}
+                            onClick={() => {
+                              setForm(f => ({ ...f, ataDate: "", ataTime: "" }));
+                              quickUpdateMutation.mutate({ id: shipmentId, data: { ataDate: null, ataTime: null } });
+                            }}
+                            className="flex items-center gap-1 text-xs text-red-500 hover:text-red-600 font-medium transition-colors disabled:opacity-50"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            Löschen
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                   <div className="grid grid-cols-2 gap-3">
