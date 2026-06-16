@@ -1,0 +1,64 @@
+root@crimson-snake-71460:/opt/comet/app# # Login direkt testen (ohne Browser)
+curl -s -c /tmp/cookies.txt -X POST http://localhost/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin123"}' \
+  -w "\n\nHTTP-Status: %{http_code}" | cat
+
+# PM2 Logs der letzten Einträge anzeigen
+pm2 logs comet-api --lines 20 --nostream
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html><head>
+<title>404 Not Found</title>
+</head><body>
+<h1>Not Found</h1>
+<p>The requested URL was not found on this server.</p>
+<hr>
+<address>Apache/2.4.67 (Debian) Server at localhost Port 80</address>
+</body></html>
+
+
+HTTP-Status: 404[TAILING] Tailing last 20 lines for [comet-api] process (change the value with --lines option)
+/root/.pm2/logs/comet-api-out.log last 20 lines:
+0|comet-ap | 81598779418,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":6,"method":"GET","url":"/assets/index-D-kK23UK.css"},"res":{"statusCode":404},"responseTime":1,"msg":"request completed"}
+0|comet-ap | {"level":30,"time":1781598814149,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":7,"method":"GET","url":"/assets/index-qnHIqDw5.js"},"res":{"statusCode":404},"responseTime":1,"msg":"request completed"}
+0|comet-ap | {"level":30,"time":1781598814153,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":8,"method":"GET","url":"/assets/index-D-kK23UK.css"},"res":{"statusCode":404},"responseTime":1,"msg":"request completed"}
+0|comet-ap | {"level":30,"time":1781598814421,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":9,"method":"GET","url":"/favicon.svg"},"res":{"statusCode":404},"responseTime":3,"msg":"request completed"}
+0|comet-ap | {"level":30,"time":1781598838345,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":10,"method":"GET","url":"/assets/index-qnHIqDw5.js"},"res":{"statusCode":404},"responseTime":1,"msg":"request completed"}
+0|comet-ap | {"level":30,"time":1781598838383,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":11,"method":"GET","url":"/assets/index-D-kK23UK.css"},"res":{"statusCode":404},"responseTime":2,"msg":"request completed"}
+0|comet-ap | {"level":30,"time":1781598840725,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":12,"method":"GET","url":"/assets/index-qnHIqDw5.js"},"res":{"statusCode":404},"responseTime":1,"msg":"request completed"}
+0|comet-ap | {"level":30,"time":1781598840757,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":13,"method":"GET","url":"/assets/index-D-kK23UK.css"},"res":{"statusCode":404},"responseTime":1,"msg":"request completed"}
+0|comet-ap | {"level":30,"time":1781598841565,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":14,"method":"GET","url":"/assets/index-qnHIqDw5.js"},"res":{"statusCode":404},"responseTime":1,"msg":"request completed"}
+0|comet-ap | {"level":30,"time":1781598841567,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":15,"method":"GET","url":"/assets/index-D-kK23UK.css"},"res":{"statusCode":404},"responseTime":1,"msg":"request completed"}
+0|comet-ap | {"level":30,"time":1781598842052,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":16,"method":"GET","url":"/assets/index-D-kK23UK.css"},"res":{"statusCode":404},"responseTime":1,"msg":"request completed"}
+0|comet-ap | {"level":30,"time":1781598842054,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":17,"method":"GET","url":"/assets/index-qnHIqDw5.js"},"res":{"statusCode":404},"responseTime":1,"msg":"request completed"}
+0|comet-ap | {"level":30,"time":1781598843889,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":18,"method":"GET","url":"/assets/index-D-kK23UK.css"},"res":{"statusCode":404},"responseTime":1,"msg":"request completed"}
+0|comet-ap | {"level":30,"time":1781598843891,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":19,"method":"GET","url":"/assets/index-qnHIqDw5.js"},"res":{"statusCode":404},"responseTime":1,"msg":"request completed"}
+0|comet-ap | {"level":30,"time":1781598851265,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":20,"method":"GET","url":"/assets/index-D-kK23UK.css"},"res":{"statusCode":404},"responseTime":2,"msg":"request completed"}
+0|comet-ap | {"level":30,"time":1781598851285,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":21,"method":"GET","url":"/assets/index-qnHIqDw5.js"},"res":{"statusCode":404},"responseTime":2,"msg":"request completed"}
+0|comet-ap | {"level":30,"time":1781599022998,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":22,"method":"GET","url":"/assets/index-D-kK23UK.css"},"res":{"statusCode":404},"responseTime":2,"msg":"request completed"}
+0|comet-ap | {"level":30,"time":1781599023000,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":23,"method":"GET","url":"/assets/index-qnHIqDw5.js"},"res":{"statusCode":404},"responseTime":1,"msg":"request completed"}
+0|comet-ap | {"level":30,"time":1781599060306,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":24,"method":"GET","url":"/assets/index-D-kK23UK.css"},"res":{"statusCode":404},"responseTime":1,"msg":"request completed"}
+
+/var/log/comet/api-error.log last 20 lines:
+0|comet-ap | 2026-06-16 11:20:02:
+0|comet-ap | 2026-06-16 11:20:02: Node.js v22.22.3
+0|comet-ap | 2026-06-16 11:20:19: Error: DATABASE_URL must be set. Did you forget to provision a database?
+0|comet-ap | 2026-06-16 11:20:19:     at ../../lib/db/src/index.ts (/opt/comet/app/lib/db/src/index.ts:8:9)
+0|comet-ap | 2026-06-16 11:20:19:     at __init (file:///opt/comet/app/artifacts/api-server/dist/index.mjs:22:56)
+0|comet-ap | 2026-06-16 11:20:19:     at <anonymous> (/opt/comet/app/artifacts/api-server/src/routes/auth.ts:3:1)
+0|comet-ap | 2026-06-16 11:20:19:     at ModuleJob.run (node:internal/modules/esm/module_job:329:25)
+0|comet-ap | 2026-06-16 11:20:19:     at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:26)
+0|comet-ap | 2026-06-16 11:25:10: Error: DATABASE_URL must be set. Did you forget to provision a database?
+0|comet-ap | 2026-06-16 11:25:10:     at ../../lib/db/src/index.ts (/opt/comet/app/lib/db/src/index.ts:8:9)
+0|comet-ap | 2026-06-16 11:25:10:     at __init (file:///opt/comet/app/artifacts/api-server/dist/index.mjs:22:56)
+0|comet-ap | 2026-06-16 11:25:10:     at <anonymous> (/opt/comet/app/artifacts/api-server/src/routes/auth.ts:3:1)
+0|comet-ap | 2026-06-16 11:25:10:     at ModuleJob.run (node:internal/modules/esm/module_job:329:25)
+0|comet-ap | 2026-06-16 11:25:10:     at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:26)
+0|comet-ap | 2026-06-16 11:27:23: Error: DATABASE_URL must be set. Did you forget to provision a database?
+0|comet-ap | 2026-06-16 11:27:23:     at ../../lib/db/src/index.ts (/opt/comet/app/lib/db/src/index.ts:8:9)
+0|comet-ap | 2026-06-16 11:27:23:     at __init (file:///opt/comet/app/artifacts/api-server/dist/index.mjs:22:56)
+0|comet-ap | 2026-06-16 11:27:23:     at <anonymous> (/opt/comet/app/artifacts/api-server/src/routes/auth.ts:3:1)
+0|comet-ap | 2026-06-16 11:27:23:     at ModuleJob.run (node:internal/modules/esm/module_job:329:25)
+0|comet-ap | 2026-06-16 11:27:23:     at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:644:26)
+
+root@crimson-snake-71460:/opt/comet/app#
