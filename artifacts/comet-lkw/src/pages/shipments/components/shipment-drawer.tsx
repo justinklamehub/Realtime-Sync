@@ -421,8 +421,9 @@ export function ShipmentDrawer({ shipmentId, open, onOpenChange }: ShipmentDrawe
                             const now = new Date();
                             const date = now.toISOString().slice(0, 10);
                             const time = now.toTimeString().slice(0, 5);
-                            setForm(f => ({ ...f, ataDate: date, ataTime: time }));
-                            quickUpdateMutation.mutate({ id: shipmentId, data: { ataDate: date, ataTime: time } });
+                            const shouldSetAngekommen = ["Angemeldet", "Erwartet"].includes(form.status);
+                            setForm(f => ({ ...f, ataDate: date, ataTime: time, ...(shouldSetAngekommen ? { status: "Angekommen" } : {}) }));
+                            quickUpdateMutation.mutate({ id: shipmentId, data: { ataDate: date, ataTime: time, ...(shouldSetAngekommen ? { status: "Angekommen" } : {}) } });
                           }}
                           className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium transition-colors disabled:opacity-50"
                         >
