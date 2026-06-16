@@ -346,6 +346,7 @@ export default function ShipmentsPage() {
               </TableHead>
               <TableHead>Art</TableHead>
               <TableHead>Relation</TableHead>
+              <TableHead>Bezeichnung</TableHead>
               <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("etaDate")}>
                 ETA / ATA <SortIcon field="etaDate" sortField={sortField} sortDir={sortDir} />
               </TableHead>
@@ -362,13 +363,13 @@ export default function ShipmentsPage() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={!isViewer && isCometUser ? 9 : 8} className="text-center py-8">
+                <TableCell colSpan={!isViewer && isCometUser ? 10 : 9} className="text-center py-8">
                   <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
                 </TableCell>
               </TableRow>
             ) : sorted.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={!isViewer && isCometUser ? 9 : 8} className="text-center py-8 text-slate-500">
+                <TableCell colSpan={!isViewer && isCometUser ? 10 : 9} className="text-center py-8 text-slate-500">
                   Keine Verladungen gefunden.
                 </TableCell>
               </TableRow>
@@ -398,6 +399,7 @@ export default function ShipmentsPage() {
                   <TableCell>{shipment.speditionName || "-"}</TableCell>
                   <TableCell>{shipment.lkwArt || "-"}</TableCell>
                   <TableCell className="text-slate-600 text-sm">{shipment.relation || "-"}</TableCell>
+                  <TableCell className="text-slate-600 text-sm">{shipment.bezeichnung || "-"}</TableCell>
                   <TableCell>
                     <div className="text-xs">
                       {shipment.etaDate && shipment.etaTime ? (
