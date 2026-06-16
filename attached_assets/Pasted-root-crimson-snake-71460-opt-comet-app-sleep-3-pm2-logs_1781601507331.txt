@@ -1,0 +1,37 @@
+root@crimson-snake-71460:/opt/comet/app# sleep 3 && pm2 logs comet-api --lines 15 --nostream
+[TAILING] Tailing last 15 lines for [comet-api] process (change the value with --lines option)
+/root/.pm2/logs/comet-api-out.log last 15 lines:
+6|comet-ap | g":"request completed"}
+6|comet-ap | {"level":30,"time":1781598838383,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":11,"method":"GET","url":"/assets/index-D-kK23UK.css"},"res":{"statusCode":404},"responseTime":2,"msg":"request completed"}
+6|comet-ap | {"level":30,"time":1781598840725,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":12,"method":"GET","url":"/assets/index-qnHIqDw5.js"},"res":{"statusCode":404},"responseTime":1,"msg":"request completed"}
+6|comet-ap | {"level":30,"time":1781598840757,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":13,"method":"GET","url":"/assets/index-D-kK23UK.css"},"res":{"statusCode":404},"responseTime":1,"msg":"request completed"}
+6|comet-ap | {"level":30,"time":1781598841565,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":14,"method":"GET","url":"/assets/index-qnHIqDw5.js"},"res":{"statusCode":404},"responseTime":1,"msg":"request completed"}
+6|comet-ap | {"level":30,"time":1781598841567,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":15,"method":"GET","url":"/assets/index-D-kK23UK.css"},"res":{"statusCode":404},"responseTime":1,"msg":"request completed"}
+6|comet-ap | {"level":30,"time":1781598842052,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":16,"method":"GET","url":"/assets/index-D-kK23UK.css"},"res":{"statusCode":404},"responseTime":1,"msg":"request completed"}
+6|comet-ap | {"level":30,"time":1781598842054,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":17,"method":"GET","url":"/assets/index-qnHIqDw5.js"},"res":{"statusCode":404},"responseTime":1,"msg":"request completed"}
+6|comet-ap | {"level":30,"time":1781598843889,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":18,"method":"GET","url":"/assets/index-D-kK23UK.css"},"res":{"statusCode":404},"responseTime":1,"msg":"request completed"}
+6|comet-ap | {"level":30,"time":1781598843891,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":19,"method":"GET","url":"/assets/index-qnHIqDw5.js"},"res":{"statusCode":404},"responseTime":1,"msg":"request completed"}
+6|comet-ap | {"level":30,"time":1781598851265,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":20,"method":"GET","url":"/assets/index-D-kK23UK.css"},"res":{"statusCode":404},"responseTime":2,"msg":"request completed"}
+6|comet-ap | {"level":30,"time":1781598851285,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":21,"method":"GET","url":"/assets/index-qnHIqDw5.js"},"res":{"statusCode":404},"responseTime":2,"msg":"request completed"}
+6|comet-ap | {"level":30,"time":1781599022998,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":22,"method":"GET","url":"/assets/index-D-kK23UK.css"},"res":{"statusCode":404},"responseTime":2,"msg":"request completed"}
+6|comet-ap | {"level":30,"time":1781599023000,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":23,"method":"GET","url":"/assets/index-qnHIqDw5.js"},"res":{"statusCode":404},"responseTime":1,"msg":"request completed"}
+6|comet-ap | {"level":30,"time":1781599060306,"pid":26297,"hostname":"crimson-snake-71460","req":{"id":24,"method":"GET","url":"/assets/index-D-kK23UK.css"},"res":{"statusCode":404},"responseTime":1,"msg":"request completed"}
+
+/var/log/comet/api-error.log last 15 lines:
+6|comet-ap | 2026-06-16 11:18:18:   ^
+6|comet-ap | 2026-06-16 11:18:18:
+6|comet-ap | 2026-06-16 11:18:18: Error: Cannot find module '/root/.nvm/versions/node/v22.17.0/lib/node_modules/pm2/lib/ProcessContainerFork.js'
+6|comet-ap | 2026-06-16 11:18:18:     at Function._resolveFilename (node:internal/modules/cjs/loader:1430:15)
+6|comet-ap | 2026-06-16 11:18:18:     at defaultResolveImpl (node:internal/modules/cjs/loader:1040:19)
+6|comet-ap | 2026-06-16 11:18:18:     at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1045:22)
+6|comet-ap | 2026-06-16 11:18:18:     at Function._load (node:internal/modules/cjs/loader:1216:25)
+6|comet-ap | 2026-06-16 11:18:18:     at wrapModuleLoad (node:internal/modules/cjs/loader:254:19)
+6|comet-ap | 2026-06-16 11:18:18:     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+6|comet-ap | 2026-06-16 11:18:18:     at node:internal/main/run_main_module:36:49 {
+6|comet-ap | 2026-06-16 11:18:18:   code: 'MODULE_NOT_FOUND',
+6|comet-ap | 2026-06-16 11:18:18:   requireStack: []
+6|comet-ap | 2026-06-16 11:18:18: }
+6|comet-ap | 2026-06-16 11:18:18:
+6|comet-ap | 2026-06-16 11:18:18: Node.js v22.22.3
+
+root@crimson-snake-71460:/opt/comet/app#
