@@ -1,0 +1,64 @@
+<VirtualHost *:80>
+    ServerName 87.237.54.218
+    ServerAdmin admin@87.237.54.218
+
+    # Logs
+    ErrorLog  ${APACHE_LOG_DIR}/comet-error.log
+    CustomLog ${APACHE_LOG_DIR}/comet-access.log combined
+
+    # ── Statisches Frontend (React/Vite Build) ──────────────
+    DocumentRoot /opt/comet-lkw/Realtime-Sync/artifacts/comet-lkw/dist/public
+
+    <Directory "/opt/comet-lkw/Realtime-Sync/artifacts/comet-lkw/dist/public">
+        Options -Indexes +FollowSymLinks
+        AllowOverride None
+        Require all granted
+
+        # Cache für statische Assets (JS/CSS/Bilder)
+        <FilesMatch "\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$">
+            ExpiresActive On
+            ExpiresDefault "access plus 1 year"
+            Header set Cache-Control "public, immutable"
+        </FilesMatch>
+
+        # SPA-Fallback: Alle unbekannten Pfade → index.html
+        RewriteEngine On
+        RewriteBase /
+        RewriteRule ^index\.html$ - [L]
+        RewriteCond %{REQUEST_FILENAME} !-f
+        RewriteCond %{REQUEST_FILENAME} !-d
+        RewriteRule . /index.html [L]
+    </Directory>
+
+    # ── Socket.IO WebSocket-Verbindungen ────────────────────
+    # WICHTIG: Muss VOR dem allgemeinen /api-Block stehen!
+    #
+    # Wenn der Browser ein WebSocket-Upgrade sendet:
+    RewriteEngine On
+    RewriteCond %{HTTP:Upgrade} =websocket [NC]
+    RewriteRule ^/api/socket\.io/(.*)$ ws://localhost:8080/api/socket.io/$1 [P,L]
+
+    # Socket.IO HTTP-Polling (Fallback, wenn WebSocket nicht verfügbar)
+    ProxyPass        /api/socket.io/ http://localhost:8080/api/socket.io/ nocanon
+    ProxyPassReverse /api/socket.io/ http://localhost:8080/api/socket.io/
+
+    # ── REST-API ────────────────────────────────────────────
+    ProxyPass        /api/ http://localhost:8080/api/
+    ProxyPassReverse /api/ http://localhost:8080/api/
+
+    # Proxy-Header weiterleiten
+    ProxyPreserveHost On
+    RequestHeader set X-Forwarded-Proto "http"
+    RequestHeader set X-Real-IP "%{REMOTE_ADDR}s"
+
+    # Timeouts für lange Socket-Verbindungen
+    ProxyPreserveHost On
+    ProxyRequests Off
+
+    ProxyPass /ev6/socket.io/ ws://127.0.0.1:3002/socket.io/
+    ProxyPassReverse /ev6/socket.io/ ws://127.0.0.1:3002/socket.io/
+
+    ProxyPass /ev6/ http://127.0.0.1:3002/
+    ProxyPassReverse /ev6/ http://127.0.0.1:3002/
+
+</VirtualHost>
