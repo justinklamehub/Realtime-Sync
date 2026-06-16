@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { Server as SocketIOServer } from "socket.io";
 import app, { sessionMiddleware } from "./app";
 import { logger } from "./lib/logger";
+import { seedMissingPermissions } from "./lib/permissions";
 
 const rawPort = process.env["PORT"];
 
@@ -146,10 +147,16 @@ io.on("connection", (socket) => {
   });
 });
 
-httpServer.listen(port, (err?: Error) => {
+httpServer.listen(port, async (err?: Error) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
     process.exit(1);
   }
   logger.info({ port }, "Server listening with Socket.IO");
+  try {
+    await seedMissingPermissions();
+    logger.info("Permissions seeded (missing rows backfilled)");
+  } catch (e) {
+    logger.warn({ err: e }, "seedMissingPermissions failed — non-fatal");
+  }
 });

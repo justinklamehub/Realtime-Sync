@@ -13,7 +13,9 @@ export type Permission =
   | "austrag.create"
   | "austrag.delete"
   | "reconciliation.create"
-  | "reconciliation.sign";
+  | "reconciliation.sign"
+  | "spedition.create"
+  | "spedition.edit";
 
 export type ConfigurableRole =
   | "comet_leitstand"
@@ -45,6 +47,8 @@ export const ALL_PERMISSIONS: Permission[] = [
   "austrag.delete",
   "reconciliation.create",
   "reconciliation.sign",
+  "spedition.create",
+  "spedition.edit",
 ];
 
 export const PERMISSION_LABELS: Record<Permission, { label: string; category: string }> = {
@@ -60,6 +64,8 @@ export const PERMISSION_LABELS: Record<Permission, { label: string; category: st
   "austrag.delete":       { label: "Austrag löschen",         category: "Austragen" },
   "reconciliation.create":{ label: "Abstimmung erstellen",    category: "Abstimmungen" },
   "reconciliation.sign":  { label: "Abstimmung unterzeichnen",category: "Abstimmungen" },
+  "spedition.create":     { label: "Spedition anlegen",        category: "Speditionsverwaltung" },
+  "spedition.edit":       { label: "Spedition bearbeiten",     category: "Speditionsverwaltung" },
 };
 
 export const ROLE_LABELS: Record<string, string> = {
@@ -94,6 +100,17 @@ async function loadCache(): Promise<void> {
 export function invalidatePermissionsCache() {
   permCache = null;
   cacheLoading = null;
+}
+
+/** Ensures every role has a row for every permission (new perms default to false). */
+export async function seedMissingPermissions(): Promise<void> {
+  for (const perm of ALL_PERMISSIONS) {
+    await db.execute(
+      sql`INSERT INTO role_permissions (role, permission, allowed)
+          SELECT role_key, ${perm}, false FROM roles
+          ON CONFLICT (role, permission) DO NOTHING`
+    );
+  }
 }
 
 async function ensureCache(): Promise<Map<string, Map<string, boolean>>> {

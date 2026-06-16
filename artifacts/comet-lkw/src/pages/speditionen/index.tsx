@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useListSpeditionen } from "@workspace/api-client-react";
+import { useListSpeditionen, customFetch } from "@workspace/api-client-react";
+import { useQuery } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,14 +10,23 @@ import { useAuth } from "@/contexts/auth-context";
 
 export default function SpeditionenPage() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "comet_admin";
   const isSpedAdmin = user?.role === "speditions_admin";
+
+  const { data: permissions = {} } = useQuery<Record<string, boolean>>({
+    queryKey: ["my-permissions"],
+    queryFn: () => customFetch("/api/auth/permissions"),
+    staleTime: 60_000,
+  });
+
+  const canCreate = !!permissions["spedition.create"];
+  const canEdit = !!permissions["spedition.edit"];
+
   const { data: speditionen, isLoading } = useListSpeditionen();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editSpedition, setEditSpedition] = useState<any | null>(null);
   const [permSpedition, setPermSpedition] = useState<any | null>(null);
 
-  const hasActions = isAdmin || isSpedAdmin;
+  const hasActions = canCreate || canEdit || isSpedAdmin;
   const colSpan = hasActions ? 6 : 5;
 
   return (
@@ -25,10 +35,10 @@ export default function SpeditionenPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Speditionen</h1>
           <p className="text-sm text-slate-500">
-            {isAdmin ? "Partner-Speditionen und Zugriffsrechte verwalten." : "Übersicht der Speditionen und Ihre Zugriffsrechte."}
+            {(canCreate || canEdit) ? "Partner-Speditionen und Zugriffsrechte verwalten." : "Übersicht der Speditionen und Ihre Zugriffsrechte."}
           </p>
         </div>
-        {isAdmin && (
+        {canCreate && (
           <Button onClick={() => setIsCreateOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Neue Spedition
@@ -88,7 +98,7 @@ export default function SpeditionenPage() {
                     {hasActions && (
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
-                          {isAdmin && (
+                          {canEdit && (
                             <Button
                               variant="ghost"
                               size="icon"
