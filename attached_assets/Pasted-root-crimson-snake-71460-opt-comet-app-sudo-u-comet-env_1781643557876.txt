@@ -1,0 +1,27 @@
+root@crimson-snake-71460:/opt/comet/app# sudo -u comet env PORT=3000 BASE_PATH="/" NODE_ENV=production \
+  pnpm --filter @workspace/comet-lkw run build
+chmod -R o+rX /opt/comet/app/artifacts/comet-lkw/dist/public
+$ vite build --config vite.config.ts
+vite v7.3.3 building client environment for production...
+src/components/ui/tooltip.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/sonner.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/label.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/select.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/sheet.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+✓ 3392 modules transformed.
+✗ Build failed in 9.96s
+error during build:
+[vite:prepare-out-dir] EACCES: permission denied, unlink '/opt/comet/app/artifacts/comet-lkw/dist/public/assets/index-DMEDtgfw.css'
+    at unlinkSync (node:fs:1948:11)
+    at _unlinkSync (node:internal/fs/rimraf:215:14)
+    at rimrafSync (node:internal/fs/rimraf:196:7)
+    at node:internal/fs/rimraf:254:9
+    at Array.forEach (<anonymous>)
+    at _rmdirSync (node:internal/fs/rimraf:251:7)
+    at rimrafSync (node:internal/fs/rimraf:194:7)
+    at Object.rmSync (node:fs:1239:10)
+    at emptyDir (file:///opt/comet/app/node_modules/.pnpm/vite@7.3.3_@types+node@25.6.2_jiti@2.7.0_lightningcss@1.32.0_tsx@4.21.0_yaml@2.8.4/node_modules/vite/dist/node/chunks/config.js:2167:11)
+    at prepareOutDir (file:///opt/comet/app/node_modules/.pnpm/vite@7.3.3_@types+node@25.6.2_jiti@2.7.0_lightningcss@1.32.0_tsx@4.21.0_yaml@2.8.4/node_modules/vite/dist/node/chunks/config.js:33345:55)
+/opt/comet/app/artifacts/comet-lkw:
+[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] @workspace/comet-lkw@0.0.0 build: `vite build --config vite.config.ts`
+Exit status 1
