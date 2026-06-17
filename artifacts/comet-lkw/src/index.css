@@ -253,6 +253,30 @@
 .dark .bg-slate-50.sticky,
 .dark thead .bg-slate-50 { background-color: hsl(222 47% 19%); }
 
+/* ── Dark mode: Recharts Tooltip ────────────────────────────────────────────
+   Recharts schreibt Tooltip-Farben als Inline-Styles → !important nötig.
+   ─────────────────────────────────────────────────────────────────────────── */
+.dark .recharts-default-tooltip {
+  background-color: hsl(222 47% 18%) !important;
+  border-color: hsl(217 32% 28%) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px 0 rgb(0 0 0 / 0.5) !important;
+}
+.dark .recharts-tooltip-label {
+  color: hsl(210 40% 96%) !important;
+}
+.dark .recharts-tooltip-item {
+  color: hsl(210 40% 78%) !important;
+}
+.dark .recharts-tooltip-item-name,
+.dark .recharts-tooltip-item-separator,
+.dark .recharts-tooltip-item-value {
+  color: hsl(210 40% 78%) !important;
+}
+.dark .recharts-legend-item-text {
+  color: hsl(210 40% 78%) !important;
+}
+
 /* Sonner toast progress bar */
 @keyframes toast-progress {
   from { transform: scaleX(1); }
