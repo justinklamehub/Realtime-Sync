@@ -47,13 +47,14 @@ export function useSocket() {
     socket.on("shipment.locked", invalidateShipments);
     socket.on("shipment.unlocked", invalidateShipments);
 
-    // Pallet events
-    const invalidatePallets = () => {
+    // Pallet events — each event only invalidates its own query
+    const invalidatePalletMovements = () =>
       queryClient.invalidateQueries({ queryKey: getListPalletMovementsQueryKey() });
+    const invalidatePalletBalances = () =>
       queryClient.invalidateQueries({ queryKey: getListPalletBalancesQueryKey() });
-    };
-    socket.on("pallet_movement.created", invalidatePallets);
-    socket.on("pallet_balance.updated", invalidatePallets);
+    socket.on("pallet_movement.created", invalidatePalletMovements);
+    socket.on("pallet_movement.created", invalidatePalletBalances);
+    socket.on("pallet_balance.updated", invalidatePalletBalances);
 
     // Reconciliation events
     const invalidateReconciliations = () => {
@@ -63,9 +64,14 @@ export function useSocket() {
     socket.on("reconciliation.updated", invalidateReconciliations);
     socket.on("reconciliation.comment_added", invalidateReconciliations);
 
-    // Dashboard invalidation — fired by any shipment or pallet change
+    // Dashboard — debounced so rapid successive events only trigger one refetch
+    let dashboardTimer: ReturnType<typeof setTimeout> | null = null;
     const invalidateDashboard = () => {
-      queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+      if (dashboardTimer) clearTimeout(dashboardTimer);
+      dashboardTimer = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+        dashboardTimer = null;
+      }, 300);
     };
     socket.on("shipment.created", invalidateDashboard);
     socket.on("shipment.updated", invalidateDashboard);
@@ -98,8 +104,9 @@ export function useSocket() {
       socket.off("shipment.deleted", invalidateShipments);
       socket.off("shipment.locked", invalidateShipments);
       socket.off("shipment.unlocked", invalidateShipments);
-      socket.off("pallet_movement.created", invalidatePallets);
-      socket.off("pallet_balance.updated", invalidatePallets);
+      socket.off("pallet_movement.created", invalidatePalletMovements);
+      socket.off("pallet_movement.created", invalidatePalletBalances);
+      socket.off("pallet_balance.updated", invalidatePalletBalances);
       socket.off("reconciliation.created", invalidateReconciliations);
       socket.off("reconciliation.updated", invalidateReconciliations);
       socket.off("reconciliation.comment_added", invalidateReconciliations);
