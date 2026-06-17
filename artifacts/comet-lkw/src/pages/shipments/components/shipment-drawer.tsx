@@ -24,9 +24,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Lock, LockOpen, AlertCircle, Pencil, Trash2, ClipboardCheck, Plus, Clock, Printer } from "lucide-react";
+import { Loader2, Lock, LockOpen, AlertCircle, Pencil, Trash2, ClipboardCheck, Plus, Clock, Printer, ShieldAlert } from "lucide-react";
 import { printDeckblatt } from "@/lib/print-deckblatt";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
 import { format } from "date-fns";
@@ -73,6 +73,38 @@ export function ShipmentDrawer({ shipmentId, open, onOpenChange }: ShipmentDrawe
   const { data: speditionen } = useListSpeditionen();
   const { data: austraege } = useListLkwAustraege(shipmentId || undefined, {
     query: { enabled: !!shipmentId && open && isCometUser, queryKey: getListLkwAustraegeQueryKey(shipmentId || undefined) },
+  });
+
+  const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
+
+  const { data: gefahrgutChecklisten, isLoading: gefahrgutLoading } = useQuery({
+    queryKey: ["gefahrgut-checklisten", shipmentId],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/gefahrgut-checklisten?shipmentId=${shipmentId}`, { credentials: "include" });
+      if (!res.ok) return [] as any[];
+      return res.json() as Promise<any[]>;
+    },
+    enabled: !!shipmentId && open && isCometUser,
+  });
+
+  const resetGefahrgutMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`${API_BASE}/gefahrgut-checklisten/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as any).error ?? "Fehler beim Zurücksetzen");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["gefahrgut-checklisten", shipmentId] });
+      queryClient.invalidateQueries({ queryKey: ["gefahrgut-status"] });
+      toast({ title: "Checkliste zurückgesetzt" });
+    },
+    onError: (e: any) => toast({ title: e.message ?? "Fehler", variant: "destructive" }),
   });
 
   useEffect(() => {
@@ -353,6 +385,16 @@ export function ShipmentDrawer({ shipmentId, open, onOpenChange }: ShipmentDrawe
               {isEditing && <TabsTrigger value="history" className="flex-1">Verlauf</TabsTrigger>}
               {isEditing && <TabsTrigger value="paletten" className="flex-1">Paletten</TabsTrigger>}
               {isEditing && isCometUser && <TabsTrigger value="austragen" className="flex-1">Austragen</TabsTrigger>}
+              {isEditing && isCometUser && (
+                <TabsTrigger value="gefahrgut" className="flex-1 gap-1">
+                  Gefahrgut
+                  {gefahrgutChecklisten && gefahrgutChecklisten.length > 0 && (
+                    <span className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-[10px] leading-none px-1 py-0.5 rounded-full">
+                      {gefahrgutChecklisten.length}
+                    </span>
+                  )}
+                </TabsTrigger>
+              )}
             </TabsList>
 
             <TabsContent value="details" className="space-y-4">
@@ -731,6 +773,80 @@ export function ShipmentDrawer({ shipmentId, open, onOpenChange }: ShipmentDrawe
                     <Plus className="w-4 h-4 mr-2" />
                     Neuer Austrag
                   </Button>
+                )}
+              </TabsContent>
+            )}
+            {isEditing && isCometUser && (
+              <TabsContent value="gefahrgut" className="space-y-3">
+                {gefahrgutLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  </div>
+                ) : !gefahrgutChecklisten || gefahrgutChecklisten.length === 0 ? (
+                  <div className="text-center py-8 space-y-2">
+                    <ShieldAlert className="w-10 h-10 text-slate-300 mx-auto" />
+                    <p className="text-sm text-slate-500">Noch keine Checkliste eingereicht.</p>
+                    <p className="text-xs text-slate-400">
+                      Scanner:{" "}
+                      <a href="/scanner" target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                        /scanner
+                      </a>
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {gefahrgutChecklisten.map((cl: any) => {
+                      const items = (cl.items ?? {}) as Record<string, any>;
+                      const bCount = Object.entries(items).filter(([k, v]) => k.endsWith("_b") && v === true).length;
+                      const vCount = Object.entries(items).filter(([k, v]) => k.endsWith("_v") && v === true).length;
+                      return (
+                        <div key={cl.id} className="border border-slate-200 rounded-md p-3 bg-slate-50 text-sm space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="font-semibold text-slate-700 text-xs">
+                              {cl.eingereichtAt ? format(new Date(cl.eingereichtAt), "dd.MM.yyyy HH:mm") : "—"} Uhr
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-red-400 hover:text-red-600"
+                              onClick={() => resetGefahrgutMutation.mutate(cl.id)}
+                              disabled={resetGefahrgutMutation.isPending}
+                              title="Checkliste zurücksetzen (Berechtigung: gefahrgut.reset)"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-slate-600">
+                            {cl.nameFahrer && <div><span className="text-slate-400">Fahrer:</span> {cl.nameFahrer}</div>}
+                            {cl.nameVerlader && <div><span className="text-slate-400">Verlader:</span> {cl.nameVerlader}</div>}
+                            {cl.spedition && <div><span className="text-slate-400">Spedition:</span> {cl.spedition}</div>}
+                            {cl.anhaenger && <div><span className="text-slate-400">Anhänger:</span> {cl.anhaenger}</div>}
+                          </div>
+                          <div className="flex flex-wrap gap-2 text-xs">
+                            <span className="font-medium text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">B: {bCount}/17</span>
+                            <span className="font-medium text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">V: {vCount}/17</span>
+                            {cl.unterschriftFahrer && <span className="text-slate-500 border border-slate-200 px-2 py-0.5 rounded-full bg-white">✓ Unterschrift F.</span>}
+                            {cl.unterschriftVerlader && <span className="text-slate-500 border border-slate-200 px-2 py-0.5 rounded-full bg-white">✓ Unterschrift V.</span>}
+                          </div>
+                          {(cl.palettenAngeliefert != null || cl.palettenVerladen != null) && (
+                            <div className="flex gap-4 text-xs border-t border-slate-200 pt-1.5">
+                              {cl.palettenAngeliefert != null && (
+                                <span><span className="text-slate-400">Angeliefert:</span> {cl.palettenAngeliefert}{cl.davonDefekteAngeliefert ? ` (${cl.davonDefekteAngeliefert} def.)` : ""}</span>
+                              )}
+                              {cl.palettenVerladen != null && (
+                                <span><span className="text-slate-400">Verladen:</span> {cl.palettenVerladen}{cl.davonDefekteVerladen ? ` (${cl.davonDefekteVerladen} def.)` : ""}</span>
+                              )}
+                            </div>
+                          )}
+                          {cl.bemerkungen && (
+                            <div className="text-xs text-slate-500 border-t border-slate-200 pt-1.5 italic">
+                              {cl.bemerkungen}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
               </TabsContent>
             )}

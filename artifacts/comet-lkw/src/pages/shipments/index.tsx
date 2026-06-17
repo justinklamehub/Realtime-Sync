@@ -7,13 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, Loader2, Plus, Lock, ArrowRight, ArrowUp, ArrowDown, ChevronsUpDown, X, Download, FileSpreadsheet, Wifi, WifiOff } from "lucide-react";
+import { Search, Loader2, Plus, Lock, ArrowRight, ArrowUp, ArrowDown, ChevronsUpDown, X, Download, FileSpreadsheet, Wifi, WifiOff, ClipboardCheck } from "lucide-react";
 import * as XLSX from "xlsx";
 import { ShipmentDrawer } from "./components/shipment-drawer";
 import { BulkCreateDialog } from "./components/bulk-create-dialog";
 import { useAuth } from "@/contexts/auth-context";
 import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { getListShipmentsQueryKey } from "@workspace/api-client-react";
 import { useSocket } from "@/hooks/use-socket";
 
@@ -81,6 +81,22 @@ export default function ShipmentsPage() {
   const { data: shipments, isLoading } = useListShipments(queryParams);
   const { data: speditionen } = useListSpeditionen();
   const updateShipment = useUpdateShipment();
+
+  const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
+  const { data: gefahrgutStatus } = useQuery({
+    queryKey: ["gefahrgut-status"],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/gefahrgut-status`, { credentials: "include" });
+      if (!res.ok) return { shipmentIds: [] as number[] };
+      return res.json() as Promise<{ shipmentIds: number[] }>;
+    },
+    enabled: isCometUser,
+    staleTime: 30_000,
+  });
+  const gefahrgutSet = useMemo(
+    () => new Set(gefahrgutStatus?.shipmentIds ?? []),
+    [gefahrgutStatus]
+  );
 
   function toggleSort(field: SortField) {
     if (sortField === field) {
@@ -520,11 +536,18 @@ export default function ShipmentsPage() {
                   </TableCell>
                   <TableCell className="font-medium">{shipment.tor || "-"}</TableCell>
                   <TableCell>
-                    {shipment.gesperrtFuerSpedition ? (
-                      <Lock className="w-4 h-4 text-red-500" />
-                    ) : (
-                      <ArrowRight className="w-4 h-4 text-slate-300" />
-                    )}
+                    <div className="flex items-center gap-1.5">
+                      {isCometUser && gefahrgutSet.has(shipment.id) && (
+                        <span title="Gefahrgut-Checkliste vorhanden">
+                          <ClipboardCheck className="w-3.5 h-3.5 text-amber-500" />
+                        </span>
+                      )}
+                      {shipment.gesperrtFuerSpedition ? (
+                        <Lock className="w-4 h-4 text-red-500" />
+                      ) : (
+                        <ArrowRight className="w-4 h-4 text-slate-300" />
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))

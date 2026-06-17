@@ -15,7 +15,8 @@ export type Permission =
   | "reconciliation.create"
   | "reconciliation.sign"
   | "spedition.create"
-  | "spedition.edit";
+  | "spedition.edit"
+  | "gefahrgut.reset";
 
 export type ConfigurableRole =
   | "comet_leitstand"
@@ -49,6 +50,7 @@ export const ALL_PERMISSIONS: Permission[] = [
   "reconciliation.sign",
   "spedition.create",
   "spedition.edit",
+  "gefahrgut.reset",
 ];
 
 export const PERMISSION_LABELS: Record<Permission, { label: string; category: string }> = {
@@ -66,6 +68,7 @@ export const PERMISSION_LABELS: Record<Permission, { label: string; category: st
   "reconciliation.sign":  { label: "Abstimmung unterzeichnen",category: "Abstimmungen" },
   "spedition.create":     { label: "Spedition anlegen",        category: "Speditionsverwaltung" },
   "spedition.edit":       { label: "Spedition bearbeiten",     category: "Speditionsverwaltung" },
+  "gefahrgut.reset":      { label: "Checkliste zurücksetzen",  category: "Gefahrgut" },
 };
 
 export const ROLE_LABELS: Record<string, string> = {
