@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
-import { Loader2, Plus, Download, BarChart2 } from "lucide-react";
+import { Loader2, Plus, Download, BarChart2, FileDown } from "lucide-react";
+import * as XLSX from "xlsx";
 import { MovementDialog } from "./components/movement-dialog";
 import { MovementDetailSheet } from "./components/movement-detail-sheet";
 import { ShipmentDrawer } from "@/pages/shipments/components/shipment-drawer";
@@ -34,6 +35,45 @@ export default function PalettenPage() {
   const [reportData, setReportData] = useState<any[]>([]);
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState("");
+
+  const getReportRows = () => {
+    const cols = ["Spedition", "Anfangsbestand", "Zugänge (+)", "Abgänge (−)", "Korrekturen", "Endbestand", "Def. von COMET", "Def. an COMET", "Def. Gesamt"];
+    const rows = reportData.map(r => [
+      r.speditionName, r.anfangsbestand, r.zugaenge, r.abgaenge, r.korrekturen, r.endbestand,
+      r.defekteVonComet, r.defekteAnComet, r.defekteGesamt,
+    ]);
+    const totals = ["Gesamt",
+      reportData.reduce((s, r) => s + r.anfangsbestand, 0),
+      reportData.reduce((s, r) => s + r.zugaenge, 0),
+      reportData.reduce((s, r) => s + r.abgaenge, 0),
+      reportData.reduce((s, r) => s + r.korrekturen, 0),
+      reportData.reduce((s, r) => s + r.endbestand, 0),
+      reportData.reduce((s, r) => s + r.defekteVonComet, 0),
+      reportData.reduce((s, r) => s + r.defekteAnComet, 0),
+      reportData.reduce((s, r) => s + r.defekteGesamt, 0),
+    ];
+    return { cols, rows, totals };
+  };
+
+  const handleExportCsv = () => {
+    const { cols, rows, totals } = getReportRows();
+    const escape = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const lines = [cols, ...rows, totals].map(row => row.map(escape).join(","));
+    const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `paletten-auswertung-${reportFrom}-${reportTo}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportXlsx = () => {
+    const { cols, rows, totals } = getReportRows();
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([cols, ...rows, totals]);
+    ws["!cols"] = cols.map((_, i) => ({ wch: i === 0 ? 28 : 16 }));
+    XLSX.utils.book_append_sheet(wb, ws, "Auswertung");
+    XLSX.writeFile(wb, `paletten-auswertung-${reportFrom}-${reportTo}.xlsx`);
+  };
 
   const handleLoadReport = async () => {
     if (!reportFrom || !reportTo) return;
@@ -280,6 +320,18 @@ export default function PalettenPage() {
                 {reportLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <BarChart2 className="w-4 h-4 mr-2" />}
                 Anzeigen
               </Button>
+              {reportData.length > 0 && (
+                <>
+                  <Button variant="outline" size="sm" onClick={handleExportCsv}>
+                    <FileDown className="w-4 h-4 mr-2" />
+                    CSV
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleExportXlsx}>
+                    <FileDown className="w-4 h-4 mr-2" />
+                    XLSX
+                  </Button>
+                </>
+              )}
             </div>
 
             {reportError && (
