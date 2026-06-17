@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, Loader2, Plus, Lock, ArrowRight, ArrowUp, ArrowDown, ChevronsUpDown, X } from "lucide-react";
+import { Search, Loader2, Plus, Lock, ArrowRight, ArrowUp, ArrowDown, ChevronsUpDown, X, Download, FileSpreadsheet } from "lucide-react";
+import * as XLSX from "xlsx";
 import { ShipmentDrawer } from "./components/shipment-drawer";
 import { BulkCreateDialog } from "./components/bulk-create-dialog";
 import { useAuth } from "@/contexts/auth-context";
@@ -152,6 +153,52 @@ export default function ShipmentsPage() {
     setFilterDateTo("");
   }
 
+  function buildExportRows(rows: Shipment[]) {
+    return rows.map((s) => ({
+      ID: s.id,
+      Kennzeichen: s.kennzeichen ?? "",
+      Spedition: s.speditionName ?? "",
+      "LKW-Art": s.lkwArt ?? "",
+      Relation: s.relation ?? "",
+      Bezeichnung: s.bezeichnung ?? "",
+      "ETA-Datum": s.etaDate ? format(new Date(s.etaDate), "dd.MM.yyyy") : "",
+      "ETA-Zeit": s.etaTime ?? "",
+      "ATA-Datum": s.ataDate ? format(new Date(s.ataDate), "dd.MM.yyyy") : "",
+      "ATA-Zeit": s.ataTime ?? "",
+      Status: s.status,
+      Ware: (s as any).wareStatus ?? "",
+      Tor: s.tor ?? "",
+      Gesperrt: s.gesperrtFuerSpedition ? "Ja" : "Nein",
+      Bemerkungen: s.bemerkungen ?? "",
+    }));
+  }
+
+  function exportCsv() {
+    const rows = buildExportRows(sorted);
+    if (!rows.length) return;
+    const headers = Object.keys(rows[0]);
+    const lines = [
+      headers.join(";"),
+      ...rows.map((r) => headers.map((h) => String((r as any)[h]).replace(/;/g, ",")).join(";")),
+    ];
+    const blob = new Blob(["\uFEFF" + lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `verladungen_${format(new Date(), "yyyyMMdd")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function exportXlsx() {
+    const rows = buildExportRows(sorted);
+    if (!rows.length) return;
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Verladungen");
+    XLSX.writeFile(wb, `verladungen_${format(new Date(), "yyyyMMdd")}.xlsx`);
+  }
+
   const hasActiveFilters =
     search.length > 0 ||
     filterStatus !== "__all__" ||
@@ -168,18 +215,40 @@ export default function ShipmentsPage() {
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Verladungen</h1>
           <p className="text-sm text-slate-500">Verwalten und verfolgen Sie alle LKW-Bewegungen.</p>
         </div>
-        {!isViewer && (
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setIsBulkOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Massenanlage
-            </Button>
-            <Button onClick={() => { setSelectedShipmentId(null); setIsDrawerOpen(true); }}>
-              <Plus className="w-4 h-4 mr-2" />
-              Neue Verladung
-            </Button>
-          </div>
-        )}
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={sorted.length === 0}
+            onClick={exportCsv}
+            className="h-9"
+          >
+            <Download className="w-4 h-4 mr-1.5" />
+            CSV
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={sorted.length === 0}
+            onClick={exportXlsx}
+            className="h-9"
+          >
+            <FileSpreadsheet className="w-4 h-4 mr-1.5" />
+            Excel
+          </Button>
+          {!isViewer && (
+            <>
+              <Button variant="outline" onClick={() => setIsBulkOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Massenanlage
+              </Button>
+              <Button onClick={() => { setSelectedShipmentId(null); setIsDrawerOpen(true); }}>
+                <Plus className="w-4 h-4 mr-2" />
+                Neue Verladung
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm space-y-3">
