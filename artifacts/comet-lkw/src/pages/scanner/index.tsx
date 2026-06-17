@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useLocation } from "wouter";
-import { Loader2, Search, Truck, AlertTriangle, CheckCircle2, Hash } from "lucide-react";
+import { Loader2, Search, Truck, AlertTriangle, CheckCircle2, Hash, ClipboardCheck } from "lucide-react";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
@@ -135,6 +135,8 @@ export default function ScannerLandingPage() {
   const [searched, setSearched] = useState(false);
   const [shipment, setShipment] = useState<ShipmentInfo>(null);
   const [spedition, setSpedition] = useState<string | null>(null);
+  const [checklistCount, setChecklistCount] = useState(0);
+  const [confirmedDuplicate, setConfirmedDuplicate] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const [, setLocation] = useLocation();
 
@@ -144,14 +146,17 @@ export default function ScannerLandingPage() {
     if (!val || isNaN(Number(val))) return;
     setIsSearching(true);
     setSearched(false);
+    setConfirmedDuplicate(false);
     try {
       const res = await fetch(`${API}/scanner/find-shipment?id=${encodeURIComponent(val)}`);
       const data = await res.json();
       setShipment(data.found ? data.shipment : null);
       setSpedition(data.spedition ?? null);
+      setChecklistCount(data.checklistCount ?? 0);
       setSearched(true);
     } catch {
       setShipment(null);
+      setChecklistCount(0);
       setSearched(true);
     } finally {
       setIsSearching(false);
@@ -249,10 +254,43 @@ export default function ScannerLandingPage() {
                 <span style={S.infoLabel}>Status</span>
                 <span style={S.infoValue}>{shipment.status}</span>
               </div>
-              <button style={S.btnGreen} onClick={() => goToChecklist(shipment, spedition)}>
-                <Truck size={18} />
-                CHECKLISTE AUSFÜLLEN
-              </button>
+
+              {checklistCount > 0 && !confirmedDuplicate ? (
+                <div style={{ marginTop: 14 }}>
+                  <div style={{
+                    background: "rgba(251,191,36,0.1)",
+                    border: "1px solid #f59e0b",
+                    borderRadius: 8,
+                    padding: "12px 14px",
+                    marginBottom: 12,
+                    display: "flex",
+                    gap: 10,
+                    alignItems: "flex-start",
+                  }}>
+                    <ClipboardCheck size={18} color="#f59e0b" style={{ flexShrink: 0, marginTop: 1 }} />
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#fbbf24", marginBottom: 3 }}>
+                        Checkliste bereits vorhanden
+                      </div>
+                      <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.4 }}>
+                        Für diese Verladung {checklistCount === 1 ? "wurde bereits 1 Checkliste" : `wurden bereits ${checklistCount} Checklisten`} eingereicht. Soll trotzdem eine weitere ausgefüllt werden?
+                      </div>
+                    </div>
+                  </div>
+                  <button style={S.btnGreen} onClick={() => setConfirmedDuplicate(true)}>
+                    <Truck size={18} />
+                    JA, WEITERE CHECKLISTE AUSFÜLLEN
+                  </button>
+                  <button style={S.btnGray} onClick={() => { setSearched(false); setShipment(null); }}>
+                    ABBRECHEN
+                  </button>
+                </div>
+              ) : (
+                <button style={{ ...S.btnGreen, marginTop: 14 }} onClick={() => goToChecklist(shipment, spedition)}>
+                  <Truck size={18} />
+                  CHECKLISTE AUSFÜLLEN
+                </button>
+              )}
             </>
           ) : (
             <>

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { gefahrgutChecklistenTable, shipmentsTable, speditionenTable } from "@workspace/db";
-import { eq, desc, isNotNull } from "drizzle-orm";
+import { eq, desc, isNotNull, count } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { isCometRole } from "../lib/auth";
 import { can } from "../lib/permissions";
@@ -46,7 +46,12 @@ router.get("/scanner/find-shipment", async (req, res) => {
       if (speds.length > 0) speditionName = speds[0].name;
     }
 
-    return res.json({ found: true, shipment, spedition: speditionName });
+    const [{ value: checklistCount }] = await db
+      .select({ value: count() })
+      .from(gefahrgutChecklistenTable)
+      .where(eq(gefahrgutChecklistenTable.shipmentId, shipment.id));
+
+    return res.json({ found: true, shipment, spedition: speditionName, checklistCount });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Serverfehler" });
