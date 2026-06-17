@@ -48,32 +48,32 @@ export async function printDeckblatt(data: DeckblattData) {
 
   const codeValue = String(data.shipmentId);
   const qrDataUrl = await QRCode.toDataURL(codeValue, {
-    width: 200,
+    width: 400,
     margin: 1,
     color: { dark: "#0f172a", light: "#ffffff" },
     errorCorrectionLevel: "M",
   });
 
   /*
-   * Seitenaufbau — alle Höhen explizit in mm, Summe = 297mm
-   *   Header  :  30mm
-   *   Content : 260mm  (padding 4+4mm innen, nutzbar 252mm)
+   * Seitenaufbau — alle Höhen explizit in mm
+   *   Header  :  42mm  (LKW-ID links | Relation GROSS mittig)
+   *   Content : 176mm  (padding 4+4mm innen, nutzbar 168mm)
    *   Footer  :   7mm
-   *   Gesamt  : 297mm
+   *   Gesamt  : 225mm  (Puffer zu 297mm)
    *
-   * Innerhalb Content (252mm nutzbar):
+   * Innerhalb Content (168mm nutzbar):
    *   Spedition          : 11mm
    *   gap+divider        :  4mm
    *   Kennzeichen-Zeile  : 12mm
    *   gap+divider        :  4mm
-   *   Relation/ETA-Zeile : 18mm
+   *   ETA-Zeile          : 11mm
    *   gap+divider        :  4mm
-   *   Bemerkungen        : 16mm
+   *   Bemerkungen        : 30mm  (größer)
    *   gap+divider        :  4mm
    *   Paletten           : 14mm
    *   gap                :  3mm
-   *   Zeichenkasten      : 162mm   ← Rest
-   *   Summe              : 252mm ✓
+   *   Bottom-Row         : 71mm  (Zeichenkasten + QR nebeneinander)
+   *   Summe              : 168mm ✓
    */
 
   const html = `<!DOCTYPE html>
@@ -111,14 +111,13 @@ export async function printDeckblatt(data: DeckblattData) {
       break-inside: avoid;
     }
 
-    /* ── HEADER  30mm ───────────────────────────────── */
+    /* ── HEADER  42mm ───────────────────────────────── */
     .header {
-      height: 30mm;
+      height: 42mm;
       background: #f1f5f9;
       padding: 4mm 14mm;
       display: flex;
       align-items: center;
-      justify-content: space-between;
       gap: 6mm;
       flex-shrink: 0;
       overflow: hidden;
@@ -150,31 +149,44 @@ export async function printDeckblatt(data: DeckblattData) {
       line-height: 1;
     }
 
-    .qr-wrap {
+    /* Relation im Header — groß, mittig, füllt den Rest */
+    .header-relation {
+      flex: 1;
       display: flex;
       flex-direction: column;
-      align-items: center;
-      gap: 1mm;
-      flex-shrink: 0;
+      justify-content: center;
+      overflow: hidden;
     }
 
-    .qr-label {
-      font-size: 5.5pt;
+    .header-relation-label {
+      font-size: 6pt;
       font-weight: 700;
-      letter-spacing: 0.12em;
+      letter-spacing: 0.14em;
       text-transform: uppercase;
-      color: #64748b;
+      color: #94a3b8;
+      margin-bottom: 1mm;
     }
 
-    .qr-img {
-      width: 20mm;
-      height: 20mm;
-      display: block;
+    .header-relation-value {
+      font-size: 28pt;
+      font-weight: 900;
+      color: #0f172a;
+      line-height: 1.05;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
-    /* ── CONTENT  218mm ─────────────────────────────── */
+    .header-relation-value.empty {
+      color: #cbd5e1;
+      font-weight: 400;
+      font-style: italic;
+      font-size: 20pt;
+    }
+
+    /* ── CONTENT  176mm ─────────────────────────────── */
     .content {
-      height: 218mm;
+      height: 176mm;
       flex-shrink: 0;
       padding: 4mm 14mm;
       display: flex;
@@ -202,7 +214,6 @@ export async function printDeckblatt(data: DeckblattData) {
       overflow: hidden;
     }
 
-    .field-value.xl    { font-size: 24pt; line-height: 1.05; }
     .field-value.large { font-size: 15pt; }
 
     .field-value.empty {
@@ -212,12 +223,12 @@ export async function printDeckblatt(data: DeckblattData) {
     }
 
     /* ── SEKTIONEN MIT FIXER HÖHE ───────────────────── */
-    .sec-spedition      { height: 11mm; overflow: hidden; flex-shrink: 0; }
-    .sec-kennzeichen    { height: 12mm; overflow: hidden; flex-shrink: 0; }
-    .sec-relation       { height: 18mm; overflow: hidden; flex-shrink: 0; }
-    .sec-bemerkungen    { height: 16mm; overflow: hidden; flex-shrink: 0; }
-    .sec-paletten       { height: 14mm; overflow: hidden; flex-shrink: 0; }
-    .sec-zeichenkasten  { height: 120mm; overflow: hidden; flex-shrink: 0; }
+    .sec-spedition   { height: 11mm; overflow: hidden; flex-shrink: 0; }
+    .sec-kennzeichen { height: 12mm; overflow: hidden; flex-shrink: 0; }
+    .sec-eta         { height: 11mm; overflow: hidden; flex-shrink: 0; }
+    .sec-bemerkungen { height: 30mm; overflow: hidden; flex-shrink: 0; }
+    .sec-paletten    { height: 14mm; overflow: hidden; flex-shrink: 0; }
+    .sec-bottom-row  { height: 71mm; overflow: hidden; flex-shrink: 0; }
 
     /* ── GAP + DIVIDER ──────────────────────────────── */
     .gap-divider {
@@ -237,7 +248,6 @@ export async function printDeckblatt(data: DeckblattData) {
     /* ── GRID ───────────────────────────────────────── */
     .row { display: flex; gap: 6mm; height: 100%; }
     .col { flex: 1; overflow: hidden; }
-    .col-2 { flex: 2; overflow: hidden; }
     .col-auto { flex: none; min-width: 26mm; overflow: hidden; }
 
     /* ── BEMERKUNGEN ────────────────────────────────── */
@@ -245,15 +255,15 @@ export async function printDeckblatt(data: DeckblattData) {
       background: #f8fafc;
       border: 0.3mm solid #e2e8f0;
       border-radius: 2mm;
-      padding: 2mm 4mm;
-      height: 10mm;
+      padding: 3mm 5mm;
+      height: 23mm;
       overflow: hidden;
     }
 
     .bemerkungen-text {
-      font-size: 9pt;
+      font-size: 11pt;
       color: #1e293b;
-      line-height: 1.35;
+      line-height: 1.4;
       word-break: break-word;
       white-space: pre-wrap;
     }
@@ -300,11 +310,17 @@ export async function printDeckblatt(data: DeckblattData) {
       opacity: 0.25;
     }
 
-    /* ── ZEICHENKASTEN ──────────────────────────────── */
+    /* ── BOTTOM ROW: Zeichenkasten + QR ─────────────── */
+    .bottom-row {
+      display: flex;
+      gap: 4mm;
+      height: 100%;
+    }
+
     .zeichenkasten {
+      flex: 1;
       border: 0.6mm solid #0f172a;
       border-radius: 2mm;
-      height: 100%;
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -324,9 +340,6 @@ export async function printDeckblatt(data: DeckblattData) {
     .zeichenkasten-body {
       flex: 1;
       position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: center;
       overflow: hidden;
     }
 
@@ -340,17 +353,42 @@ export async function printDeckblatt(data: DeckblattData) {
       background-size: 10mm 10mm;
     }
 
-    .zeichenkasten-inner {
-      position: relative;
-      z-index: 1;
+    /* QR-Box neben dem Zeichenkasten */
+    .qr-box {
+      width: 60mm;
+      flex-shrink: 0;
+      border: 0.6mm solid #0f172a;
+      border-radius: 2mm;
       display: flex;
       flex-direction: column;
       align-items: center;
+      justify-content: center;
       gap: 2mm;
-      pointer-events: none;
-      user-select: none;
+      overflow: hidden;
+      padding: 3mm;
     }
 
+    .qr-box-label {
+      font-size: 6pt;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #64748b;
+    }
+
+    .qr-box-img {
+      width: 52mm;
+      height: 52mm;
+      display: block;
+    }
+
+    .qr-box-id {
+      font-size: 9pt;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: #0f172a;
+      font-variant-numeric: tabular-nums;
+    }
 
     /* ── FOOTER  7mm ────────────────────────────────── */
     .footer {
@@ -374,19 +412,21 @@ export async function printDeckblatt(data: DeckblattData) {
 <body>
 <div class="page">
 
-  <!-- HEADER 30mm -->
+  <!-- HEADER 42mm: LKW-ID | Relation GROSS | -->
   <div class="header">
     <div class="lkw-id-badge">
       <div class="lkw-id-label">LKW-ID</div>
       <div class="lkw-id-value">${escHtml(codeValue)}</div>
     </div>
-    <div class="qr-wrap">
-      <div class="qr-label">QR</div>
-      <img src="${qrDataUrl}" alt="QR ${lkwId}" class="qr-img" />
+    <div class="header-relation">
+      <div class="header-relation-label">Relation / Leitgebiet</div>
+      <div class="header-relation-value ${!data.relation ? "empty" : ""}">
+        ${data.relation ? escHtml(data.relation) : "—"}
+      </div>
     </div>
   </div>
 
-  <!-- CONTENT 260mm -->
+  <!-- CONTENT 176mm -->
   <div class="content">
 
     <!-- Spedition 11mm -->
@@ -425,27 +465,17 @@ export async function printDeckblatt(data: DeckblattData) {
 
     <div class="gap-divider"><div class="gap-divider-inner"></div></div>
 
-    <!-- Relation + ETA 18mm -->
-    <div class="sec-relation">
-      <div class="row">
-        <div class="col-2">
-          <div class="field-label">Relation / Leitgebiet</div>
-          <div class="field-value xl ${!data.relation ? "empty" : ""}">
-            ${data.relation ? escHtml(data.relation) : "—"}
-          </div>
-        </div>
-        <div class="col">
-          <div class="field-label">Voraussichtl. Ankunft</div>
-          <div class="field-value large ${!data.etaDate ? "empty" : ""}">
-            ${escHtml(eta)}
-          </div>
-        </div>
+    <!-- Voraussichtl. Ankunft 11mm -->
+    <div class="sec-eta">
+      <div class="field-label">Voraussichtl. Ankunft</div>
+      <div class="field-value large ${!data.etaDate ? "empty" : ""}">
+        ${escHtml(eta)}
       </div>
     </div>
 
     <div class="gap-divider"><div class="gap-divider-inner"></div></div>
 
-    <!-- Bemerkungen 16mm -->
+    <!-- Bemerkungen 30mm -->
     <div class="sec-bemerkungen">
       <div class="field-label">Bemerkungen</div>
       <div class="bemerkungen-box">
@@ -472,11 +502,18 @@ export async function printDeckblatt(data: DeckblattData) {
 
     <div class="gap-only"></div>
 
-    <!-- Zeichenkasten 162mm -->
-    <div class="sec-zeichenkasten">
-      <div class="zeichenkasten">
-        <div class="zeichenkasten-header">Palettenstand — Skizze (Draufsicht)</div>
-        <div class="zeichenkasten-body"></div>
+    <!-- Bottom-Row 71mm: Zeichenkasten + QR nebeneinander -->
+    <div class="sec-bottom-row">
+      <div class="bottom-row">
+        <div class="zeichenkasten">
+          <div class="zeichenkasten-header">Palettenstand — Skizze (Draufsicht)</div>
+          <div class="zeichenkasten-body"></div>
+        </div>
+        <div class="qr-box">
+          <div class="qr-box-label">QR-Code</div>
+          <img src="${qrDataUrl}" alt="QR ${lkwId}" class="qr-box-img" />
+          <div class="qr-box-id">${escHtml(lkwId)}</div>
+        </div>
       </div>
     </div>
 
