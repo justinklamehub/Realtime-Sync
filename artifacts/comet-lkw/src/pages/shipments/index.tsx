@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, Loader2, Plus, Lock, ArrowRight, ArrowUp, ArrowDown, ChevronsUpDown, X, Download, FileSpreadsheet } from "lucide-react";
+import { Search, Loader2, Plus, Lock, ArrowRight, ArrowUp, ArrowDown, ChevronsUpDown, X, Download, FileSpreadsheet, Wifi, WifiOff } from "lucide-react";
 import * as XLSX from "xlsx";
 import { ShipmentDrawer } from "./components/shipment-drawer";
 import { BulkCreateDialog } from "./components/bulk-create-dialog";
@@ -15,6 +15,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListShipmentsQueryKey } from "@workspace/api-client-react";
+import { useSocket } from "@/hooks/use-socket";
 
 const STATUS_OPTIONS = ["Angemeldet", "Erwartet", "Angekommen", "in Verladung", "Verladen", "Abgefertigt", "Storniert"];
 const LKW_ART_OPTIONS = ["Container", "Anlieferung", "Abholung", "Sattelzug", "Wechselbrücke", "Sonstige"];
@@ -44,6 +45,7 @@ export default function ShipmentsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isConnected } = useSocket();
   const role = user?.role ?? "";
   const isCometUser = ["comet_admin", "comet_leitstand", "comet_lager"].includes(role);
   const isViewer = role === "comet_viewer" || role === "speditions_viewer";
@@ -212,7 +214,19 @@ export default function ShipmentsPage() {
     <div className="space-y-6 max-w-[1600px] mx-auto">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Verladungen</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Verladungen</h1>
+            <span
+              className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full border ${
+                isConnected
+                  ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800"
+                  : "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800"
+              }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? "bg-green-500 animate-pulse" : "bg-red-500"}`} />
+              {isConnected ? "Live" : "Getrennt"}
+            </span>
+          </div>
           <p className="text-sm text-slate-500">Verwalten und verfolgen Sie alle LKW-Bewegungen.</p>
         </div>
         <div className="flex gap-2 flex-wrap">

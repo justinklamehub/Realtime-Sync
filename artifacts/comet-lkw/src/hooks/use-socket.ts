@@ -43,6 +43,7 @@ export function useSocket() {
     socket.on("shipment.created", invalidateShipments);
     socket.on("shipment.updated", invalidateShipments);
     socket.on("shipment.status_changed", invalidateShipments);
+    socket.on("shipment.deleted", invalidateShipments);
     socket.on("shipment.locked", invalidateShipments);
     socket.on("shipment.unlocked", invalidateShipments);
 
@@ -94,6 +95,7 @@ export function useSocket() {
       socket.off("shipment.created", invalidateShipments);
       socket.off("shipment.updated", invalidateShipments);
       socket.off("shipment.status_changed", invalidateShipments);
+      socket.off("shipment.deleted", invalidateShipments);
       socket.off("shipment.locked", invalidateShipments);
       socket.off("shipment.unlocked", invalidateShipments);
       socket.off("pallet_movement.created", invalidatePallets);
