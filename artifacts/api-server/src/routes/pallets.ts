@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import {
   palletMovementsTable,
+  palletPlantCountsTable,
   speditionenTable,
   usersTable,
   shipmentsTable,
@@ -312,6 +313,38 @@ router.get("/pallet-export", requireAuth, async (req, res) => {
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="paletten-export.csv"`);
     return res.send(lines.join("\n"));
+  } catch (err) {
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.get("/pallet-plant-count", requireAuth, async (req, res) => {
+  try {
+    const rows = await db
+      .select()
+      .from(palletPlantCountsTable)
+      .orderBy(palletPlantCountsTable.recordedAt);
+    return res.json(rows);
+  } catch (err) {
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/pallet-plant-count", requireAuth, async (req, res) => {
+  try {
+    const role = req.session.role!;
+    if (!can(role, "pallet.create")) {
+      return res.status(403).json({ error: "Keine Berechtigung" });
+    }
+    const { recordedAt, amount, note } = req.body as { recordedAt: string; amount: number; note?: string };
+    if (!recordedAt || amount == null || isNaN(Number(amount))) {
+      return res.status(400).json({ error: "recordedAt und amount sind erforderlich" });
+    }
+    const [row] = await db
+      .insert(palletPlantCountsTable)
+      .values({ recordedAt, amount: Number(amount), note: note || null, createdBy: req.session.userId })
+      .returning();
+    return res.json(row);
   } catch (err) {
     return res.status(500).json({ error: "Internal server error" });
   }

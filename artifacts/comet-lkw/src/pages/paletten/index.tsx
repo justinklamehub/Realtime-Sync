@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
-import { Loader2, Plus, Download, BarChart2, FileDown } from "lucide-react";
+import { Loader2, Plus, Download, BarChart2, FileDown, ClipboardList } from "lucide-react";
 import * as XLSX from "xlsx";
 import { MovementDialog } from "./components/movement-dialog";
 import { MovementDetailSheet } from "./components/movement-detail-sheet";
@@ -36,23 +36,70 @@ export default function PalettenPage() {
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState("");
 
+  const [plantCounts, setPlantCounts] = useState<any[]>([]);
+  const [inventurOpen, setInventurOpen] = useState(false);
+  const [inventurDate, setInventurDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [inventurAmount, setInventurAmount] = useState("");
+  const [inventurNote, setInventurNote] = useState("");
+  const [inventurSaving, setInventurSaving] = useState(false);
+  const [inventurError, setInventurError] = useState("");
+
+  const loadPlantCounts = async () => {
+    try {
+      const res = await fetch("/api/pallet-plant-count", { credentials: "include" });
+      if (res.ok) setPlantCounts(await res.json());
+    } catch { /* ignore */ }
+  };
+
+  const handleSavePlantCount = async () => {
+    const amt = Number(inventurAmount);
+    if (!inventurDate || isNaN(amt)) { setInventurError("Datum und Menge erforderlich"); return; }
+    setInventurSaving(true);
+    setInventurError("");
+    try {
+      const res = await fetch("/api/pallet-plant-count", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recordedAt: inventurDate, amount: amt, note: inventurNote || undefined }),
+      });
+      if (!res.ok) {
+        let msg = "Fehler";
+        try { msg = (await res.json()).error ?? msg; } catch { /* ignore */ }
+        throw new Error(msg);
+      }
+      await loadPlantCounts();
+      setInventurOpen(false);
+      setInventurAmount("");
+      setInventurNote("");
+    } catch (e: any) {
+      setInventurError(e.message ?? "Unbekannter Fehler");
+    } finally {
+      setInventurSaving(false);
+    }
+  };
+
+  const plantCountTotal = plantCounts.reduce((s, p) => s + p.amount, 0);
+
   const getReportRows = () => {
-    const cols = ["Spedition", "Anfangsbestand", "Zugänge (+)", "Abgänge (−)", "Korrekturen", "Endbestand", "Def. von COMET", "Def. an COMET", "Def. Gesamt"];
+    const cols = ["Position", "Anfangsbestand", "Zugänge (+)", "Abgänge (−)", "Korrekturen", "Endbestand", "Def. von COMET", "Def. an COMET", "Def. Gesamt"];
     const rows = reportData.map(r => [
       r.speditionName, r.anfangsbestand, r.zugaenge, r.abgaenge, r.korrekturen, r.endbestand,
       r.defekteVonComet, r.defekteAnComet, r.defekteGesamt,
     ]);
-    const totals = ["Gesamt",
+    const calcEndbestand = reportData.reduce((s, r) => s + r.endbestand, 0);
+    const inventurRows = plantCounts.map(p => [`Inventur Werk (${p.recordedAt})`, "", "", "", "", p.amount, "", "", p.note || ""]);
+    const totals = ["Gesamt (inkl. Inventur)",
       reportData.reduce((s, r) => s + r.anfangsbestand, 0),
       reportData.reduce((s, r) => s + r.zugaenge, 0),
       reportData.reduce((s, r) => s + r.abgaenge, 0),
       reportData.reduce((s, r) => s + r.korrekturen, 0),
-      reportData.reduce((s, r) => s + r.endbestand, 0),
+      calcEndbestand + plantCountTotal,
       reportData.reduce((s, r) => s + r.defekteVonComet, 0),
       reportData.reduce((s, r) => s + r.defekteAnComet, 0),
       reportData.reduce((s, r) => s + r.defekteGesamt, 0),
     ];
-    return { cols, rows, totals };
+    return { cols, rows: [...rows, ...inventurRows], totals };
   };
 
   const handleExportCsv = () => {
@@ -305,7 +352,7 @@ export default function PalettenPage() {
         </Table>
       </div>
 
-      <Dialog open={reportOpen} onOpenChange={(v) => { setReportOpen(v); if (!v) setReportData([]); }}>
+      <Dialog open={reportOpen} onOpenChange={(v) => { setReportOpen(v); if (v) loadPlantCounts(); else setReportData([]); }}>
         <DialogContent className="sm:max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Paletten-Auswertung</DialogTitle>
@@ -324,6 +371,12 @@ export default function PalettenPage() {
                 {reportLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <BarChart2 className="w-4 h-4 mr-2" />}
                 Anzeigen
               </Button>
+              {canWrite && (
+                <Button variant="outline" size="sm" onClick={() => { setInventurError(""); setInventurOpen(true); }}>
+                  <ClipboardList className="w-4 h-4 mr-2" />
+                  Inventur erfassen
+                </Button>
+              )}
               {reportData.length > 0 && (
                 <>
                   <Button variant="outline" size="sm" onClick={handleExportCsv}>
@@ -347,7 +400,7 @@ export default function PalettenPage() {
                 <Table>
                   <TableHeader className="bg-slate-50">
                     <TableRow>
-                      <TableHead>Spedition</TableHead>
+                      <TableHead>Spedition / Position</TableHead>
                       <TableHead className="text-right">Anfangsbestand</TableHead>
                       <TableHead className="text-right text-green-700">Zugänge (+)</TableHead>
                       <TableHead className="text-right text-red-700">Abgänge (−)</TableHead>
@@ -378,16 +431,41 @@ export default function PalettenPage() {
                         </TableCell>
                       </TableRow>
                     ))}
-                    <TableRow className="bg-slate-50 font-semibold border-t-2 border-slate-300">
-                      <TableCell>Gesamt</TableCell>
+                    {plantCounts.length > 0 && (
+                      <TableRow className="bg-blue-50 border-t border-blue-200">
+                        <TableCell colSpan={9} className="py-1 px-4 text-xs font-semibold text-blue-700 uppercase tracking-wide">
+                          Inventur Werk
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {plantCounts.map((pc) => (
+                      <TableRow key={pc.id} className="bg-blue-50/60">
+                        <TableCell className="font-medium text-blue-800">
+                          <span className="flex flex-col">
+                            <span>Paletten im Werk</span>
+                            <span className="text-xs text-blue-500 font-normal">{pc.recordedAt}{pc.note ? ` — ${pc.note}` : ""}</span>
+                          </span>
+                        </TableCell>
+                        <TableCell />
+                        <TableCell />
+                        <TableCell />
+                        <TableCell />
+                        <TableCell className="text-right font-bold font-mono text-blue-700">+{pc.amount}</TableCell>
+                        <TableCell />
+                        <TableCell />
+                        <TableCell />
+                      </TableRow>
+                    ))}
+                    <TableRow className="bg-slate-100 font-bold border-t-2 border-slate-400">
+                      <TableCell>Gesamt {plantCounts.length > 0 ? "(inkl. Inventur)" : ""}</TableCell>
                       <TableCell className="text-right font-mono">{reportData.reduce((s, r) => s + r.anfangsbestand, 0)}</TableCell>
                       <TableCell className="text-right font-mono text-green-700">+{reportData.reduce((s, r) => s + r.zugaenge, 0)}</TableCell>
                       <TableCell className="text-right font-mono text-red-700">−{reportData.reduce((s, r) => s + r.abgaenge, 0)}</TableCell>
                       <TableCell className="text-right font-mono text-orange-700">
                         {(() => { const t = reportData.reduce((s, r) => s + r.korrekturen, 0); return t > 0 ? `+${t}` : t; })()}
                       </TableCell>
-                      <TableCell className="text-right font-bold font-mono">
-                        {(() => { const t = reportData.reduce((s, r) => s + r.endbestand, 0); return t > 0 ? `+${t}` : t; })()}
+                      <TableCell className="text-right font-bold font-mono text-slate-800">
+                        {(() => { const t = reportData.reduce((s, r) => s + r.endbestand, 0) + plantCountTotal; return t > 0 ? `+${t}` : t; })()}
                       </TableCell>
                       <TableCell className="text-right font-mono">{reportData.reduce((s, r) => s + r.defekteVonComet, 0) || "—"}</TableCell>
                       <TableCell className="text-right font-mono">{reportData.reduce((s, r) => s + r.defekteAnComet, 0) || "—"}</TableCell>
@@ -401,6 +479,53 @@ export default function PalettenPage() {
             {!reportLoading && reportData.length === 0 && !reportError && reportFrom && reportTo && (
               <p className="text-center text-slate-400 py-6">Keine Daten für diesen Zeitraum.</p>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={inventurOpen} onOpenChange={setInventurOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Inventur Werk erfassen</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-1">
+            <p className="text-sm text-slate-500">
+              Tragen Sie die tatsächliche Anzahl der Paletten im Werk ein. Der Wert wird als eigene Position im Auswertungsbericht angezeigt und zum Endbestand addiert.
+            </p>
+            <div className="space-y-1">
+              <Label className="text-xs text-slate-500">Datum der Zählung</Label>
+              <Input type="date" value={inventurDate} onChange={e => setInventurDate(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-slate-500">Anzahl Paletten im Werk</Label>
+              <Input
+                type="number"
+                min="0"
+                placeholder="z.B. 150"
+                value={inventurAmount}
+                onChange={e => setInventurAmount(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-slate-500">Bemerkung (optional)</Label>
+              <Input
+                placeholder="z.B. Jahresinventur 2025"
+                value={inventurNote}
+                onChange={e => setInventurNote(e.target.value)}
+              />
+            </div>
+            {inventurError && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2">{inventurError}</p>
+            )}
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" size="sm" onClick={() => setInventurOpen(false)} disabled={inventurSaving}>
+                Abbrechen
+              </Button>
+              <Button size="sm" onClick={handleSavePlantCount} disabled={inventurSaving || !inventurDate || !inventurAmount}>
+                {inventurSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                Speichern
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

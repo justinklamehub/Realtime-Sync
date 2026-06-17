@@ -42,6 +42,15 @@ export const reconciliationCommentsTable = pgTable("reconciliation_comments", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const palletPlantCountsTable = pgTable("pallet_plant_counts", {
+  id: serial("id").primaryKey(),
+  recordedAt: date("recorded_at").notNull(),
+  amount: integer("amount").notNull(),
+  note: text("note"),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const insertPalletMovementSchema = createInsertSchema(palletMovementsTable).omit({ id: true, createdAt: true });
 export type InsertPalletMovement = z.infer<typeof insertPalletMovementSchema>;
 export type PalletMovement = typeof palletMovementsTable.$inferSelect;
