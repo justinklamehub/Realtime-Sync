@@ -23,6 +23,7 @@ router.get("/scanner/find-shipment", async (req, res) => {
         id: shipmentsTable.id,
         kennzeichen: shipmentsTable.kennzeichen,
         bezeichnung: shipmentsTable.bezeichnung,
+        relation: shipmentsTable.relation,
         speditionId: shipmentsTable.speditionId,
         status: shipmentsTable.status,
       })

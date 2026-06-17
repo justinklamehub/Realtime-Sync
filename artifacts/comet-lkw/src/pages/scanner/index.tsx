@@ -125,6 +125,7 @@ type ShipmentInfo = {
   id: number;
   kennzeichen: string | null;
   bezeichnung: string | null;
+  relation: string | null;
   status: string;
 } | null;
 
@@ -230,6 +231,12 @@ export default function ScannerLandingPage() {
                 <div style={S.infoRow}>
                   <span style={S.infoLabel}>Bezeichnung</span>
                   <span style={S.infoValue}>{shipment.bezeichnung}</span>
+                </div>
+              )}
+              {shipment.relation && (
+                <div style={S.infoRow}>
+                  <span style={S.infoLabel}>Relation</span>
+                  <span style={S.infoValue}>{shipment.relation}</span>
                 </div>
               )}
               {spedition && (
