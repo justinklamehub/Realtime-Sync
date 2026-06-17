@@ -253,6 +253,16 @@
 .dark .bg-slate-50.sticky,
 .dark thead .bg-slate-50 { background-color: hsl(222 47% 19%); }
 
+/* Tabellen-Zeilen: Hover-Hintergrund im Dunkelmodus */
+.dark .hover\:bg-slate-50:hover  { background-color: hsl(222 47% 21%) !important; }
+.dark .hover\:bg-slate-100:hover { background-color: hsl(222 47% 23%) !important; }
+.dark .hover\:bg-white:hover     { background-color: hsl(222 47% 21%) !important; }
+/* shadcn TableRow default hover (hover:bg-muted via CSS var — bereits ok) */
+/* Zusatz für direkte Inline-Klassen auf TableRow */
+.dark tr:hover > td,
+.dark tr.hover\:bg-slate-50:hover,
+.dark tr.hover\:bg-white:hover   { background-color: hsl(222 47% 21%); }
+
 /* ── Dark mode: Recharts Tooltip ────────────────────────────────────────────
    Recharts schreibt Tooltip-Farben als Inline-Styles → !important nötig.
    ─────────────────────────────────────────────────────────────────────────── */
