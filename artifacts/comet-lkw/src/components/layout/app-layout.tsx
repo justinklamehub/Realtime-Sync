@@ -17,7 +17,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   }, [collapsed]);
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-slate-950 w-full overflow-hidden">
+    <div className="flex h-screen bg-slate-50 dark:bg-slate-900 w-full overflow-hidden">
       <AppSidebar
         collapsed={collapsed}
         onToggle={() => setCollapsed((c) => !c)}

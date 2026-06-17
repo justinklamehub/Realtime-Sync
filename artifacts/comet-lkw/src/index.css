@@ -223,6 +223,36 @@
   }
 }
 
+/* ── Dark mode: auto-adapt hardcoded light-mode utility classes ─────────────
+   Alle Seiten nutzen slate-Farben direkt (text-slate-900, bg-white, …).
+   Diese Overrides sorgen dafür, dass sie im Dunkelmodus automatisch passen,
+   ohne jede Seite einzeln anzupassen.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Überschriften & Texte */
+.dark .text-slate-900 { color: hsl(210 40% 96%); }
+.dark .text-slate-800 { color: hsl(210 40% 90%); }
+.dark .text-slate-700 { color: hsl(210 40% 82%); }
+.dark .text-slate-600 { color: hsl(210 30% 70%); }
+
+/* Karten-Hintergründe */
+.dark .bg-white       { background-color: hsl(222 47% 16%); }
+.dark .bg-slate-50    { background-color: hsl(222 47% 19%); }
+.dark .bg-slate-100   { background-color: hsl(222 47% 22%); }
+
+/* Rahmen */
+.dark .border-slate-200 { border-color: hsl(217 32% 24%); }
+.dark .border-slate-100 { border-color: hsl(217 32% 20%); }
+
+/* Schatten: auf dunklem Hintergrund stärker */
+.dark .shadow-sm {
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.4), 0 1px 2px -1px rgb(0 0 0 / 0.4);
+}
+
+/* Table-Header */
+.dark .bg-slate-50.sticky,
+.dark thead .bg-slate-50 { background-color: hsl(222 47% 19%); }
+
 /* Sonner toast progress bar */
 @keyframes toast-progress {
   from { transform: scaleX(1); }
