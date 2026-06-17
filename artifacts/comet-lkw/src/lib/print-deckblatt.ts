@@ -40,23 +40,6 @@ function escHtml(str: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function statusDotClass(status?: string | null): string {
-  switch (status) {
-    case "Angekommen":
-    case "Verladen":
-      return "blue";
-    case "Abgefertigt":
-      return "";
-    case "Storniert":
-      return "red";
-    case "Erwartet":
-      return "orange";
-    default:
-      return "gray";
-  }
-}
-
-
 export async function printDeckblatt(data: DeckblattData) {
   const now = new Date();
   const printTs = format(now, "dd.MM.yyyy HH:mm:ss", { locale: de });
@@ -104,50 +87,23 @@ export async function printDeckblatt(data: DeckblattData) {
     /* ── HEADER ─────────────────────────────────────── */
     .header {
       background: #f1f5f9;
-      color: #1e293b;
-      padding: 14mm 14mm 10mm 14mm;
+      padding: 10mm 14mm 8mm 14mm;
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       justify-content: space-between;
       gap: 6mm;
     }
 
-    .company-name {
-      font-size: 9pt;
-      font-weight: 700;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: #64748b;
-      margin-bottom: 2mm;
-    }
-
-    .doc-title {
-      font-size: 24pt;
-      font-weight: 900;
-      color: #1e293b;
-      letter-spacing: -0.01em;
-      line-height: 1.1;
-    }
-
-    .doc-subtitle {
-      font-size: 9pt;
-      color: #475569;
-      margin-top: 1.5mm;
-      letter-spacing: 0.02em;
-    }
-
-    /* ── LKW-ID BADGE ───────────────────────────────── */
     .lkw-id-badge {
       background: #c0392b;
       border-radius: 3mm;
-      padding: 3.5mm 7mm;
+      padding: 4mm 8mm;
       text-align: center;
-      min-width: 42mm;
       flex-shrink: 0;
     }
 
     .lkw-id-label {
-      font-size: 6pt;
+      font-size: 7pt;
       font-weight: 700;
       letter-spacing: 0.16em;
       text-transform: uppercase;
@@ -156,46 +112,43 @@ export async function printDeckblatt(data: DeckblattData) {
     }
 
     .lkw-id-value {
-      font-size: 19pt;
+      font-size: 30pt;
       font-weight: 900;
       color: #fff;
       letter-spacing: 0.04em;
       font-variant-numeric: tabular-nums;
+      line-height: 1;
     }
 
-    /* ── STATUS BANNER ──────────────────────────────── */
-    .status-banner {
-      background: #1e293b;
-      color: #94a3b8;
-      font-size: 8pt;
-      font-weight: 600;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      padding: 2mm 14mm;
+    .qr-wrap {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 4mm;
-    }
-
-    .status-dot {
-      width: 2.5mm;
-      height: 2.5mm;
-      border-radius: 50%;
-      background: #22c55e;
+      gap: 1mm;
       flex-shrink: 0;
     }
-    .status-dot.orange { background: #f59e0b; }
-    .status-dot.blue   { background: #3b82f6; }
-    .status-dot.red    { background: #ef4444; }
-    .status-dot.gray   { background: #6b7280; }
+
+    .qr-label {
+      font-size: 5.5pt;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #64748b;
+    }
+
+    .qr-img {
+      width: 22mm;
+      height: 22mm;
+      display: block;
+    }
 
     /* ── CONTENT ────────────────────────────────────── */
     .content {
       flex: 1;
-      padding: 8mm 14mm 6mm 14mm;
+      padding: 6mm 14mm 5mm 14mm;
       display: flex;
       flex-direction: column;
-      gap: 5.5mm;
+      gap: 5mm;
     }
 
     /* ── FIELD ──────────────────────────────────────── */
@@ -216,8 +169,9 @@ export async function printDeckblatt(data: DeckblattData) {
       word-break: break-word;
     }
 
-    .field-value.large { font-size: 17pt; }
-    .field-value.medium { font-size: 12pt; }
+    .field-value.xl    { font-size: 32pt; line-height: 1.05; }
+    .field-value.large { font-size: 18pt; }
+    .field-value.std   { font-size: 14pt; }
 
     .field-value.empty {
       color: #cbd5e1;
@@ -243,115 +197,133 @@ export async function printDeckblatt(data: DeckblattData) {
       border: 0.3mm solid #e2e8f0;
       border-radius: 2mm;
       padding: 4mm 5mm;
-      min-height: 16mm;
+      min-height: 12mm;
     }
 
     .bemerkungen-text {
-      font-size: 10.5pt;
+      font-size: 10pt;
       color: #1e293b;
       line-height: 1.5;
       word-break: break-word;
       white-space: pre-wrap;
     }
 
-    /* ── PALETTEN WRITE-IN ──────────────────────────── */
-    .paletten-writein {
+    /* ── PALETTEN WRITEIN ───────────────────────────── */
+    .paletten-row {
+      display: flex;
+      align-items: stretch;
       border: 0.6mm solid #0f172a;
       border-radius: 2mm;
-      padding: 5mm 6mm 4mm 6mm;
+      min-height: 18mm;
     }
 
-    .paletten-writein .field-label {
-      font-size: 7pt;
-      margin-bottom: 3mm;
+    .paletten-label-cell {
+      padding: 4mm 5mm;
+      border-right: 0.6mm solid #0f172a;
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+      min-width: 52mm;
     }
 
-    .writein-lines {
+    .paletten-label-text {
+      font-size: 11pt;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #0f172a;
+      line-height: 1.2;
+    }
+
+    .paletten-writein-cell {
+      flex: 1;
+      padding: 3mm 5mm;
       display: flex;
       flex-direction: column;
-      gap: 6mm;
+      justify-content: flex-end;
+      gap: 5mm;
     }
 
     .writein-line {
       height: 0.3mm;
       background: #334155;
-      opacity: 0.3;
+      opacity: 0.25;
     }
 
-    /* ── CODES SECTION ──────────────────────────────── */
-    .codes-section {
-      border-top: 0.8mm solid #0f172a;
-      padding-top: 5mm;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8mm;
-    }
-
-    .barcode-wrap {
+    /* ── ZEICHENKASTEN ──────────────────────────────── */
+    .zeichenkasten {
+      border: 0.6mm solid #0f172a;
+      border-radius: 2mm;
       flex: 1;
       display: flex;
       flex-direction: column;
-      align-items: flex-start;
-      gap: 1.5mm;
+      min-height: 70mm;
+      overflow: hidden;
     }
 
-    .barcode-label {
-      font-size: 6.5pt;
+    .zeichenkasten-header {
+      background: #0f172a;
+      color: #f1f5f9;
+      font-size: 7pt;
       font-weight: 700;
       letter-spacing: 0.14em;
       text-transform: uppercase;
-      color: #64748b;
+      padding: 2mm 5mm;
     }
 
-    .barcode-img {
-      max-width: 100%;
-      height: 18mm;
-      display: block;
+    .zeichenkasten-body {
+      flex: 1;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
-    .barcode-id {
-      font-size: 9pt;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      color: #0f172a;
-      font-variant-numeric: tabular-nums;
+    /* Grid-Hintergrund */
+    .zeichenkasten-body::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(to right,  #e2e8f0 0.25mm, transparent 0.25mm),
+        linear-gradient(to bottom, #e2e8f0 0.25mm, transparent 0.25mm);
+      background-size: 10mm 10mm;
     }
 
-    .qr-wrap {
+    /* Fahrtrichtungs-Pfeile */
+    .zeichenkasten-inner {
+      position: relative;
+      z-index: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 1.5mm;
-      flex-shrink: 0;
+      gap: 3mm;
+      pointer-events: none;
+      user-select: none;
     }
 
-    .qr-label {
-      font-size: 6.5pt;
+    .fahrt-label {
+      font-size: 7pt;
       font-weight: 700;
-      letter-spacing: 0.14em;
+      letter-spacing: 0.16em;
       text-transform: uppercase;
-      color: #64748b;
+      color: #94a3b8;
     }
 
-    .qr-img {
-      width: 28mm;
-      height: 28mm;
-      display: block;
+    .arrow-svg {
+      opacity: 0.18;
     }
 
     /* ── FOOTER ─────────────────────────────────────── */
     .footer {
       border-top: 0.25mm solid #e2e8f0;
-      padding: 3.5mm 14mm;
+      padding: 3mm 14mm;
       display: flex;
       align-items: center;
       justify-content: space-between;
       font-size: 7pt;
       color: #94a3b8;
     }
-
-    .footer-star { color: #c0392b; font-size: 9pt; margin-right: 1.5mm; }
 
     @media print {
       html, body { width: 210mm; }
@@ -361,30 +333,16 @@ export async function printDeckblatt(data: DeckblattData) {
 <body>
 <div class="page">
 
-  <!-- HEADER -->
+  <!-- HEADER: nur LKW-ID + QR -->
   <div class="header">
-    <div>
-      <div class="company-name">COMET Feuerwerk GmbH</div>
-      <div class="doc-title">Verladungs&shy;deckblatt</div>
-      <div class="doc-subtitle">${data.bezeichnung ? escHtml(data.bezeichnung) : "&nbsp;"}</div>
+    <div class="lkw-id-badge">
+      <div class="lkw-id-label">LKW-ID</div>
+      <div class="lkw-id-value">${escHtml(codeValue)}</div>
     </div>
-    <div style="display:flex;align-items:flex-start;gap:4mm;">
-      <div class="lkw-id-badge">
-        <div class="lkw-id-label">LKW-ID</div>
-        <div class="lkw-id-value">${escHtml(codeValue)}</div>
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:1mm;">
-        <div style="font-size:5.5pt;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#64748b;">QR</div>
-        <img src="${qrDataUrl}" alt="QR ${lkwId}" style="width:22mm;height:22mm;display:block;" />
-      </div>
+    <div class="qr-wrap">
+      <div class="qr-label">QR</div>
+      <img src="${qrDataUrl}" alt="QR ${lkwId}" class="qr-img" />
     </div>
-  </div>
-
-  <!-- STATUS BANNER -->
-  <div class="status-banner">
-    <div class="status-dot ${statusDotClass(data.status)}"></div>
-    <span>Status:&nbsp;${escHtml(data.status || "—")}</span>
-    ${data.lkwArt ? `<span style="margin-left:auto;color:#475569;">${escHtml(data.lkwArt)}</span>` : ""}
   </div>
 
   <!-- CONTENT -->
@@ -400,12 +358,18 @@ export async function printDeckblatt(data: DeckblattData) {
 
     <div class="divider"></div>
 
-    <!-- Kennzeichen + Tor -->
+    <!-- Kennzeichen + Bezeichnung -->
     <div class="row">
       <div class="col">
         <div class="field-label">Kennzeichen</div>
         <div class="field-value large ${!data.kennzeichen ? "empty" : ""}">
           ${data.kennzeichen ? escHtml(data.kennzeichen) : "—"}
+        </div>
+      </div>
+      <div class="col">
+        <div class="field-label">Bezeichnung</div>
+        <div class="field-value large ${!data.bezeichnung ? "empty" : ""}">
+          ${data.bezeichnung ? escHtml(data.bezeichnung) : "—"}
         </div>
       </div>
       <div class="col-auto">
@@ -418,17 +382,17 @@ export async function printDeckblatt(data: DeckblattData) {
 
     <div class="divider"></div>
 
-    <!-- Relation + ETA -->
+    <!-- Relation GROSS + ETA GROSS -->
     <div class="row">
       <div class="col-2">
         <div class="field-label">Relation / Leitgebiet</div>
-        <div class="field-value medium ${!data.relation ? "empty" : ""}">
+        <div class="field-value xl ${!data.relation ? "empty" : ""}">
           ${data.relation ? escHtml(data.relation) : "—"}
         </div>
       </div>
       <div class="col">
         <div class="field-label">Voraussichtl. Ankunft</div>
-        <div class="field-value medium ${!data.etaDate ? "empty" : ""}">
+        <div class="field-value large ${!data.etaDate ? "empty" : ""}">
           ${escHtml(eta)}
         </div>
       </div>
@@ -438,7 +402,7 @@ export async function printDeckblatt(data: DeckblattData) {
 
     <!-- Bemerkungen -->
     <div>
-      <div class="field-label">Bemerkungen Lager / Spedition</div>
+      <div class="field-label">Bemerkungen</div>
       <div class="bemerkungen-box">
         <div class="bemerkungen-text ${!data.bemerkungen ? "empty" : ""}">
           ${data.bemerkungen ? escHtml(data.bemerkungen) : "Keine Bemerkungen"}
@@ -448,24 +412,38 @@ export async function printDeckblatt(data: DeckblattData) {
 
     <div class="divider"></div>
 
-    <!-- Paletten Write-In -->
-    <div class="paletten-writein">
-      <div class="field-label">Anzahl Paletten &nbsp;(handschriftlich)</div>
-      <div class="writein-lines">
+    <!-- Anzahl Paletten: Label links, Schreibfeld rechts -->
+    <div class="paletten-row">
+      <div class="paletten-label-cell">
+        <div class="paletten-label-text">Anzahl<br/>Paletten</div>
+      </div>
+      <div class="paletten-writein-cell">
         <div class="writein-line"></div>
         <div class="writein-line"></div>
       </div>
     </div>
 
+    <!-- Zeichenkasten: Palettenstand aufzeichnen -->
+    <div class="zeichenkasten">
+      <div class="zeichenkasten-header">Palettenstand — Skizze (Draufsicht)</div>
+      <div class="zeichenkasten-body">
+        <div class="zeichenkasten-inner">
+          <div class="fahrt-label">▲ Fahrtrichtung</div>
+          <svg class="arrow-svg" width="60" height="60" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <line x1="30" y1="55" x2="30" y2="5"  stroke="#0f172a" stroke-width="3" stroke-linecap="round"/>
+            <polyline points="15,22 30,5 45,22" fill="none" stroke="#0f172a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+            <line x1="5"  y1="30" x2="55" y2="30" stroke="#0f172a" stroke-width="3" stroke-linecap="round"/>
+            <polyline points="38,15 55,30 38,45" fill="none" stroke="#0f172a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+          </svg>
+        </div>
+      </div>
+    </div>
 
   </div><!-- /content -->
 
   <!-- FOOTER -->
   <div class="footer">
-    <div style="display:flex;align-items:center;">
-      <span class="footer-star">★</span>
-      <span>Ausdruck vom ${escHtml(printTs)} Uhr</span>
-    </div>
+    <span>Ausdruck vom ${escHtml(printTs)} Uhr</span>
     <span>${escHtml(data.username)}</span>
   </div>
 
