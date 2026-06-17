@@ -7,7 +7,7 @@ import {
   usersTable,
   shipmentsTable,
 } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq, gte, lte, inArray, sql, desc } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { logAudit } from "../lib/audit";
 import { emitToRooms } from "../lib/socket-emit";
@@ -33,35 +33,43 @@ router.get("/pallet-movements", requireAuth, async (req, res) => {
     const role = req.session.role!;
     const sessionSpeditionId = req.session.speditionId;
 
-    let rows = await db.select().from(palletMovementsTable);
+    const effectiveSpedId = SPED_ROLES.includes(role)
+      ? sessionSpeditionId ?? -1
+      : speditionId ? Number(speditionId) : null;
 
-    if (SPED_ROLES.includes(role)) {
-      if (!sessionSpeditionId) return res.json([]);
-      rows = rows.filter((m) => m.speditionId === sessionSpeditionId);
-    } else if (speditionId) {
-      rows = rows.filter((m) => m.speditionId === Number(speditionId));
-    }
+    const conditions = [];
+    if (effectiveSpedId !== null) conditions.push(eq(palletMovementsTable.speditionId, effectiveSpedId));
+    if (dateFrom) conditions.push(gte(palletMovementsTable.movementDate, dateFrom));
+    if (dateTo) conditions.push(lte(palletMovementsTable.movementDate, dateTo));
+    if (shipmentId) conditions.push(eq(palletMovementsTable.shipmentId, Number(shipmentId)));
 
-    if (dateFrom) rows = rows.filter((m) => m.movementDate >= dateFrom);
-    if (dateTo) rows = rows.filter((m) => m.movementDate <= dateTo);
-    if (shipmentId) rows = rows.filter((m) => m.shipmentId === Number(shipmentId));
+    const rows = await db
+      .select()
+      .from(palletMovementsTable)
+      .where(conditions.length ? and(...conditions) : undefined)
+      .orderBy(desc(palletMovementsTable.movementDate));
 
-    const speds = await db.select().from(speditionenTable);
-    const users = await db.select().from(usersTable);
-    const shipments = await db.select().from(shipmentsTable);
-    const spedMap: Record<number, string> = {};
-    const userMap: Record<number, string> = {};
-    const shipMap: Record<number, string> = {};
-    for (const s of speds) spedMap[s.id] = s.name;
-    for (const u of users) userMap[u.id] = u.username;
-    for (const s of shipments) shipMap[s.id] = s.bezeichnung ?? `#${s.id}`;
+    // Fetch only the referenced lookup rows (not full tables)
+    const spedIds = [...new Set(rows.map((r) => r.speditionId))];
+    const userIds = [...new Set(rows.map((r) => r.createdBy).filter(Boolean))] as number[];
+    const shipIds = [...new Set(rows.map((r) => r.shipmentId).filter(Boolean))] as number[];
+
+    const [speds, users, ships] = await Promise.all([
+      spedIds.length ? db.select({ id: speditionenTable.id, name: speditionenTable.name }).from(speditionenTable).where(inArray(speditionenTable.id, spedIds)) : [],
+      userIds.length ? db.select({ id: usersTable.id, username: usersTable.username }).from(usersTable).where(inArray(usersTable.id, userIds)) : [],
+      shipIds.length ? db.select({ id: shipmentsTable.id, bezeichnung: shipmentsTable.bezeichnung }).from(shipmentsTable).where(inArray(shipmentsTable.id, shipIds)) : [],
+    ]);
+
+    const spedMap: Record<number, string> = Object.fromEntries(speds.map((s) => [s.id, s.name]));
+    const userMap: Record<number, string> = Object.fromEntries(users.map((u) => [u.id, u.username]));
+    const shipMap: Record<number, string> = Object.fromEntries(ships.map((s) => [s.id, s.bezeichnung ?? `#${s.id}`]));
 
     return res.json(
       rows.map((m) => ({
         ...m,
         speditionName: spedMap[m.speditionId] ?? null,
-        shipmentBezeichnung: m.shipmentId ? shipMap[m.shipmentId] ?? null : null,
-        createdByName: m.createdBy ? userMap[m.createdBy] ?? null : null,
+        shipmentBezeichnung: m.shipmentId ? (shipMap[m.shipmentId] ?? null) : null,
+        createdByName: m.createdBy ? (userMap[m.createdBy] ?? null) : null,
       })),
     );
   } catch (err) {
@@ -189,33 +197,46 @@ router.get("/pallet-balances", requireAuth, async (req, res) => {
     const role = req.session.role!;
     const sessionSpeditionId = req.session.speditionId;
 
-    const speds = await db.select().from(speditionenTable).where(eq(speditionenTable.status, "aktiv"));
-    const movements = await db.select().from(palletMovementsTable);
+    const spedConditions: any[] = [eq(speditionenTable.status, "aktiv")];
+    if (SPED_ROLES.includes(role)) {
+      if (!sessionSpeditionId) return res.json([]);
+      spedConditions.push(eq(speditionenTable.id, sessionSpeditionId));
+    }
+    const speds = await db.select().from(speditionenTable).where(and(...spedConditions));
+    if (!speds.length) return res.json([]);
 
-    const balances = speds
-      .filter((s) => {
-        if (SPED_ROLES.includes(role)) return s.id === sessionSpeditionId;
-        return true;
+    const spedIds = speds.map((s) => s.id);
+
+    // Single aggregation query: balance + last movement date per spedition
+    const agg = await db
+      .select({
+        speditionId: palletMovementsTable.speditionId,
+        balance: sql<number>`SUM(
+          CASE
+            WHEN ${palletMovementsTable.movementType} = 'eingang'   THEN  ${palletMovementsTable.amount}
+            WHEN ${palletMovementsTable.movementType} = 'ausgang'   THEN -${palletMovementsTable.amount}
+            WHEN ${palletMovementsTable.movementType} = 'korrektur' THEN  ${palletMovementsTable.amount}
+            ELSE 0
+          END
+        )`.mapWith(Number),
+        lastMovementDate: sql<string>`MAX(${palletMovementsTable.movementDate})`,
       })
-      .map((s) => {
-        const spedMovements = movements.filter((m) => m.speditionId === s.id);
-        const balance = spedMovements.reduce((sum, m) => {
-          if (m.movementType === "eingang") return sum + m.amount;
-          if (m.movementType === "ausgang") return sum - m.amount;
-          if (m.movementType === "korrektur") return sum + m.amount;
-          return sum;
-        }, 0);
-        const lastMovement = spedMovements.sort((a, b) => b.movementDate.localeCompare(a.movementDate))[0];
-        return {
-          speditionId: s.id,
-          speditionName: s.name,
-          kuerzel: s.kuerzel,
-          balance,
-          lastMovementDate: lastMovement?.movementDate ?? null,
-        };
-      });
+      .from(palletMovementsTable)
+      .where(inArray(palletMovementsTable.speditionId, spedIds))
+      .groupBy(palletMovementsTable.speditionId);
 
-    return res.json(balances);
+    const aggMap: Record<number, { balance: number; lastMovementDate: string | null }> =
+      Object.fromEntries(agg.map((r) => [r.speditionId, { balance: r.balance, lastMovementDate: r.lastMovementDate }]));
+
+    return res.json(
+      speds.map((s) => ({
+        speditionId: s.id,
+        speditionName: s.name,
+        kuerzel: s.kuerzel,
+        balance: aggMap[s.id]?.balance ?? 0,
+        lastMovementDate: aggMap[s.id]?.lastMovementDate ?? null,
+      })),
+    );
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Internal server error" });
@@ -232,44 +253,51 @@ router.get("/pallet-report", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "dateFrom und dateTo sind erforderlich" });
     }
 
-    const speds = await db.select().from(speditionenTable).where(eq(speditionenTable.status, "aktiv"));
-    const allMovements = await db.select().from(palletMovementsTable);
+    const spedConditions: any[] = [eq(speditionenTable.status, "aktiv")];
+    if (SPED_ROLES.includes(role)) {
+      if (!sessionSpeditionId) return res.json([]);
+      spedConditions.push(eq(speditionenTable.id, sessionSpeditionId));
+    }
+    const speds = await db.select().from(speditionenTable).where(and(...spedConditions));
+    if (!speds.length) return res.json([]);
 
-    const filteredSpeds = SPED_ROLES.includes(role)
-      ? speds.filter((s) => s.id === sessionSpeditionId)
-      : speds;
+    const spedIds = speds.map((s) => s.id);
 
-    const report = filteredSpeds.map((s) => {
-      const spedMovements = allMovements.filter((m) => m.speditionId === s.id);
+    // One query: conditional aggregation for anfangsbestand + period stats
+    const agg = await db
+      .select({
+        speditionId: palletMovementsTable.speditionId,
+        anfangsbestand: sql<number>`SUM(CASE
+          WHEN ${palletMovementsTable.movementDate} < ${dateFrom} AND ${palletMovementsTable.movementType} = 'eingang'   THEN  ${palletMovementsTable.amount}
+          WHEN ${palletMovementsTable.movementDate} < ${dateFrom} AND ${palletMovementsTable.movementType} = 'ausgang'   THEN -${palletMovementsTable.amount}
+          WHEN ${palletMovementsTable.movementDate} < ${dateFrom} AND ${palletMovementsTable.movementType} = 'korrektur' THEN  ${palletMovementsTable.amount}
+          ELSE 0 END)`.mapWith(Number),
+        zugaenge: sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementDate} >= ${dateFrom} AND ${palletMovementsTable.movementDate} <= ${dateTo} AND ${palletMovementsTable.movementType} = 'eingang' THEN ${palletMovementsTable.amount} ELSE 0 END)`.mapWith(Number),
+        abgaenge: sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementDate} >= ${dateFrom} AND ${palletMovementsTable.movementDate} <= ${dateTo} AND ${palletMovementsTable.movementType} = 'ausgang' THEN ${palletMovementsTable.amount} ELSE 0 END)`.mapWith(Number),
+        korrekturen: sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementDate} >= ${dateFrom} AND ${palletMovementsTable.movementDate} <= ${dateTo} AND ${palletMovementsTable.movementType} = 'korrektur' THEN ${palletMovementsTable.amount} ELSE 0 END)`.mapWith(Number),
+        defekteVonComet: sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementDate} >= ${dateFrom} AND ${palletMovementsTable.movementDate} <= ${dateTo} THEN COALESCE(${palletMovementsTable.vonDefektePaletten}, 0) ELSE 0 END)`.mapWith(Number),
+        defekteAnComet: sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementDate} >= ${dateFrom} AND ${palletMovementsTable.movementDate} <= ${dateTo} THEN COALESCE(${palletMovementsTable.anDefektePaletten}, 0) ELSE 0 END)`.mapWith(Number),
+      })
+      .from(palletMovementsTable)
+      .where(inArray(palletMovementsTable.speditionId, spedIds))
+      .groupBy(palletMovementsTable.speditionId);
 
-      const before = spedMovements.filter((m) => m.movementDate < dateFrom);
-      const anfangsbestand = before.reduce((sum, m) => {
-        if (m.movementType === "eingang") return sum + m.amount;
-        if (m.movementType === "ausgang") return sum - m.amount;
-        if (m.movementType === "korrektur") return sum + m.amount;
-        return sum;
-      }, 0);
+    const aggMap = Object.fromEntries(agg.map((r) => [r.speditionId, r]));
 
-      const period = spedMovements.filter((m) => m.movementDate >= dateFrom && m.movementDate <= dateTo);
-      const zugaenge = period.filter((m) => m.movementType === "eingang").reduce((s, m) => s + m.amount, 0);
-      const abgaenge = period.filter((m) => m.movementType === "ausgang").reduce((s, m) => s + m.amount, 0);
-      const korrekturen = period.filter((m) => m.movementType === "korrektur").reduce((s, m) => s + m.amount, 0);
-      const endbestand = anfangsbestand + zugaenge - abgaenge + korrekturen;
-
-      const defekteVonComet = period.reduce((s, m) => s + (m.vonDefektePaletten ?? 0), 0);
-      const defekteAnComet = period.reduce((s, m) => s + (m.anDefektePaletten ?? 0), 0);
-
+    const report = speds.map((s) => {
+      const r = aggMap[s.id] ?? { anfangsbestand: 0, zugaenge: 0, abgaenge: 0, korrekturen: 0, defekteVonComet: 0, defekteAnComet: 0 };
+      const endbestand = r.anfangsbestand + r.zugaenge - r.abgaenge + r.korrekturen;
       return {
         speditionId: s.id,
         speditionName: s.name,
-        anfangsbestand,
-        zugaenge,
-        abgaenge,
-        korrekturen,
+        anfangsbestand: r.anfangsbestand,
+        zugaenge: r.zugaenge,
+        abgaenge: r.abgaenge,
+        korrekturen: r.korrekturen,
         endbestand,
-        defekteVonComet,
-        defekteAnComet,
-        defekteGesamt: defekteVonComet + defekteAnComet,
+        defekteVonComet: r.defekteVonComet,
+        defekteAnComet: r.defekteAnComet,
+        defekteGesamt: r.defekteVonComet + r.defekteAnComet,
       };
     });
 
@@ -286,21 +314,26 @@ router.get("/pallet-export", requireAuth, async (req, res) => {
     const sessionSpeditionId = req.session.speditionId;
     const role = req.session.role!;
 
-    let rows = await db.select().from(palletMovementsTable);
+    const effectiveSpedId = SPED_ROLES.includes(role)
+      ? sessionSpeditionId ?? -1
+      : speditionId ? Number(speditionId) : null;
 
-    if (SPED_ROLES.includes(role)) {
-      rows = rows.filter((m) => m.speditionId === sessionSpeditionId);
-    } else if (speditionId) {
-      rows = rows.filter((m) => m.speditionId === Number(speditionId));
-    }
-    if (dateFrom) rows = rows.filter((m) => m.movementDate >= dateFrom);
-    if (dateTo) rows = rows.filter((m) => m.movementDate <= dateTo);
+    const conditions = [];
+    if (effectiveSpedId !== null) conditions.push(eq(palletMovementsTable.speditionId, effectiveSpedId));
+    if (dateFrom) conditions.push(gte(palletMovementsTable.movementDate, dateFrom));
+    if (dateTo) conditions.push(lte(palletMovementsTable.movementDate, dateTo));
 
-    rows.sort((a, b) => a.movementDate.localeCompare(b.movementDate));
+    const rows = await db
+      .select()
+      .from(palletMovementsTable)
+      .where(conditions.length ? and(...conditions) : undefined)
+      .orderBy(palletMovementsTable.movementDate);
 
-    const speds = await db.select().from(speditionenTable);
-    const spedMap: Record<number, string> = {};
-    for (const s of speds) spedMap[s.id] = s.name;
+    const spedIds = [...new Set(rows.map((r) => r.speditionId))];
+    const speds = spedIds.length
+      ? await db.select({ id: speditionenTable.id, name: speditionenTable.name }).from(speditionenTable).where(inArray(speditionenTable.id, spedIds))
+      : [];
+    const spedMap: Record<number, string> = Object.fromEntries(speds.map((s) => [s.id, s.name]));
 
     const lines = [
       "ID,Datum,Spedition,Art,Menge,Bemerkungen",
