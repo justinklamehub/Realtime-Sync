@@ -123,6 +123,7 @@ const S = {
 
 const STATUS_OPTIONS = ["Angemeldet", "Erwartet", "Angekommen", "in Verladung", "Verladen", "Abgefertigt", "Storniert"];
 const WARE_OPTIONS = ["nicht bereit", "vorbereitet", "ausgedruckt"];
+const TOR_OPTIONS = Array.from({ length: 18 }, (_, i) => `Tor ${i + 1}`);
 
 type ShipmentInfo = {
   id: number;
@@ -369,13 +370,14 @@ export default function ScannerLandingPage() {
                   {/* Tor */}
                   <div style={{ marginBottom: 12 }}>
                     <label style={{ ...S.label, marginBottom: 6 }}>Tor</label>
-                    <input
-                      style={{ ...S.input, fontSize: 16, padding: "10px 14px", border: "1.5px solid #2d4a6b" }}
-                      type="text"
+                    <select
                       value={editTor}
                       onChange={e => setEditTor(e.target.value)}
-                      placeholder="z.B. Tor 3"
-                    />
+                      style={{ width: "100%", padding: "10px 14px", borderRadius: 8, fontSize: 15, background: "#0d1b2a", color: editTor ? "#f1f5f9" : "#64748b", border: "1.5px solid #2d4a6b", appearance: "none", WebkitAppearance: "none", cursor: "pointer" }}
+                    >
+                      <option value="">— Kein Tor —</option>
+                      {TOR_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
                   </div>
 
                   {saveError && (
