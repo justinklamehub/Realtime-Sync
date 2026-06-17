@@ -24,6 +24,8 @@ import BerechtigungenPage from "@/pages/berechtigungen";
 import WochenansichtPage from "@/pages/wochenansicht";
 import ProfilPage from "@/pages/profil";
 import AuswertungPage from "@/pages/auswertung";
+import ScannerLandingPage from "@/pages/scanner/index";
+import ScannerGefahrgutPage from "@/pages/scanner/gefahrgut";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -54,7 +56,9 @@ function Router() {
   return (
     <Switch>
       <Route path="/login" component={LoginPage} />
-      
+      <Route path="/scanner" component={ScannerLandingPage} />
+      <Route path="/scanner/gefahrgut" component={ScannerGefahrgutPage} />
+
       <Route path="/">
         <Redirect to="/dashboard" />
       </Route>

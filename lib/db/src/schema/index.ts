@@ -6,3 +6,4 @@ export * from "./audit";
 export * from "./austraege";
 export * from "./settings";
 export * from "./notifications";
+export * from "./gefahrgut";

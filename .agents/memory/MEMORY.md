@@ -1,2 +1,3 @@
 - [COMET LKW session-based auth](comet-lkw-auth.md) — express-session with connect-pg-simple; session table must be manually created; credentials:include required in custom-fetch.
 - [COMET LKW Vite proxy](comet-lkw-vite-proxy.md) — frontend at port 18454 proxies /api/ to API server at port 8080 via vite.config.ts server.proxy.
+- [Auth public routes](auth-public-routes.md) — AuthProvider in auth-context.tsx redirects unauthenticated users to /login; scanner/public pages must be added to the isPublicRoute check.
