@@ -20,8 +20,8 @@ interface Props {
 }
 
 const TYPE_LABEL: Record<string, string> = {
-  eingang: "Eingang",
-  ausgang: "Ausgang",
+  eingang: "Zugang",
+  ausgang: "Abgang",
   korrektur: "Korrektur",
   abstimmung: "Abstimmung",
 };

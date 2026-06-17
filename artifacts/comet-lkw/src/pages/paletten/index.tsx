@@ -165,8 +165,8 @@ export default function PalettenPage() {
 
   const getMovementColor = (type: string) => {
     switch (type) {
-      case "eingang": return "bg-green-100 text-green-800 hover:bg-green-100 border-transparent";
-      case "ausgang": return "bg-red-100 text-red-800 hover:bg-red-100 border-transparent";
+      case "eingang": return "bg-green-100 text-green-800 hover:bg-green-100 border-transparent";  // Zugang
+      case "ausgang": return "bg-red-100 text-red-800 hover:bg-red-100 border-transparent";   // Abgang
       case "korrektur": return "bg-orange-100 text-orange-800 hover:bg-orange-100 border-transparent";
       case "abstimmung": return "bg-blue-100 text-blue-800 hover:bg-blue-100 border-transparent";
       default: return "bg-slate-100 text-slate-800 border-transparent";
@@ -310,7 +310,9 @@ export default function PalettenPage() {
                   )}
                   <TableCell>
                     <Badge variant="outline" className={getMovementColor(movement.movementType)}>
-                      {movement.movementType}
+                      {movement.movementType === "eingang" ? "Zugang" :
+                       movement.movementType === "ausgang" ? "Abgang" :
+                       movement.movementType === "korrektur" ? "Korrektur" : "Abstimmung"}
                     </Badge>
                   </TableCell>
                   <TableCell className="font-mono text-sm text-slate-700">

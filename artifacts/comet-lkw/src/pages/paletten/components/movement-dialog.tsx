@@ -1,10 +1,10 @@
 import { useState, useMemo } from "react";
 import { useCreatePalletMovement, useListSpeditionen, getListPalletMovementsQueryKey, getListPalletBalancesQueryKey } from "@workspace/api-client-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -32,12 +32,9 @@ export function MovementDialog({ open, onOpenChange }: { open: boolean, onOpenCh
   const [speditionId, setSpeditionId] = useState(
     !isCometUser && user?.speditionId ? String(user.speditionId) : ""
   );
-  const [movementType, setMovementType] = useState("eingang");
   const [movementDate, setMovementDate] = useState(new Date().toISOString().slice(0, 10));
   const [bemerkungen, setBemerkungen] = useState("");
   const [palletForm, setPalletForm] = useState(emptyForm());
-
-  const requiresSchein = movementType !== "abstimmung";
 
   // Auto-calculated: (Von Euro + Von Ladung - Von Defekt) - (An Euro + An Ladung - An Defekt)
   const calculatedAmount = useMemo(() => {
@@ -46,11 +43,13 @@ export function MovementDialog({ open, onOpenChange }: { open: boolean, onOpenCh
     return von - an;
   }, [palletForm]);
 
+  // Art wird automatisch ermittelt: Von > An = Abgang, An > Von = Zugang
+  const movementType = calculatedAmount > 0 ? "ausgang" : calculatedAmount < 0 ? "eingang" : "abstimmung";
   const absAmount = Math.abs(calculatedAmount);
+  const requiresSchein = movementType !== "abstimmung";
 
   const handleReset = () => {
     setBemerkungen("");
-    setMovementType("eingang");
     setPalletForm(emptyForm());
   };
 
@@ -100,8 +99,10 @@ export function MovementDialog({ open, onOpenChange }: { open: boolean, onOpenCh
     ? speditionen
     : speditionen?.filter(s => s.id === user?.speditionId);
 
+  const isAbgang = movementType === "ausgang";
+  const isZugang = movementType === "eingang";
   const amountColor = absAmount > 0
-    ? movementType === "ausgang" ? "text-red-600" : "text-green-600"
+    ? isAbgang ? "text-red-600" : "text-green-600"
     : "text-slate-400";
 
   return (
@@ -129,15 +130,13 @@ export function MovementDialog({ open, onOpenChange }: { open: boolean, onOpenCh
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Art</Label>
-                <Select value={movementType} onValueChange={setMovementType}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="eingang">Eingang (+)</SelectItem>
-                    <SelectItem value="ausgang">Ausgang (−)</SelectItem>
-                    <SelectItem value="korrektur">Korrektur</SelectItem>
-                    <SelectItem value="abstimmung">Abstimmung</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className={`flex items-center h-9 rounded-md border px-3 text-sm font-medium select-none ${
+                  isAbgang ? "border-red-200 bg-red-50 text-red-700" :
+                  isZugang ? "border-green-200 bg-green-50 text-green-700" :
+                  "border-slate-200 bg-slate-50 text-slate-400"
+                }`}>
+                  {isAbgang ? "Abgang (−)" : isZugang ? "Zugang (+)" : "— wird berechnet —"}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Datum</Label>
@@ -210,25 +209,25 @@ export function MovementDialog({ open, onOpenChange }: { open: boolean, onOpenCh
             </div>
 
             {/* Auto-calculated amount */}
-            <div className="rounded-md border-2 border-dashed border-slate-200 p-4 bg-white">
+            <div className={`rounded-md border-2 border-dashed p-4 bg-white ${isAbgang ? "border-red-200" : isZugang ? "border-green-200" : "border-slate-200"}`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-xs text-slate-400 uppercase tracking-wide font-medium mb-0.5">Berechnete Menge</div>
+                  <div className="text-xs text-slate-400 uppercase tracking-wide font-medium mb-0.5">Differenz (Menge)</div>
                   <div className="text-xs text-slate-400">
-                    (Von: {palletForm.vonCometEuropaletten}+{palletForm.vonCometLadungssicherung}−{palletForm.vonDefektePaletten})
-                    {" − "}
-                    (An: {palletForm.anCometEuropaletten}+{palletForm.anCometLadungssicherung}−{palletForm.anDefektePaletten})
+                    Von: {palletForm.vonCometEuropaletten}+{palletForm.vonCometLadungssicherung}−{palletForm.vonDefektePaletten}
+                    {" | "}
+                    An: {palletForm.anCometEuropaletten}+{palletForm.anCometLadungssicherung}−{palletForm.anDefektePaletten}
                   </div>
+                  {absAmount > 0 && (
+                    <div className={`text-xs font-medium mt-1 ${isAbgang ? "text-red-600" : "text-green-600"}`}>
+                      {isAbgang ? "Von COMET > An COMET → Abgang" : "An COMET > Von COMET → Zugang"}
+                    </div>
+                  )}
                 </div>
                 <div className={`text-3xl font-bold tabular-nums ${amountColor}`}>
                   {absAmount}
                 </div>
               </div>
-              {calculatedAmount < 0 && (
-                <p className="text-xs text-amber-600 mt-2">
-                  Hinweis: An COMET übersteigt Von COMET — Betrag wird als Absolutwert gespeichert.
-                </p>
-              )}
             </div>
 
             <div className="space-y-2">
