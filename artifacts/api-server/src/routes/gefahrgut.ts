@@ -8,7 +8,7 @@ import { can } from "../lib/permissions";
 
 const router = Router();
 
-router.get("/api/scanner/find-shipment", async (req, res) => {
+router.get("/scanner/find-shipment", async (req, res) => {
   try {
     const { id } = req.query as { id?: string };
     if (!id) {
@@ -52,7 +52,7 @@ router.get("/api/scanner/find-shipment", async (req, res) => {
   }
 });
 
-router.post("/api/scanner/gefahrgut", async (req, res) => {
+router.post("/scanner/gefahrgut", async (req, res) => {
   try {
     const {
       shipmentId, kennzeichen, items, anhaenger, spedition,
@@ -93,7 +93,7 @@ router.post("/api/scanner/gefahrgut", async (req, res) => {
   }
 });
 
-router.get("/api/gefahrgut-status", requireAuth, async (req, res) => {
+router.get("/gefahrgut-status", requireAuth, async (req, res) => {
   try {
     if (!isCometRole(req.session.role!)) {
       return res.status(403).json({ error: "Kein Zugriff" });
@@ -114,7 +114,7 @@ router.get("/api/gefahrgut-status", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/api/gefahrgut-checklisten", requireAuth, async (req, res) => {
+router.get("/gefahrgut-checklisten", requireAuth, async (req, res) => {
   try {
     if (!isCometRole(req.session.role!)) {
       return res.status(403).json({ error: "Kein Zugriff" });
@@ -141,7 +141,7 @@ router.get("/api/gefahrgut-checklisten", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/api/gefahrgut-checklisten/:id", requireAuth, async (req, res) => {
+router.get("/gefahrgut-checklisten/:id", requireAuth, async (req, res) => {
   try {
     if (!isCometRole(req.session.role!)) {
       return res.status(403).json({ error: "Kein Zugriff" });
@@ -160,7 +160,7 @@ router.get("/api/gefahrgut-checklisten/:id", requireAuth, async (req, res) => {
   }
 });
 
-router.delete("/api/gefahrgut-checklisten/:id", requireAuth, async (req, res) => {
+router.delete("/gefahrgut-checklisten/:id", requireAuth, async (req, res) => {
   try {
     if (!isCometRole(req.session.role!)) {
       return res.status(403).json({ error: "Kein Zugriff" });
