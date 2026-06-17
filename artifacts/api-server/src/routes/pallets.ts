@@ -131,7 +131,7 @@ router.post("/pallet-movements", requireAuth, async (req, res) => {
       })
       .returning();
 
-    await logAudit(req.session.userId!, "pallet_movement", movement.id, "created", null, `${movementType}:${absAmount}`);
+    logAudit(req.session.userId!, "pallet_movement", movement.id, "created", null, `${movementType}:${absAmount}`);
     emit(req, "pallet_movement.created", { id: movement.id, speditionId }, speditionId);
     emit(req, "pallet_balance.updated", { speditionId }, speditionId);
 
@@ -149,9 +149,6 @@ router.patch("/pallet-movements/:id", requireAuth, async (req, res) => {
       return res.status(403).json({ error: "Keine Berechtigung" });
     }
     const id = Number(req.params.id);
-    const [existing] = await db.select().from(palletMovementsTable).where(eq(palletMovementsTable.id, id)).limit(1);
-    if (!existing) return res.status(404).json({ error: "Not found" });
-
     const { movementType, movementDate, amount, bemerkungen } = req.body;
     const updates: any = {};
     if (movementType !== undefined) updates.movementType = movementType;
@@ -166,7 +163,7 @@ router.patch("/pallet-movements/:id", requireAuth, async (req, res) => {
       .returning();
     if (!movement) return res.status(404).json({ error: "Not found" });
 
-    await logAudit(req.session.userId!, "pallet_movement", id, "updated", JSON.stringify({ movementType: existing.movementType, amount: existing.amount }), JSON.stringify(updates));
+    logAudit(req.session.userId!, "pallet_movement", id, "updated", null, JSON.stringify(updates));
     emit(req, "pallet_balance.updated", { speditionId: movement.speditionId }, movement.speditionId);
     return res.json({ ...movement, speditionName: null, shipmentBezeichnung: null, createdByName: null });
   } catch (err) {
@@ -181,10 +178,9 @@ router.delete("/pallet-movements/:id", requireAuth, async (req, res) => {
       return res.status(403).json({ error: "Keine Berechtigung" });
     }
     const id = Number(req.params.id);
-    const [m] = await db.select().from(palletMovementsTable).where(eq(palletMovementsTable.id, id)).limit(1);
+    const [m] = await db.delete(palletMovementsTable).where(eq(palletMovementsTable.id, id)).returning();
     if (!m) return res.status(404).json({ error: "Not found" });
-    await db.delete(palletMovementsTable).where(eq(palletMovementsTable.id, id));
-    await logAudit(req.session.userId!, "pallet_movement", id, "deleted", `${m.movementType}:${m.amount}`, null);
+    logAudit(req.session.userId!, "pallet_movement", id, "deleted", `${m.movementType}:${m.amount}`, null);
     emit(req, "pallet_balance.updated", { speditionId: m.speditionId }, m.speditionId);
     return res.json({ ok: true });
   } catch (err) {
