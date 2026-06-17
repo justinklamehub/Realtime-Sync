@@ -512,7 +512,6 @@ export async function printDeckblatt(data: DeckblattData) {
         <div class="qr-box">
           <div class="qr-box-label">QR-Code</div>
           <img src="${qrDataUrl}" alt="QR ${lkwId}" class="qr-box-img" />
-          <div class="qr-box-id">${escHtml(lkwId)}</div>
         </div>
       </div>
     </div>
