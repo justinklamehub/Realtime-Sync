@@ -2,8 +2,9 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
 import {
   CheckSquare, Square, ChevronLeft, Send, RotateCcw,
-  PenTool, CheckCircle2, AlertCircle, Loader2,
+  PenTool, CheckCircle2, AlertCircle, Loader2, FileDown,
 } from "lucide-react";
+import { printGefahrgutCheckliste, type GefahrgutPrintData } from "@/lib/print-gefahrgut";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
@@ -486,6 +487,7 @@ export default function ScannerGefahrgutPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [printData, setPrintData] = useState<GefahrgutPrintData | null>(null);
 
   const toggle = useCallback((key: string) => {
     setChecks((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -538,6 +540,24 @@ export default function ScannerGefahrgutPage() {
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Fehler");
+      setPrintData({
+        kennzeichen: localKennzeichen || null,
+        anhaenger: anhaenger || null,
+        spedition: spedition || null,
+        nameFahrer: nameFahrer || null,
+        unterschriftFahrer: unterschriftFahrer,
+        nameVerlader: nameVerlader || null,
+        unterschriftVerlader: unterschriftVerlader,
+        datum,
+        items: itemsPayload,
+        vonCometEuropaletten: vonCometEuro !== "" ? Number(vonCometEuro) : null,
+        vonCometLadungssicherung: vonCometLasich !== "" ? Number(vonCometLasich) : null,
+        vonDefektePaletten: vonDefekte !== "" ? Number(vonDefekte) : null,
+        anCometEuropaletten: anCometEuro !== "" ? Number(anCometEuro) : null,
+        anCometLadungssicherung: anCometLasich !== "" ? Number(anCometLasich) : null,
+        anDefektePaletten: anDefekte !== "" ? Number(anDefekte) : null,
+        bemerkungen: bemerkungen || null,
+      });
       setSubmitted(true);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err: any) {
@@ -557,9 +577,20 @@ export default function ScannerGefahrgutPage() {
         <div style={{ fontSize: 14, color: "#94a3b8", textAlign: "center", marginBottom: 32, maxWidth: 320 }}>
           Die Gefahrgut-Checkliste{localKennzeichen ? <> für <strong style={{ color: "#f8fafc" }}>{localKennzeichen}</strong></> : ""} wurde erfolgreich übermittelt.
         </div>
-        <button style={{ ...S.submitBtn, maxWidth: 320 }} onClick={() => setLocation("/scanner")}>
-          NEUE CHECKLISTE
-        </button>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%", maxWidth: 320 }}>
+          {printData && (
+            <button
+              style={{ ...S.submitBtn, background: "#1e3a5f", border: `1px solid ${BORDER}`, color: C }}
+              onClick={() => printGefahrgutCheckliste(printData)}
+            >
+              <FileDown size={18} style={{ marginRight: 8 }} />
+              PDF / DRUCKEN
+            </button>
+          )}
+          <button style={S.submitBtn} onClick={() => setLocation("/scanner")}>
+            NEUE CHECKLISTE
+          </button>
+        </div>
       </div>
     );
   }

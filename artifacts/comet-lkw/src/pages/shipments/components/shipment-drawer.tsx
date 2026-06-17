@@ -24,7 +24,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Lock, LockOpen, AlertCircle, Pencil, Trash2, ClipboardCheck, Plus, Clock, Printer, ShieldAlert } from "lucide-react";
+import { Loader2, Lock, LockOpen, AlertCircle, Pencil, Trash2, ClipboardCheck, Plus, Clock, Printer, ShieldAlert, FileDown } from "lucide-react";
+import { printGefahrgutCheckliste } from "@/lib/print-gefahrgut";
 import { printDeckblatt } from "@/lib/print-deckblatt";
 import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -805,16 +806,44 @@ export function ShipmentDrawer({ shipmentId, open, onOpenChange }: ShipmentDrawe
                             <div className="font-semibold text-slate-700 text-xs">
                               {cl.eingereichtAt ? format(new Date(cl.eingereichtAt), "dd.MM.yyyy HH:mm") : "—"} Uhr
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 text-red-400 hover:text-red-600"
-                              onClick={() => resetGefahrgutMutation.mutate(cl.id)}
-                              disabled={resetGefahrgutMutation.isPending}
-                              title="Checkliste zurücksetzen (Berechtigung: gefahrgut.reset)"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-slate-500 hover:text-slate-700"
+                                title="PDF / Drucken"
+                                onClick={() => printGefahrgutCheckliste({
+                                  kennzeichen: cl.kennzeichen,
+                                  anhaenger: cl.anhaenger,
+                                  spedition: cl.spedition,
+                                  nameFahrer: cl.nameFahrer,
+                                  unterschriftFahrer: cl.unterschriftFahrer,
+                                  nameVerlader: cl.nameVerlader,
+                                  unterschriftVerlader: cl.unterschriftVerlader,
+                                  datum: cl.datum,
+                                  items: cl.items as Record<string, unknown>,
+                                  vonCometEuropaletten: cl.vonCometEuropaletten,
+                                  vonCometLadungssicherung: cl.vonCometLadungssicherung,
+                                  vonDefektePaletten: cl.vonDefektePaletten,
+                                  anCometEuropaletten: cl.anCometEuropaletten,
+                                  anCometLadungssicherung: cl.anCometLadungssicherung,
+                                  anDefektePaletten: cl.anDefektePaletten,
+                                  bemerkungen: cl.bemerkungen,
+                                })}
+                              >
+                                <FileDown className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-red-400 hover:text-red-600"
+                                onClick={() => resetGefahrgutMutation.mutate(cl.id)}
+                                disabled={resetGefahrgutMutation.isPending}
+                                title="Checkliste zurücksetzen (Berechtigung: gefahrgut.reset)"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
                           </div>
                           <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-slate-600">
                             {cl.nameFahrer && <div><span className="text-slate-400">Fahrer:</span> {cl.nameFahrer}</div>}
