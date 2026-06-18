@@ -213,8 +213,8 @@ router.get("/pallet-balances", requireAuth, async (req, res) => {
             WHEN ${palletMovementsTable.movementType} = 'ausgang'   THEN -${palletMovementsTable.amount}
             WHEN ${palletMovementsTable.movementType} = 'korrektur' THEN  ${palletMovementsTable.amount}
             WHEN ${palletMovementsTable.movementType} = 'neutral'   THEN
-              (COALESCE(${palletMovementsTable.vonCometEuropaletten},0) + COALESCE(${palletMovementsTable.vonCometLadungssicherung},0) - COALESCE(${palletMovementsTable.vonDefektePaletten},0))
-              - (COALESCE(${palletMovementsTable.anCometEuropaletten},0) + COALESCE(${palletMovementsTable.anCometLadungssicherung},0) - COALESCE(${palletMovementsTable.anDefektePaletten},0))
+              (COALESCE(${palletMovementsTable.anCometEuropaletten},0) + COALESCE(${palletMovementsTable.anCometLadungssicherung},0) - COALESCE(${palletMovementsTable.anDefektePaletten},0))
+              - (COALESCE(${palletMovementsTable.vonCometEuropaletten},0) + COALESCE(${palletMovementsTable.vonCometLadungssicherung},0) - COALESCE(${palletMovementsTable.vonDefektePaletten},0))
             ELSE 0
           END
         )`.mapWith(Number),
@@ -271,16 +271,16 @@ router.get("/pallet-report", requireAuth, async (req, res) => {
           WHEN ${palletMovementsTable.movementDate} < ${dateFrom} AND ${palletMovementsTable.movementType} = 'ausgang'   THEN -${palletMovementsTable.amount}
           WHEN ${palletMovementsTable.movementDate} < ${dateFrom} AND ${palletMovementsTable.movementType} = 'korrektur' THEN  ${palletMovementsTable.amount}
           WHEN ${palletMovementsTable.movementDate} < ${dateFrom} AND ${palletMovementsTable.movementType} = 'neutral'   THEN
-            (COALESCE(${palletMovementsTable.vonCometEuropaletten},0) + COALESCE(${palletMovementsTable.vonCometLadungssicherung},0) - COALESCE(${palletMovementsTable.vonDefektePaletten},0))
-            - (COALESCE(${palletMovementsTable.anCometEuropaletten},0) + COALESCE(${palletMovementsTable.anCometLadungssicherung},0) - COALESCE(${palletMovementsTable.anDefektePaletten},0))
+            (COALESCE(${palletMovementsTable.anCometEuropaletten},0) + COALESCE(${palletMovementsTable.anCometLadungssicherung},0) - COALESCE(${palletMovementsTable.anDefektePaletten},0))
+            - (COALESCE(${palletMovementsTable.vonCometEuropaletten},0) + COALESCE(${palletMovementsTable.vonCometLadungssicherung},0) - COALESCE(${palletMovementsTable.vonDefektePaletten},0))
           ELSE 0 END)`.mapWith(Number),
         zugaenge: sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementDate} >= ${dateFrom} AND ${palletMovementsTable.movementDate} <= ${dateTo} AND ${palletMovementsTable.movementType} = 'eingang' THEN ${palletMovementsTable.amount} ELSE 0 END)`.mapWith(Number),
         abgaenge: sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementDate} >= ${dateFrom} AND ${palletMovementsTable.movementDate} <= ${dateTo} AND ${palletMovementsTable.movementType} = 'ausgang' THEN ${palletMovementsTable.amount} ELSE 0 END)`.mapWith(Number),
         korrekturen: sql<number>`SUM(CASE
           WHEN ${palletMovementsTable.movementDate} >= ${dateFrom} AND ${palletMovementsTable.movementDate} <= ${dateTo} AND ${palletMovementsTable.movementType} = 'korrektur' THEN ${palletMovementsTable.amount}
           WHEN ${palletMovementsTable.movementDate} >= ${dateFrom} AND ${palletMovementsTable.movementDate} <= ${dateTo} AND ${palletMovementsTable.movementType} = 'neutral' THEN
-            (COALESCE(${palletMovementsTable.vonCometEuropaletten},0) + COALESCE(${palletMovementsTable.vonCometLadungssicherung},0) - COALESCE(${palletMovementsTable.vonDefektePaletten},0))
-            - (COALESCE(${palletMovementsTable.anCometEuropaletten},0) + COALESCE(${palletMovementsTable.anCometLadungssicherung},0) - COALESCE(${palletMovementsTable.anDefektePaletten},0))
+            (COALESCE(${palletMovementsTable.anCometEuropaletten},0) + COALESCE(${palletMovementsTable.anCometLadungssicherung},0) - COALESCE(${palletMovementsTable.anDefektePaletten},0))
+            - (COALESCE(${palletMovementsTable.vonCometEuropaletten},0) + COALESCE(${palletMovementsTable.vonCometLadungssicherung},0) - COALESCE(${palletMovementsTable.vonDefektePaletten},0))
           ELSE 0 END)`.mapWith(Number),
         defekteVonComet: sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementDate} >= ${dateFrom} AND ${palletMovementsTable.movementDate} <= ${dateTo} THEN COALESCE(${palletMovementsTable.vonDefektePaletten}, 0) ELSE 0 END)`.mapWith(Number),
         defekteAnComet: sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementDate} >= ${dateFrom} AND ${palletMovementsTable.movementDate} <= ${dateTo} THEN COALESCE(${palletMovementsTable.anDefektePaletten}, 0) ELSE 0 END)`.mapWith(Number),
@@ -366,6 +366,30 @@ router.get("/pallet-plant-count", requireAuth, async (req, res) => {
       .orderBy(palletPlantCountsTable.recordedAt);
     return res.json(rows);
   } catch (err) {
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/pallet-recalculate", requireAuth, async (req, res) => {
+  try {
+    const role = req.session.role!;
+    if (!(await can(role, "pallet.create"))) {
+      return res.status(403).json({ error: "Keine Berechtigung" });
+    }
+    // Recompute `amount` for all neutral movements from their raw pallet fields.
+    // Net = an_net - von_net; stored as abs value for display.
+    const result = await db.execute(sql`
+      UPDATE pallet_movements
+      SET amount = ABS(
+        (COALESCE(an_comet_europaletten,0) + COALESCE(an_comet_ladungssicherung,0) - COALESCE(an_defekte_paletten,0))
+        - (COALESCE(von_comet_europaletten,0) + COALESCE(von_comet_ladungssicherung,0) - COALESCE(von_defekte_paletten,0))
+      )
+      WHERE movement_type = 'neutral'
+    `);
+    const updated = (result as any).rowCount ?? 0;
+    return res.json({ updated, message: `${updated} neutrale Buchungen neu berechnet.` });
+  } catch (err) {
+    console.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });

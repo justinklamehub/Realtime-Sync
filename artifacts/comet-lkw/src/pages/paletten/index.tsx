@@ -9,15 +9,17 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
-import { Loader2, Plus, Download, BarChart2, FileDown, ClipboardList } from "lucide-react";
+import { Loader2, Plus, Download, BarChart2, FileDown, ClipboardList, RefreshCw } from "lucide-react";
 import * as XLSX from "xlsx";
 import { MovementDialog } from "./components/movement-dialog";
 import { MovementDetailSheet } from "./components/movement-detail-sheet";
 import { ShipmentDrawer } from "@/pages/shipments/components/shipment-drawer";
 import { useAuth } from "@/contexts/auth-context";
+import { useToast } from "@/hooks/use-toast";
 
 export default function PalettenPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const isCometUser = user?.role && ["comet_admin", "comet_leitstand", "comet_lager", "comet_viewer"].includes(user.role);
   const canWrite = user?.role && ["comet_admin", "comet_leitstand", "comet_lager"].includes(user.role);
 
@@ -35,6 +37,20 @@ export default function PalettenPage() {
   const [reportData, setReportData] = useState<any[]>([]);
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState("");
+
+  const [recalculating, setRecalculating] = useState(false);
+  const handleRecalculate = async () => {
+    setRecalculating(true);
+    try {
+      const res = await fetch("/api/pallet-recalculate", { method: "POST", credentials: "include" });
+      const data = await res.json();
+      toast({ title: data.message ?? "Neuberechnung abgeschlossen" });
+    } catch {
+      toast({ title: "Fehler bei der Neuberechnung", variant: "destructive" });
+    } finally {
+      setRecalculating(false);
+    }
+  };
 
   const [plantCounts, setPlantCounts] = useState<any[]>([]);
   const [inventurOpen, setInventurOpen] = useState(false);
@@ -200,10 +216,16 @@ export default function PalettenPage() {
             CSV Export
           </Button>
           {canWrite && (
-            <Button onClick={() => setIsDialogOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Neue Buchung
-            </Button>
+            <>
+              <Button variant="outline" onClick={handleRecalculate} disabled={recalculating}>
+                {recalculating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                Neu berechnen
+              </Button>
+              <Button onClick={() => setIsDialogOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Neue Buchung
+              </Button>
+            </>
           )}
         </div>
       </div>
