@@ -47,6 +47,7 @@ export default function PalettenPage() {
       if (!res.ok) {
         toast({ title: data.error ?? "Fehler bei der Neuberechnung", variant: "destructive" });
       } else {
+        await Promise.all([refetchBalances(), refetchMovements()]);
         toast({ title: data.message ?? "Neuberechnung abgeschlossen" });
       }
     } catch {
@@ -163,8 +164,8 @@ export default function PalettenPage() {
   };
 
   const { data: speditionen } = useListSpeditionen();
-  const { data: balances, isLoading: loadingBalances } = useListPalletBalances();
-  const { data: movements, isLoading: loadingMovements } = useListPalletMovements({
+  const { data: balances, isLoading: loadingBalances, refetch: refetchBalances } = useListPalletBalances();
+  const { data: movements, isLoading: loadingMovements, refetch: refetchMovements } = useListPalletMovements({
     speditionId: (filterSpeditionId && filterSpeditionId !== "__all__") ? Number(filterSpeditionId) : undefined,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
