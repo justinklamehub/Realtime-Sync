@@ -360,9 +360,14 @@ router.get("/pallet-export", requireAuth, async (req, res) => {
 
 router.get("/pallet-plant-count", requireAuth, async (req, res) => {
   try {
+    const { dateFrom, dateTo } = req.query as Record<string, string>;
+    const conditions = [];
+    if (dateFrom) conditions.push(gte(palletPlantCountsTable.recordedAt, dateFrom));
+    if (dateTo) conditions.push(lte(palletPlantCountsTable.recordedAt, dateTo));
     const rows = await db
       .select()
       .from(palletPlantCountsTable)
+      .where(conditions.length ? and(...conditions) : undefined)
       .orderBy(palletPlantCountsTable.recordedAt);
     return res.json(rows);
   } catch (err) {

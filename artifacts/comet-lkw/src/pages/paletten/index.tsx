@@ -65,9 +65,13 @@ export default function PalettenPage() {
   const [inventurSaving, setInventurSaving] = useState(false);
   const [inventurError, setInventurError] = useState("");
 
-  const loadPlantCounts = async () => {
+  const loadPlantCounts = async (dateFrom?: string, dateTo?: string) => {
     try {
-      const res = await fetch("/api/pallet-plant-count", { credentials: "include" });
+      const params = new URLSearchParams();
+      if (dateFrom) params.set("dateFrom", dateFrom);
+      if (dateTo) params.set("dateTo", dateTo);
+      const query = params.toString() ? `?${params.toString()}` : "";
+      const res = await fetch(`/api/pallet-plant-count${query}`, { credentials: "include" });
       if (res.ok) setPlantCounts(await res.json());
     } catch { /* ignore */ }
   };
@@ -148,7 +152,10 @@ export default function PalettenPage() {
     setReportLoading(true);
     setReportError("");
     try {
-      const res = await fetch(`/api/pallet-report?dateFrom=${reportFrom}&dateTo=${reportTo}`, { credentials: "include" });
+      const [res] = await Promise.all([
+        fetch(`/api/pallet-report?dateFrom=${reportFrom}&dateTo=${reportTo}`, { credentials: "include" }),
+        loadPlantCounts(reportFrom, reportTo),
+      ]);
       if (!res.ok) {
         let msg = "Fehler";
         try { msg = (await res.json()).error ?? msg; } catch { msg = await res.text().catch(() => msg); }
