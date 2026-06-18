@@ -61,11 +61,6 @@ export function MovementDialog({ open, onOpenChange }: { open: boolean, onOpenCh
     : anGross > 0 ? "eingang"
     : "abstimmung";
 
-  // For neutral with factor: amount reflects the factor-adjusted balance impact
-  // e.g. VON 300 (all defect) / factor 3 = 100 effective, AN 100 → diff = 0
-  const absAmount = (movementType === "neutral" && selectedFaktor > 1)
-    ? Math.abs(anGross * selectedFaktor - vonGross)
-    : Math.abs(calculatedAmount);
   // Scheinnummer ist immer Pflicht außer bei reiner Abstimmung (beide Seiten 0)
   const requiresSchein = movementType !== "abstimmung";
 
@@ -120,6 +115,12 @@ export function MovementDialog({ open, onOpenChange }: { open: boolean, onOpenCh
 
   const selectedSped = speditionen?.find(s => s.id === Number(speditionId));
   const selectedFaktor = (selectedSped as any)?.palletFaktor ?? 1;
+
+  // For neutral with factor: amount reflects the factor-adjusted balance impact
+  // e.g. VON 300 (all defect) / factor 3 = 100 effective, AN 100 → diff = 0
+  const absAmount = (movementType === "neutral" && selectedFaktor > 1)
+    ? Math.abs(anGross * selectedFaktor - vonGross)
+    : Math.abs(calculatedAmount);
 
   const isAbgang  = movementType === "ausgang";
   const isZugang  = movementType === "eingang";
