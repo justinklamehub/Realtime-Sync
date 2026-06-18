@@ -15,7 +15,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { getListShipmentsQueryKey } from "@workspace/api-client-react";
-import { useSocket } from "@/hooks/use-socket";
+import { useSocketStatus } from "@/hooks/use-socket";
 
 const STATUS_OPTIONS = ["Angemeldet", "Erwartet", "Angekommen", "in Verladung", "Verladen", "Abgefertigt", "Storniert"];
 const LKW_ART_OPTIONS = ["Container", "Anlieferung", "Abholung", "Sattelzug", "Wechselbrücke", "Sonstige"];
@@ -45,7 +45,7 @@ export default function ShipmentsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { isConnected } = useSocket();
+  const { isConnected } = useSocketStatus();
   const role = user?.role ?? "";
   const isCometUser = ["comet_admin", "comet_leitstand", "comet_lager"].includes(role);
   const isViewer = role === "comet_viewer" || role === "speditions_viewer";

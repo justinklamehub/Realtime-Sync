@@ -1,8 +1,8 @@
-import { useSocket } from "@/hooks/use-socket";
+import { useSocketStatus } from "@/hooks/use-socket";
 import { AlertCircle } from "lucide-react";
 
 export function ConnectionBanner() {
-  const { isConnected } = useSocket();
+  const { isConnected } = useSocketStatus();
 
   if (isConnected) return null;
 

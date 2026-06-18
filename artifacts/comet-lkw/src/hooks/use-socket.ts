@@ -25,15 +25,35 @@ export function onShipmentEditing(handler: EditingHandler) {
   return () => editingListeners.delete(handler);
 }
 
+// Module-level connection state so multiple components can read it
+// without registering duplicate socket listeners.
+let _isConnected = true;
+const _statusListeners = new Set<(v: boolean) => void>();
+
+function _setConnected(v: boolean) {
+  _isConnected = v;
+  for (const fn of _statusListeners) fn(v);
+}
+
+/** Lightweight hook — only returns connection status, no query invalidation. */
+export function useSocketStatus() {
+  const [isConnected, setIsConnected] = useState(_isConnected);
+  useEffect(() => {
+    _statusListeners.add(setIsConnected);
+    return () => { _statusListeners.delete(setIsConnected); };
+  }, []);
+  return { isConnected };
+}
+
 export function useSocket() {
   const queryClient = useQueryClient();
-  const [isConnected, setIsConnected] = useState(true);
+  const [isConnected, setIsConnected] = useState(_isConnected);
 
   useEffect(() => {
     const socket = getSocket();
 
-    const onConnect = () => setIsConnected(true);
-    const onDisconnect = () => setIsConnected(false);
+    const onConnect = () => { setIsConnected(true); _setConnected(true); };
+    const onDisconnect = () => { setIsConnected(false); _setConnected(false); };
 
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
@@ -58,14 +78,14 @@ export function useSocket() {
       palletMovementsTimer = setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: getListPalletMovementsQueryKey(), cancelRefetch: false });
         palletMovementsTimer = null;
-      }, 80);
+      }, 500);
     };
     const invalidatePalletBalances = () => {
       if (palletBalancesTimer) clearTimeout(palletBalancesTimer);
       palletBalancesTimer = setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: getListPalletBalancesQueryKey(), cancelRefetch: false });
         palletBalancesTimer = null;
-      }, 80);
+      }, 500);
     };
 
     socket.on("pallet_movement.created", invalidatePalletMovements);
