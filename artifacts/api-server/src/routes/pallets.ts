@@ -314,19 +314,25 @@ router.get("/pallet-report", requireAuth, async (req, res) => {
         neutralAnGross: 0, neutralVonGross: 0,
       };
       const f = faktorMap[s.id] ?? 1;
-      // Factor N:1: what COMET receives (eingang + neutral-an-side) × f; ausgang + neutral-von-side unchanged.
-      // When f > 1: defekte excluded (use gross). When f = 1: use net (defekte subtracted).
-      // Neutral movements are split into zugaenge (an-side) and abgaenge (von-side) for clear reporting.
-      const preNeutralAn  = f > 1 ? r.preNeutralAnGross  : r.preNeutralAnNet;
-      const preNeutralVon = f > 1 ? r.preNeutralVonGross : r.preNeutralVonNet;
-      const neutralAn     = f > 1 ? r.neutralAnGross      : r.neutralAnNet;
-      const neutralVon    = f > 1 ? r.neutralVonGross     : r.neutralVonNet;
+      // Factor N:1: displayed zugaenge/abgaenge show RAW physical quantities (no factor applied).
+      // The factor only affects anfangsbestand and endbestand (balance calculation).
+      // When f > 1: defekte excluded from neutral (use gross). When f = 1: use net (defekte subtracted).
+      // Neutral movements are split: AN-side → Zugänge, VON-side → Abgänge.
+      const neutralAnRaw  = f > 1 ? r.neutralAnGross  : r.neutralAnNet;
+      const neutralVonRaw = f > 1 ? r.neutralVonGross : r.neutralVonNet;
+      const preNeutralAnRaw  = f > 1 ? r.preNeutralAnGross  : r.preNeutralAnNet;
+      const preNeutralVonRaw = f > 1 ? r.preNeutralVonGross : r.preNeutralVonNet;
 
-      const anfangsbestand = (r.preEingang + preNeutralAn) * f - (r.preAusgang + preNeutralVon) + r.preKorrektur;
-      const zugaenge   = (r.zugaenge + neutralAn) * f;
-      const abgaenge   = r.abgaengeRaw + neutralVon;
+      // Display columns: raw physical quantities
+      const zugaenge    = r.zugaenge + neutralAnRaw;
+      const abgaenge    = r.abgaengeRaw + neutralVonRaw;
       const korrekturen = r.korrekturRaw;
-      const endbestand = anfangsbestand + zugaenge - abgaenge + korrekturen;
+
+      // Balance calculation: factor applied to the "received by COMET" side only
+      const preZugaengeRaw = r.preEingang + preNeutralAnRaw;
+      const preAbgaengeRaw = r.preAusgang + preNeutralVonRaw;
+      const anfangsbestand = preZugaengeRaw * f - preAbgaengeRaw + r.preKorrektur;
+      const endbestand     = anfangsbestand + zugaenge * f - abgaenge + korrekturen;
       return {
         speditionId: s.id,
         speditionName: s.name,
