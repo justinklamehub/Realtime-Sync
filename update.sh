@@ -17,7 +17,9 @@ sudo -u comet bash -c "
   set -a
   source /opt/comet/app/artifacts/api-server/.env
   set +a
-  pnpm --filter @workspace/db --dir \"$APP\" push-force
+  # WICHTIG: 'push' statt 'push-force' – niemals automatisch Tabellen loeschen!
+  # Bei interaktiven Rueckfragen immer '+ create table' waehlen, niemals 'rename'.
+  pnpm --filter @workspace/db --dir \"$APP\" push
 "
 
 echo "==> Backend bauen..."
