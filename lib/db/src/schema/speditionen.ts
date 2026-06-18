@@ -11,6 +11,7 @@ export const speditionenTable = pgTable("speditionen", {
   telefon: text("telefon"),
   status: text("status").notNull().default("aktiv"),
   bemerkungen: text("bemerkungen"),
+  palletFaktor: integer("pallet_faktor").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

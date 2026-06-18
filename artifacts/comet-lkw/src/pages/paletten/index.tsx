@@ -247,12 +247,21 @@ export default function PalettenPage() {
           <Card className="col-span-full border-slate-200 shadow-sm flex items-center justify-center p-8">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </Card>
-        ) : balances?.map(balance => (
+        ) : balances?.map(balance => {
+          const faktor = (balance as any).palletFaktor ?? 1;
+          return (
           <Card key={balance.speditionId} className="border-slate-200 shadow-sm bg-white">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-slate-500 truncate" title={balance.speditionName ?? ""}>
-                {balance.speditionName}
-              </CardTitle>
+              <div className="flex items-center justify-between gap-1">
+                <CardTitle className="text-sm font-medium text-slate-500 truncate" title={balance.speditionName ?? ""}>
+                  {balance.speditionName}
+                </CardTitle>
+                {faktor > 1 && (
+                  <span className="shrink-0 text-xs font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200">
+                    1:{faktor}
+                  </span>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               <div className={`text-3xl font-bold ${(balance.balance ?? 0) < 0 ? 'text-red-600' : (balance.balance ?? 0) > 0 ? 'text-green-600' : 'text-slate-800'}`}>
@@ -265,7 +274,8 @@ export default function PalettenPage() {
               </p>
             </CardContent>
           </Card>
-        ))}
+          );
+        })}
       </div>
 
       {isCometUser && (

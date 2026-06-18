@@ -32,10 +32,10 @@ router.post("/speditionen", requireAuth, async (req, res) => {
     if (req.session.role !== "comet_admin") {
       return res.status(403).json({ error: "Nur COMET Admin kann Speditionen anlegen" });
     }
-    const { name, kuerzel, ansprechpartner, email, telefon, status, bemerkungen } = req.body;
+    const { name, kuerzel, ansprechpartner, email, telefon, status, bemerkungen, palletFaktor } = req.body;
     const [sped] = await db
       .insert(speditionenTable)
-      .values({ name, kuerzel, ansprechpartner, email, telefon, status: status || "aktiv", bemerkungen })
+      .values({ name, kuerzel, ansprechpartner, email, telefon, status: status || "aktiv", bemerkungen, palletFaktor: Number(palletFaktor) || 1 })
       .returning();
     await logAudit(req.session.userId!, "spedition", sped.id, "created", null, name);
     return res.status(201).json(sped);
@@ -66,7 +66,7 @@ router.patch("/speditionen/:id", requireAuth, async (req, res) => {
     }
 
     const id = Number(req.params.id);
-    const { name, kuerzel, ansprechpartner, email, telefon, status, bemerkungen } = req.body;
+    const { name, kuerzel, ansprechpartner, email, telefon, status, bemerkungen, palletFaktor } = req.body;
     const updates: any = {};
     if (name !== undefined) updates.name = name;
     if (kuerzel !== undefined) updates.kuerzel = kuerzel;
@@ -75,6 +75,7 @@ router.patch("/speditionen/:id", requireAuth, async (req, res) => {
     if (telefon !== undefined) updates.telefon = telefon;
     if (status !== undefined) updates.status = status;
     if (bemerkungen !== undefined) updates.bemerkungen = bemerkungen;
+    if (palletFaktor !== undefined) updates.palletFaktor = Number(palletFaktor) || 1;
     updates.updatedAt = new Date();
 
     const [sped] = await db.update(speditionenTable).set(updates).where(eq(speditionenTable.id, id)).returning();

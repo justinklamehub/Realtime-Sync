@@ -30,6 +30,7 @@ interface Spedition {
   telefon?: string | null;
   status?: string;
   bemerkungen?: string | null;
+  palletFaktor?: number | null;
 }
 
 interface SpeditionDialogProps {
@@ -46,7 +47,7 @@ export function SpeditionDialog({ open, onOpenChange, editSpedition, permissions
   const isEditing = !!editSpedition;
 
   const [form, setForm] = useState({
-    name: "", kuerzel: "", ansprechpartner: "", email: "", telefon: "", status: "aktiv", bemerkungen: "",
+    name: "", kuerzel: "", ansprechpartner: "", email: "", telefon: "", status: "aktiv", bemerkungen: "", palletFaktor: 1,
   });
 
   useEffect(() => {
@@ -60,9 +61,10 @@ export function SpeditionDialog({ open, onOpenChange, editSpedition, permissions
           telefon: editSpedition.telefon || "",
           status: editSpedition.status || "aktiv",
           bemerkungen: editSpedition.bemerkungen || "",
+          palletFaktor: editSpedition.palletFaktor ?? 1,
         });
       } else {
-        setForm({ name: "", kuerzel: "", ansprechpartner: "", email: "", telefon: "", status: "aktiv", bemerkungen: "" });
+        setForm({ name: "", kuerzel: "", ansprechpartner: "", email: "", telefon: "", status: "aktiv", bemerkungen: "", palletFaktor: 1 });
       }
     }
   }, [open, editSpedition]);
@@ -332,6 +334,25 @@ export function SpeditionDialog({ open, onOpenChange, editSpedition, permissions
               <div className="space-y-1 col-span-2">
                 <Label>Bemerkungen</Label>
                 <Input value={form.bemerkungen} onChange={e => setForm(f => ({ ...f, bemerkungen: e.target.value }))} />
+              </div>
+              <div className="space-y-1 col-span-2">
+                <Label>Paletten-Tauschfaktor</Label>
+                <Select
+                  value={String(form.palletFaktor)}
+                  onValueChange={v => setForm(f => ({ ...f, palletFaktor: Number(v) }))}
+                >
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1 : 1 (Standard)</SelectItem>
+                    <SelectItem value="2">1 : 2</SelectItem>
+                    <SelectItem value="3">1 : 3</SelectItem>
+                    <SelectItem value="4">1 : 4</SelectItem>
+                    <SelectItem value="5">1 : 5</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-slate-400 mt-1">
+                  Anzahl Speditions-Paletten pro COMET-Palette. Beeinflusst Saldo-Berechnung bei Abgängen und neutralen Buchungen.
+                </p>
               </div>
             </div>
           </TabsContent>

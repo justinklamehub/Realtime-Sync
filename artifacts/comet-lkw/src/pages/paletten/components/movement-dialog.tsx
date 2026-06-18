@@ -106,6 +106,9 @@ export function MovementDialog({ open, onOpenChange }: { open: boolean, onOpenCh
     ? speditionen
     : speditionen?.filter(s => s.id === user?.speditionId);
 
+  const selectedSped = speditionen?.find(s => s.id === Number(speditionId));
+  const selectedFaktor = (selectedSped as any)?.palletFaktor ?? 1;
+
   const isAbgang  = movementType === "ausgang";
   const isZugang  = movementType === "eingang";
   const isNeutral = movementType === "neutral";
@@ -122,14 +125,26 @@ export function MovementDialog({ open, onOpenChange }: { open: boolean, onOpenCh
             {isCometUser && (
               <div className="space-y-2">
                 <Label>Spedition</Label>
-                <Select value={speditionId} onValueChange={setSpeditionId}>
-                  <SelectTrigger><SelectValue placeholder="Spedition wählen" /></SelectTrigger>
-                  <SelectContent>
-                    {availableSpeditionen?.map(s => (
-                      <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex gap-2 items-center">
+                  <Select value={speditionId} onValueChange={setSpeditionId}>
+                    <SelectTrigger><SelectValue placeholder="Spedition wählen" /></SelectTrigger>
+                    <SelectContent>
+                      {availableSpeditionen?.map(s => (
+                        <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedFaktor > 1 && (
+                    <span className="shrink-0 text-xs font-semibold px-2 py-1 rounded bg-amber-100 text-amber-700 border border-amber-200 whitespace-nowrap">
+                      Faktor 1:{selectedFaktor}
+                    </span>
+                  )}
+                </div>
+                {selectedFaktor > 1 && (
+                  <p className="text-xs text-amber-700">
+                    1 COMET-Palette = {selectedFaktor} Speditions-Paletten — wirkt auf Abgänge und neutrale Buchungen.
+                  </p>
+                )}
               </div>
             )}
 

@@ -203,21 +203,18 @@ router.get("/pallet-balances", requireAuth, async (req, res) => {
 
     const spedIds = speds.map((s) => s.id);
 
-    // Single aggregation query: balance + last movement date per spedition
+    // Build factor map from already-fetched speditionen
+    const faktorMap: Record<number, number> = Object.fromEntries(speds.map((s) => [s.id, s.palletFaktor ?? 1]));
+
+    // Aggregation split by movement type so factor can be applied in JS
     const agg = await db
       .select({
         speditionId: palletMovementsTable.speditionId,
-        balance: sql<number>`SUM(
-          CASE
-            WHEN ${palletMovementsTable.movementType} = 'eingang'   THEN  ${palletMovementsTable.amount}
-            WHEN ${palletMovementsTable.movementType} = 'ausgang'   THEN -${palletMovementsTable.amount}
-            WHEN ${palletMovementsTable.movementType} = 'korrektur' THEN  ${palletMovementsTable.amount}
-            WHEN ${palletMovementsTable.movementType} = 'neutral'   THEN
-              (COALESCE(${palletMovementsTable.anCometEuropaletten},0) + COALESCE(${palletMovementsTable.anCometLadungssicherung},0) - COALESCE(${palletMovementsTable.anDefektePaletten},0))
-              - (COALESCE(${palletMovementsTable.vonCometEuropaletten},0) + COALESCE(${palletMovementsTable.vonCometLadungssicherung},0) - COALESCE(${palletMovementsTable.vonDefektePaletten},0))
-            ELSE 0
-          END
-        )`.mapWith(Number),
+        sumEingang:      sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementType} = 'eingang'   THEN ${palletMovementsTable.amount} ELSE 0 END)`.mapWith(Number),
+        sumAusgang:      sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementType} = 'ausgang'   THEN ${palletMovementsTable.amount} ELSE 0 END)`.mapWith(Number),
+        sumKorrektur:    sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementType} = 'korrektur' THEN ${palletMovementsTable.amount} ELSE 0 END)`.mapWith(Number),
+        neutralAnNet:    sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementType} = 'neutral' THEN COALESCE(${palletMovementsTable.anCometEuropaletten},0) + COALESCE(${palletMovementsTable.anCometLadungssicherung},0) - COALESCE(${palletMovementsTable.anDefektePaletten},0) ELSE 0 END)`.mapWith(Number),
+        neutralVonNet:   sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementType} = 'neutral' THEN COALESCE(${palletMovementsTable.vonCometEuropaletten},0) + COALESCE(${palletMovementsTable.vonCometLadungssicherung},0) - COALESCE(${palletMovementsTable.vonDefektePaletten},0) ELSE 0 END)`.mapWith(Number),
         lastMovementDate: sql<string>`MAX(${palletMovementsTable.movementDate})`,
       })
       .from(palletMovementsTable)
@@ -225,7 +222,11 @@ router.get("/pallet-balances", requireAuth, async (req, res) => {
       .groupBy(palletMovementsTable.speditionId);
 
     const aggMap: Record<number, { balance: number; lastMovementDate: string | null }> =
-      Object.fromEntries(agg.map((r) => [r.speditionId, { balance: r.balance, lastMovementDate: r.lastMovementDate }]));
+      Object.fromEntries(agg.map((r) => {
+        const f = faktorMap[r.speditionId] ?? 1;
+        const balance = r.sumEingang - r.sumAusgang * f + r.sumKorrektur + r.neutralAnNet - r.neutralVonNet * f;
+        return [r.speditionId, { balance, lastMovementDate: r.lastMovementDate }];
+      }));
 
     return res.json(
       speds.map((s) => ({
@@ -234,6 +235,7 @@ router.get("/pallet-balances", requireAuth, async (req, res) => {
         kuerzel: s.kuerzel,
         balance: aggMap[s.id]?.balance ?? 0,
         lastMovementDate: aggMap[s.id]?.lastMovementDate ?? null,
+        palletFaktor: s.palletFaktor ?? 1,
       })),
     );
   } catch (err) {
@@ -262,28 +264,27 @@ router.get("/pallet-report", requireAuth, async (req, res) => {
 
     const spedIds = speds.map((s) => s.id);
 
-    // One query: conditional aggregation for anfangsbestand + period stats
+    // Build factor map
+    const faktorMap: Record<number, number> = Object.fromEntries(speds.map((s) => [s.id, s.palletFaktor ?? 1]));
+
+    // Aggregation split so factor can be applied per-Spedition in JS
     const agg = await db
       .select({
         speditionId: palletMovementsTable.speditionId,
-        anfangsbestand: sql<number>`SUM(CASE
-          WHEN ${palletMovementsTable.movementDate} < ${dateFrom} AND ${palletMovementsTable.movementType} = 'eingang'   THEN  ${palletMovementsTable.amount}
-          WHEN ${palletMovementsTable.movementDate} < ${dateFrom} AND ${palletMovementsTable.movementType} = 'ausgang'   THEN -${palletMovementsTable.amount}
-          WHEN ${palletMovementsTable.movementDate} < ${dateFrom} AND ${palletMovementsTable.movementType} = 'korrektur' THEN  ${palletMovementsTable.amount}
-          WHEN ${palletMovementsTable.movementDate} < ${dateFrom} AND ${palletMovementsTable.movementType} = 'neutral'   THEN
-            (COALESCE(${palletMovementsTable.anCometEuropaletten},0) + COALESCE(${palletMovementsTable.anCometLadungssicherung},0) - COALESCE(${palletMovementsTable.anDefektePaletten},0))
-            - (COALESCE(${palletMovementsTable.vonCometEuropaletten},0) + COALESCE(${palletMovementsTable.vonCometLadungssicherung},0) - COALESCE(${palletMovementsTable.vonDefektePaletten},0))
-          ELSE 0 END)`.mapWith(Number),
-        zugaenge: sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementDate} >= ${dateFrom} AND ${palletMovementsTable.movementDate} <= ${dateTo} AND ${palletMovementsTable.movementType} = 'eingang' THEN ${palletMovementsTable.amount} ELSE 0 END)`.mapWith(Number),
-        abgaenge: sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementDate} >= ${dateFrom} AND ${palletMovementsTable.movementDate} <= ${dateTo} AND ${palletMovementsTable.movementType} = 'ausgang' THEN ${palletMovementsTable.amount} ELSE 0 END)`.mapWith(Number),
-        korrekturen: sql<number>`SUM(CASE
-          WHEN ${palletMovementsTable.movementDate} >= ${dateFrom} AND ${palletMovementsTable.movementDate} <= ${dateTo} AND ${palletMovementsTable.movementType} = 'korrektur' THEN ${palletMovementsTable.amount}
-          WHEN ${palletMovementsTable.movementDate} >= ${dateFrom} AND ${palletMovementsTable.movementDate} <= ${dateTo} AND ${palletMovementsTable.movementType} = 'neutral' THEN
-            (COALESCE(${palletMovementsTable.anCometEuropaletten},0) + COALESCE(${palletMovementsTable.anCometLadungssicherung},0) - COALESCE(${palletMovementsTable.anDefektePaletten},0))
-            - (COALESCE(${palletMovementsTable.vonCometEuropaletten},0) + COALESCE(${palletMovementsTable.vonCometLadungssicherung},0) - COALESCE(${palletMovementsTable.vonDefektePaletten},0))
-          ELSE 0 END)`.mapWith(Number),
+        // Pre-period components (for anfangsbestand)
+        preEingang:     sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementDate} < ${dateFrom} AND ${palletMovementsTable.movementType} = 'eingang'   THEN ${palletMovementsTable.amount} ELSE 0 END)`.mapWith(Number),
+        preAusgang:     sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementDate} < ${dateFrom} AND ${palletMovementsTable.movementType} = 'ausgang'   THEN ${palletMovementsTable.amount} ELSE 0 END)`.mapWith(Number),
+        preKorrektur:   sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementDate} < ${dateFrom} AND ${palletMovementsTable.movementType} = 'korrektur' THEN ${palletMovementsTable.amount} ELSE 0 END)`.mapWith(Number),
+        preNeutralAnNet: sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementDate} < ${dateFrom} AND ${palletMovementsTable.movementType} = 'neutral' THEN COALESCE(${palletMovementsTable.anCometEuropaletten},0) + COALESCE(${palletMovementsTable.anCometLadungssicherung},0) - COALESCE(${palletMovementsTable.anDefektePaletten},0) ELSE 0 END)`.mapWith(Number),
+        preNeutralVonNet: sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementDate} < ${dateFrom} AND ${palletMovementsTable.movementType} = 'neutral' THEN COALESCE(${palletMovementsTable.vonCometEuropaletten},0) + COALESCE(${palletMovementsTable.vonCometLadungssicherung},0) - COALESCE(${palletMovementsTable.vonDefektePaletten},0) ELSE 0 END)`.mapWith(Number),
+        // Within-period components
+        zugaenge:       sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementDate} >= ${dateFrom} AND ${palletMovementsTable.movementDate} <= ${dateTo} AND ${palletMovementsTable.movementType} = 'eingang'   THEN ${palletMovementsTable.amount} ELSE 0 END)`.mapWith(Number),
+        abgaengeRaw:    sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementDate} >= ${dateFrom} AND ${palletMovementsTable.movementDate} <= ${dateTo} AND ${palletMovementsTable.movementType} = 'ausgang'   THEN ${palletMovementsTable.amount} ELSE 0 END)`.mapWith(Number),
+        korrekturRaw:   sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementDate} >= ${dateFrom} AND ${palletMovementsTable.movementDate} <= ${dateTo} AND ${palletMovementsTable.movementType} = 'korrektur' THEN ${palletMovementsTable.amount} ELSE 0 END)`.mapWith(Number),
+        neutralAnNet:   sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementDate} >= ${dateFrom} AND ${palletMovementsTable.movementDate} <= ${dateTo} AND ${palletMovementsTable.movementType} = 'neutral' THEN COALESCE(${palletMovementsTable.anCometEuropaletten},0) + COALESCE(${palletMovementsTable.anCometLadungssicherung},0) - COALESCE(${palletMovementsTable.anDefektePaletten},0) ELSE 0 END)`.mapWith(Number),
+        neutralVonNet:  sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementDate} >= ${dateFrom} AND ${palletMovementsTable.movementDate} <= ${dateTo} AND ${palletMovementsTable.movementType} = 'neutral' THEN COALESCE(${palletMovementsTable.vonCometEuropaletten},0) + COALESCE(${palletMovementsTable.vonCometLadungssicherung},0) - COALESCE(${palletMovementsTable.vonDefektePaletten},0) ELSE 0 END)`.mapWith(Number),
         defekteVonComet: sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementDate} >= ${dateFrom} AND ${palletMovementsTable.movementDate} <= ${dateTo} THEN COALESCE(${palletMovementsTable.vonDefektePaletten}, 0) ELSE 0 END)`.mapWith(Number),
-        defekteAnComet: sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementDate} >= ${dateFrom} AND ${palletMovementsTable.movementDate} <= ${dateTo} THEN COALESCE(${palletMovementsTable.anDefektePaletten}, 0) ELSE 0 END)`.mapWith(Number),
+        defekteAnComet:  sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementDate} >= ${dateFrom} AND ${palletMovementsTable.movementDate} <= ${dateTo} THEN COALESCE(${palletMovementsTable.anDefektePaletten}, 0) ELSE 0 END)`.mapWith(Number),
       })
       .from(palletMovementsTable)
       .where(inArray(palletMovementsTable.speditionId, spedIds))
@@ -292,15 +293,24 @@ router.get("/pallet-report", requireAuth, async (req, res) => {
     const aggMap = Object.fromEntries(agg.map((r) => [r.speditionId, r]));
 
     const report = speds.map((s) => {
-      const r = aggMap[s.id] ?? { anfangsbestand: 0, zugaenge: 0, abgaenge: 0, korrekturen: 0, defekteVonComet: 0, defekteAnComet: 0 };
-      const endbestand = r.anfangsbestand + r.zugaenge - r.abgaenge + r.korrekturen;
+      const r = aggMap[s.id] ?? {
+        preEingang: 0, preAusgang: 0, preKorrektur: 0, preNeutralAnNet: 0, preNeutralVonNet: 0,
+        zugaenge: 0, abgaengeRaw: 0, korrekturRaw: 0, neutralAnNet: 0, neutralVonNet: 0,
+        defekteVonComet: 0, defekteAnComet: 0,
+      };
+      const f = faktorMap[s.id] ?? 1;
+      const anfangsbestand = r.preEingang - r.preAusgang * f + r.preKorrektur + r.preNeutralAnNet - r.preNeutralVonNet * f;
+      const abgaenge = r.abgaengeRaw * f;
+      const korrekturen = r.korrekturRaw + r.neutralAnNet - r.neutralVonNet * f;
+      const endbestand = anfangsbestand + r.zugaenge - abgaenge + korrekturen;
       return {
         speditionId: s.id,
         speditionName: s.name,
-        anfangsbestand: r.anfangsbestand,
+        palletFaktor: f,
+        anfangsbestand,
         zugaenge: r.zugaenge,
-        abgaenge: r.abgaenge,
-        korrekturen: r.korrekturen,
+        abgaenge,
+        korrekturen,
         endbestand,
         defekteVonComet: r.defekteVonComet,
         defekteAnComet: r.defekteAnComet,
