@@ -206,7 +206,14 @@ export default function PalettenPage() {
 
   const displayAmount = (m: any) => {
     const sign = m.movementType === "ausgang" ? "-" : m.movementType === "eingang" ? "+" : "";
-    return `${sign}${m.amount}`;
+    const f = (balances ?? []).find((b: any) => b.speditionId === m.speditionId)?.palletFaktor ?? 1;
+    const amt = (m.movementType === "neutral" && f > 1)
+      ? Math.abs(
+          ((m.anCometEuropaletten ?? 0) + (m.anCometLadungssicherung ?? 0)) * f
+          - ((m.vonCometEuropaletten ?? 0) + (m.vonCometLadungssicherung ?? 0))
+        )
+      : (m.amount ?? 0);
+    return `${sign}${amt}`;
   };
 
   const colSpan = isCometUser ? 7 : 6;
