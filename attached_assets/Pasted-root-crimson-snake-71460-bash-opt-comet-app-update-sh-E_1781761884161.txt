@@ -1,0 +1,61 @@
+root@crimson-snake-71460:~# bash /opt/comet/app/update.sh
+==> Eigentuemer korrigieren...
+==> Git pull...
+From https://github.com/justinklamehub/Realtime-Sync
+ * branch            main       -> FETCH_HEAD
+Already up to date.
+==> Abhaengigkeiten aktualisieren...
+Scope: all 9 workspace projects
+Already up to date
+Done in 737ms using pnpm v11.7.0
+==> Backend bauen...
+$ node ./build.mjs
+
+  dist/index.mjs                       3.1mb ⚠️
+  dist/pino-worker.mjs               153.4kb
+  dist/pino-file.mjs                 142.0kb
+  dist/pino-pretty.mjs               114.6kb
+  dist/thread-stream-worker.mjs        7.3kb
+  dist/index.mjs.map                   5.2mb
+  dist/pino-worker.mjs.map           256.9kb
+  dist/pino-file.mjs.map             229.0kb
+  dist/pino-pretty.mjs.map           204.0kb
+  dist/thread-stream-worker.mjs.map   12.0kb
+
+⚡ Done in 536ms
+==> Frontend bauen...
+$ vite build --config vite.config.ts
+vite v7.3.3 building client environment for production...
+src/components/ui/tooltip.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/sonner.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/label.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/select.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/sheet.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+✓ 3398 modules transformed.
+dist/public/index.html                     1.49 kB │ gzip:   0.57 kB
+dist/public/assets/index-BziEWM5D.css    120.01 kB │ gzip:  19.99 kB
+dist/public/assets/index-a1nyZkjL.js   1,544.47 kB │ gzip: 453.47 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 11.72s
+==> Rechte setzen...
+==> Node-Berechtigungen sicherstellen...
+==> Backend neu starten...
+[PM2] Spawning PM2 daemon with pm2_home=/opt/comet/.pm2
+spawn /usr/local/bin/node EACCES
+spawn /usr/local/bin/node EACCES
+[PM2] Spawning PM2 daemon with pm2_home=/opt/comet/.pm2
+spawn /usr/local/bin/node EACCES
+spawn /usr/local/bin/node EACCES
+[PM2] Spawning PM2 daemon with pm2_home=/opt/comet/.pm2
+spawn /usr/local/bin/node EACCES
+spawn /usr/local/bin/node EACCES
+[PM2] Saving current process list...
+[PM2] Spawning PM2 daemon with pm2_home=/opt/comet/.pm2
+spawn /usr/local/bin/node EACCES
+spawn /usr/local/bin/node EACCES
+Error retrieving process list: spawn /usr/local/bin/node EACCES
+root@crimson-snake-71460:~#
