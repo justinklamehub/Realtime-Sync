@@ -330,6 +330,7 @@ router.post("/reconciliations/:id/accept", requireAuth, async (req, res) => {
       if (m.movementType === "eingang") return sum + m.amount;
       if (m.movementType === "ausgang") return sum - m.amount;
       if (m.movementType === "korrektur") return sum + m.amount;
+      if (m.movementType === "anfangsbestand") return sum + m.amount;
       return sum;
     }, 0);
 
@@ -346,6 +347,7 @@ router.post("/reconciliations/:id/accept", requireAuth, async (req, res) => {
         movementDate: todayStr,
         amount: correctionAmount,
         bemerkungen: `Automatische Korrekturbuchung aus Abstimmung #${id}`,
+        reconciliationId: id,
         createdBy: req.session.userId,
       });
     }

@@ -559,10 +559,11 @@ export const ListPalletMovementsResponseItem = zod.object({
   "speditionName": zod.string().nullish(),
   "shipmentId": zod.number().nullish(),
   "shipmentBezeichnung": zod.string().nullish(),
-  "movementType": zod.enum(['eingang', 'ausgang', 'korrektur', 'abstimmung']),
+  "movementType": zod.enum(['eingang', 'ausgang', 'korrektur', 'abstimmung', 'anfangsbestand']),
   "movementDate": zod.string(),
   "amount": zod.number(),
   "bemerkungen": zod.string().nullish(),
+  "reconciliationId": zod.number().nullish(),
   "createdBy": zod.number().nullish(),
   "createdByName": zod.string().nullish(),
   "createdAt": zod.string()
@@ -576,7 +577,7 @@ export const ListPalletMovementsResponse = zod.array(ListPalletMovementsResponse
 export const CreatePalletMovementBody = zod.object({
   "speditionId": zod.number(),
   "shipmentId": zod.number().nullish(),
-  "movementType": zod.enum(['eingang', 'ausgang', 'korrektur', 'abstimmung']),
+  "movementType": zod.enum(['eingang', 'ausgang', 'korrektur', 'abstimmung', 'anfangsbestand']),
   "movementDate": zod.string(),
   "amount": zod.number(),
   "bemerkungen": zod.string().nullish()
@@ -591,7 +592,7 @@ export const UpdatePalletMovementParams = zod.object({
 })
 
 export const UpdatePalletMovementBody = zod.object({
-  "movementType": zod.enum(['eingang', 'ausgang', 'korrektur', 'abstimmung']).optional(),
+  "movementType": zod.enum(['eingang', 'ausgang', 'korrektur', 'abstimmung', 'anfangsbestand']).optional(),
   "movementDate": zod.string().optional(),
   "amount": zod.number().optional(),
   "bemerkungen": zod.string().nullish()
@@ -603,10 +604,11 @@ export const UpdatePalletMovementResponse = zod.object({
   "speditionName": zod.string().nullish(),
   "shipmentId": zod.number().nullish(),
   "shipmentBezeichnung": zod.string().nullish(),
-  "movementType": zod.enum(['eingang', 'ausgang', 'korrektur', 'abstimmung']),
+  "movementType": zod.enum(['eingang', 'ausgang', 'korrektur', 'abstimmung', 'anfangsbestand']),
   "movementDate": zod.string(),
   "amount": zod.number(),
   "bemerkungen": zod.string().nullish(),
+  "reconciliationId": zod.number().nullish(),
   "createdBy": zod.number().nullish(),
   "createdByName": zod.string().nullish(),
   "createdAt": zod.string()

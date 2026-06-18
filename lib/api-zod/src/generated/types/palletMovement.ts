@@ -22,6 +22,8 @@ export interface PalletMovement {
   /** @nullable */
   bemerkungen?: string | null;
   /** @nullable */
+  reconciliationId?: number | null;
+  /** @nullable */
   createdBy?: number | null;
   /** @nullable */
   createdByName?: string | null;

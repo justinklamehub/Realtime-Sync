@@ -200,6 +200,7 @@ export default function PalettenPage() {
       case "korrektur": return "bg-orange-100 text-orange-800 hover:bg-orange-100 border-transparent";
       case "neutral": return "bg-blue-100 text-blue-800 hover:bg-blue-100 border-transparent";
       case "abstimmung": return "bg-slate-100 text-slate-600 hover:bg-slate-100 border-transparent";
+      case "anfangsbestand": return "bg-violet-100 text-violet-800 hover:bg-violet-100 border-transparent";
       default: return "bg-slate-100 text-slate-800 border-transparent";
     }
   };
@@ -367,7 +368,8 @@ export default function PalettenPage() {
                       {movement.movementType === "eingang" ? "Zugang" :
                        movement.movementType === "ausgang" ? "Abgang" :
                        movement.movementType === "korrektur" ? "Korrektur" :
-                       movement.movementType === "neutral" ? "Neutral" : "Abstimmung"}
+                       movement.movementType === "neutral" ? "Neutral" :
+                       movement.movementType === "anfangsbestand" ? "Anfangsbestand" : "Abstimmung"}
                     </Badge>
                   </TableCell>
                   <TableCell className="font-mono text-sm text-slate-700">

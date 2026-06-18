@@ -14,4 +14,5 @@ export const PalletMovementMovementType = {
   ausgang: 'ausgang',
   korrektur: 'korrektur',
   abstimmung: 'abstimmung',
+  anfangsbestand: 'anfangsbestand',
 } as const;

@@ -34,6 +34,11 @@ export function MovementDialog({ open, onOpenChange }: { open: boolean, onOpenCh
   const [bemerkungen, setBemerkungen] = useState("");
   const [palletForm, setPalletForm] = useState(emptyForm());
 
+  // Anfangsbestand mode
+  const [isAnfangsbestandMode, setIsAnfangsbestandMode] = useState(false);
+  const [anfangsbestandYear, setAnfangsbestandYear] = useState(new Date().getFullYear());
+  const [anfangsbestandBetrag, setAnfangsbestandBetrag] = useState<number | "">(0);
+
   // Gross = euro + ladungssicherung (ohne Defekte-Abzug)
   // Net  = gross - defekte (für Anzeige und amount-Feld)
   const vonGross = useMemo(() =>
@@ -67,6 +72,9 @@ export function MovementDialog({ open, onOpenChange }: { open: boolean, onOpenCh
   const handleReset = () => {
     setBemerkungen("");
     setPalletForm(emptyForm());
+    setIsAnfangsbestandMode(false);
+    setAnfangsbestandBetrag(0);
+    setAnfangsbestandYear(new Date().getFullYear());
   };
 
   const createMutation = useCreatePalletMovement({
@@ -84,6 +92,27 @@ export function MovementDialog({ open, onOpenChange }: { open: boolean, onOpenCh
   });
 
   const handleSave = () => {
+    if (isAnfangsbestandMode) {
+      if (!speditionId) {
+        toast({ title: "Spedition wählen", variant: "destructive" });
+        return;
+      }
+      const betrag = Number(anfangsbestandBetrag);
+      if (isNaN(betrag)) {
+        toast({ title: "Ungültiger Betrag", variant: "destructive" });
+        return;
+      }
+      createMutation.mutate({
+        data: {
+          speditionId: parseInt(speditionId),
+          movementType: "anfangsbestand" as any,
+          movementDate: `${anfangsbestandYear}-01-01`,
+          amount: betrag,
+          bemerkungen: bemerkungen || undefined,
+        }
+      });
+      return;
+    }
     if (requiresSchein && !palletForm.palettenscheinnummer.trim()) {
       toast({ title: "Palettenscheinnummer ist erforderlich", variant: "destructive" });
       return;
@@ -135,6 +164,60 @@ export function MovementDialog({ open, onOpenChange }: { open: boolean, onOpenCh
         </DialogHeader>
         <ScrollArea className="max-h-[70vh] pr-4">
           <div className="space-y-4 py-2">
+
+            {/* Anfangsbestand toggle */}
+            <div
+              className={`flex items-center gap-3 rounded-md border px-3 py-2 cursor-pointer select-none transition-colors ${isAnfangsbestandMode ? "border-violet-300 bg-violet-50" : "border-slate-200 bg-slate-50 hover:bg-slate-100"}`}
+              onClick={() => setIsAnfangsbestandMode(v => !v)}
+            >
+              <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${isAnfangsbestandMode ? "border-violet-600 bg-violet-600" : "border-slate-400"}`}>
+                {isAnfangsbestandMode && <div className="w-2 h-2 bg-white rounded-sm" />}
+              </div>
+              <div>
+                <div className={`text-sm font-medium ${isAnfangsbestandMode ? "text-violet-800" : "text-slate-700"}`}>Anfangsbestand (01.01.)</div>
+                <div className="text-xs text-slate-400">Startguthaben oder Startschuld zu Jahresbeginn</div>
+              </div>
+            </div>
+
+            {/* Anfangsbestand fields */}
+            {isAnfangsbestandMode && (
+              <div className="rounded-md border border-violet-200 bg-violet-50 p-3 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-violet-700">Jahr</Label>
+                    <Select value={String(anfangsbestandYear)} onValueChange={v => setAnfangsbestandYear(Number(v))}>
+                      <SelectTrigger className="h-9 bg-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 2 + i).map(y => (
+                          <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-violet-700">Stichtag</Label>
+                    <div className="flex items-center h-9 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-500">
+                      01.01.{anfangsbestandYear}
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-violet-700">
+                    Betrag <span className="font-normal text-slate-400">(positiv = Spedition schuldet COMET · negativ = COMET schuldet Spedition)</span>
+                  </Label>
+                  <Input
+                    type="number"
+                    className="bg-white"
+                    value={anfangsbestandBetrag}
+                    onChange={e => setAnfangsbestandBetrag(e.target.value === "" ? "" : Number(e.target.value))}
+                    placeholder="z.B. 50 oder -30"
+                  />
+                </div>
+              </div>
+            )}
+
             {isCometUser && (
               <div className="space-y-2">
                 <Label>Spedition</Label>

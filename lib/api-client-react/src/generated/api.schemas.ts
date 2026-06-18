@@ -416,6 +416,7 @@ export const PalletMovementMovementType = {
   ausgang: 'ausgang',
   korrektur: 'korrektur',
   abstimmung: 'abstimmung',
+  anfangsbestand: 'anfangsbestand',
 } as const;
 
 export interface PalletMovement {
@@ -433,6 +434,8 @@ export interface PalletMovement {
   /** @nullable */
   bemerkungen?: string | null;
   /** @nullable */
+  reconciliationId?: number | null;
+  /** @nullable */
   createdBy?: number | null;
   /** @nullable */
   createdByName?: string | null;
@@ -447,6 +450,7 @@ export const PalletMovementInputMovementType = {
   ausgang: 'ausgang',
   korrektur: 'korrektur',
   abstimmung: 'abstimmung',
+  anfangsbestand: 'anfangsbestand',
 } as const;
 
 export interface PalletMovementInput {
@@ -468,6 +472,7 @@ export const PalletMovementUpdateMovementType = {
   ausgang: 'ausgang',
   korrektur: 'korrektur',
   abstimmung: 'abstimmung',
+  anfangsbestand: 'anfangsbestand',
 } as const;
 
 export interface PalletMovementUpdate {

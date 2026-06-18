@@ -17,6 +17,7 @@ export const palletMovementsTable = pgTable("pallet_movements", {
   anCometEuropaletten: integer("an_comet_europaletten").default(0),
   anCometLadungssicherung: integer("an_comet_ladungssicherung").default(0),
   anDefektePaletten: integer("an_defekte_paletten").default(0),
+  reconciliationId: integer("reconciliation_id"),
   createdBy: integer("created_by"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });

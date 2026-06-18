@@ -1174,13 +1174,15 @@ components:
           type: ["string", "null"]
         movementType:
           type: string
-          enum: [eingang, ausgang, korrektur, abstimmung]
+          enum: [eingang, ausgang, korrektur, abstimmung, anfangsbestand]
         movementDate:
           type: string
         amount:
           type: integer
         bemerkungen:
           type: ["string", "null"]
+        reconciliationId:
+          type: ["integer", "null"]
         createdBy:
           type: ["integer", "null"]
         createdByName:
@@ -1198,7 +1200,7 @@ components:
           type: ["integer", "null"]
         movementType:
           type: string
-          enum: [eingang, ausgang, korrektur, abstimmung]
+          enum: [eingang, ausgang, korrektur, abstimmung, anfangsbestand]
         movementDate:
           type: string
         amount:
@@ -1211,7 +1213,7 @@ components:
       properties:
         movementType:
           type: string
-          enum: [eingang, ausgang, korrektur, abstimmung]
+          enum: [eingang, ausgang, korrektur, abstimmung, anfangsbestand]
         movementDate:
           type: string
         amount:

@@ -15,6 +15,7 @@ interface Props {
     anCometLadungssicherung?: number;
     anDefektePaletten?: number;
     palletFaktor?: number;
+    reconciliationId?: number | null;
   }) | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -25,6 +26,7 @@ const TYPE_LABEL: Record<string, string> = {
   ausgang: "Abgang",
   korrektur: "Korrektur",
   abstimmung: "Abstimmung",
+  anfangsbestand: "Anfangsbestand",
   neutral: "Neutral",
 };
 
@@ -33,6 +35,7 @@ const TYPE_COLOR: Record<string, string> = {
   ausgang: "bg-red-100 text-red-800 border-transparent",
   korrektur: "bg-orange-100 text-orange-800 border-transparent",
   abstimmung: "bg-blue-100 text-blue-800 border-transparent",
+  anfangsbestand: "bg-violet-100 text-violet-800 border-transparent",
   neutral: "bg-blue-100 text-blue-800 border-transparent",
 };
 
@@ -145,7 +148,11 @@ export function MovementDetailSheet({ movement, open, onOpenChange }: Props) {
 
           {/* Meta */}
           <div className="rounded-md border border-slate-200 bg-white px-4 py-2">
-            <DetailRow label="Erstellt von" value={movement.createdByName} />
+            {movement.reconciliationId && (
+            <DetailRow label="Abstimmung" value={`#${movement.reconciliationId}`} />
+          )}
+          {movement.reconciliationId && <Separator className="my-1" />}
+          <DetailRow label="Erstellt von" value={movement.createdByName} />
             {movement.createdByName && <Separator className="my-1" />}
             <DetailRow
               label="Erstellt am"
