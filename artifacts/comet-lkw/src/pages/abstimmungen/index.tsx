@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
   useListReconciliations,
@@ -47,7 +47,15 @@ function getStatusBadge(status: string) {
   }
 }
 
-function CreateReconciliationDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+function CreateReconciliationDialog({
+  open,
+  onOpenChange,
+  reconciliations,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  reconciliations?: any[];
+}) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { data: speditionen } = useListSpeditionen();
@@ -55,6 +63,61 @@ function CreateReconciliationDialog({ open, onOpenChange }: { open: boolean; onO
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [cometBalance, setCometBalance] = useState("");
+  const [loadingBalance, setLoadingBalance] = useState(false);
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const fetchBalance = useCallback(async (spedId: string, from: string, to: string) => {
+    if (!spedId || !from || !to) return;
+    setLoadingBalance(true);
+    try {
+      const res = await fetch(
+        `/api/pallet-report?speditionId=${spedId}&dateFrom=${from}&dateTo=${to}`,
+        { credentials: "include" }
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        setCometBalance(String(data[0].endbestand));
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingBalance(false);
+    }
+  }, []);
+
+  // When spedition changes: auto-fill date range and fetch balance
+  useEffect(() => {
+    if (!speditionId) return;
+    setDateTo(today);
+
+    const spedRecs = (reconciliations ?? [])
+      .filter((r: any) => r.speditionId === Number(speditionId))
+      .sort((a: any, b: any) => new Date(b.dateTo).getTime() - new Date(a.dateTo).getTime());
+
+    const lastRec = spedRecs[0];
+    let newDateFrom: string;
+    if (lastRec) {
+      const d = new Date(lastRec.dateTo);
+      d.setDate(d.getDate() + 1);
+      newDateFrom = d.toISOString().slice(0, 10);
+    } else {
+      // No prior reconciliation — default to start of current year
+      newDateFrom = `${new Date().getFullYear()}-01-01`;
+    }
+    setDateFrom(newDateFrom);
+    fetchBalance(speditionId, newDateFrom, today);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [speditionId]);
+
+  // Re-fetch balance when dates are changed manually
+  useEffect(() => {
+    if (speditionId && dateFrom && dateTo) {
+      fetchBalance(speditionId, dateFrom, dateTo);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateFrom, dateTo]);
 
   const createMutation = useCreateReconciliation({
     mutation: {
@@ -78,7 +141,7 @@ function CreateReconciliationDialog({ open, onOpenChange }: { open: boolean; onO
         speditionId: parseInt(speditionId),
         dateFrom,
         dateTo,
-        cometBalance: cometBalance ? parseInt(cometBalance) : undefined,
+        cometBalance: cometBalance !== "" ? parseInt(cometBalance) : undefined,
       },
     });
   };
@@ -108,8 +171,21 @@ function CreateReconciliationDialog({ open, onOpenChange }: { open: boolean; onO
             </div>
           </div>
           <div className="space-y-1">
-            <Label>COMET Saldo (optional)</Label>
-            <Input type="number" value={cometBalance} onChange={e => setCometBalance(e.target.value)} placeholder="z.B. 42" />
+            <Label className="flex items-center gap-2">
+              COMET Saldo
+              {loadingBalance && <Loader2 className="w-3 h-3 animate-spin text-slate-400" />}
+            </Label>
+            <Input
+              type="number"
+              value={cometBalance}
+              onChange={e => setCometBalance(e.target.value)}
+              placeholder={loadingBalance ? "Wird berechnet…" : "Wird automatisch befüllt"}
+            />
+            {dateFrom && dateTo && speditionId && (
+              <p className="text-xs text-slate-400">
+                Zeitraum: {dateFrom} – {dateTo}
+              </p>
+            )}
           </div>
         </div>
         <DialogFooter>
@@ -455,7 +531,7 @@ export default function AbstimmungenPage() {
         </Table>
       </div>
 
-      <CreateReconciliationDialog open={createOpen} onOpenChange={setCreateOpen} />
+      <CreateReconciliationDialog open={createOpen} onOpenChange={setCreateOpen} reconciliations={reconciliations} />
       {selectedId && (
         <ReconciliationDetail
           id={selectedId}
