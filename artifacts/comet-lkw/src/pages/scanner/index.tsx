@@ -173,7 +173,7 @@ export default function ScannerLandingPage() {
     setSaveOk(false);
     setSaveError("");
     try {
-      const res = await fetch(`${API}/scanner/find-shipment?q=${encodeURIComponent(val)}`, {
+      const res = await fetch(`${API}/scanner/find-shipment?q=${encodeURIComponent(val)}&id=${encodeURIComponent(val)}`, {
         credentials: "include",
       });
       if (!res.ok) {
