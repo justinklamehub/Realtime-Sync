@@ -47,6 +47,15 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.use((_req, res, next) => {
+  res.setTimeout(30_000, () => {
+    if (!res.headersSent) {
+      res.status(503).json({ error: "Request timeout" });
+    }
+  });
+  next();
+});
+
 export const sessionMiddleware = session({
   store: new PgSession({
     pool,
