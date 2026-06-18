@@ -332,7 +332,7 @@ router.get("/pallet-report", requireAuth, async (req, res) => {
         speditionName: s.name,
         palletFaktor: f,
         anfangsbestand,
-        zugaenge: r.zugaenge,
+        zugaenge,
         abgaenge,
         korrekturen,
         endbestand,
