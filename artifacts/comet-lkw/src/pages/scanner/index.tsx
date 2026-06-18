@@ -250,6 +250,41 @@ export default function ScannerLandingPage() {
         <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>FB LOG – 016</div>
       </div>
 
+      {/* Blanko-Checkliste direkter Einstieg */}
+      <div style={{ width: "100%", maxWidth: 480, marginBottom: 16 }}>
+        <button
+          style={{
+            width: "100%",
+            padding: "14px 16px",
+            fontSize: 14,
+            fontWeight: 700,
+            letterSpacing: "0.08em",
+            background: "rgba(180,255,0,0.08)",
+            color: "#b4ff00",
+            border: "1.5px solid #b4ff00",
+            borderRadius: 10,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+          }}
+          onClick={() => setLocation("/scanner/gefahrgut")}
+        >
+          <ClipboardCheck size={18} />
+          BLANKO-CHECKLISTE (OHNE LKW-ID)
+        </button>
+        <div style={{ fontSize: 11, color: "#64748b", textAlign: "center" as const, marginTop: 5 }}>
+          Checkliste ohne Verladungs-ID ausfüllen
+        </div>
+      </div>
+
+      <div style={{ width: "100%", maxWidth: 480, marginBottom: 8, display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ flex: 1, height: 1, background: "#1e3a5f" }} />
+        <span style={{ fontSize: 11, color: "#475569", letterSpacing: "0.1em", textTransform: "uppercase" as const }}>oder Verladung suchen</span>
+        <div style={{ flex: 1, height: 1, background: "#1e3a5f" }} />
+      </div>
+
       <div style={S.card}>
         <form onSubmit={handleSearch}>
           <label style={S.label}>Verladungs-ID oder Kennzeichen</label>

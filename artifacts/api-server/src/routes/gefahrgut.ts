@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { gefahrgutChecklistenTable, shipmentsTable, speditionenTable } from "@workspace/db";
-import { eq, desc, isNotNull, count, ilike, or } from "drizzle-orm";
+import { eq, desc, isNotNull, isNull, count, ilike, or } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { isCometRole } from "../lib/auth";
 import { can } from "../lib/permissions";
@@ -184,7 +184,7 @@ router.get("/gefahrgut-checklisten", requireAuth, async (req, res) => {
     if (!isCometRole(req.session.role!)) {
       return res.status(403).json({ error: "Kein Zugriff" });
     }
-    const { shipmentId } = req.query as { shipmentId?: string };
+    const { shipmentId, blanko } = req.query as { shipmentId?: string; blanko?: string };
     let rows;
     if (shipmentId) {
       rows = await db
@@ -192,6 +192,13 @@ router.get("/gefahrgut-checklisten", requireAuth, async (req, res) => {
         .from(gefahrgutChecklistenTable)
         .where(eq(gefahrgutChecklistenTable.shipmentId, Number(shipmentId)))
         .orderBy(desc(gefahrgutChecklistenTable.eingereichtAt));
+    } else if (blanko === "true") {
+      rows = await db
+        .select()
+        .from(gefahrgutChecklistenTable)
+        .where(isNull(gefahrgutChecklistenTable.shipmentId))
+        .orderBy(desc(gefahrgutChecklistenTable.eingereichtAt))
+        .limit(200);
     } else {
       rows = await db
         .select()

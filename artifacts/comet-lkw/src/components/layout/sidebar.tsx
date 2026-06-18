@@ -29,6 +29,7 @@ import {
   BarChart2,
   Sun,
   Moon,
+  ShieldAlert,
 } from "lucide-react";
 import { useLogout } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -202,6 +203,7 @@ export function AppSidebar({ collapsed, onToggle, isDark, onToggleTheme }: AppSi
     { name: "Benutzer", href: "/users", icon: Users, show: canManageUsers },
     { name: "Palettenkonto", href: "/paletten", icon: PackageSearch, show: true },
     { name: "Abstimmungen", href: "/abstimmungen", icon: FileCheck2, show: true },
+    { name: "Gefahrgut", href: "/gefahrgut", icon: ShieldAlert, show: isCometUser },
     { name: "Auswertung", href: "/auswertung", icon: BarChart2, show: isCometUser },
     { name: "Änderungslog", href: "/auditlog", icon: History, show: isCometUser },
     { name: "Speditionsfreigabe", href: "/speditionsfreigabe", icon: Share2, show: user.role === "speditions_admin" },
