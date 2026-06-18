@@ -47,11 +47,27 @@ export function useSocket() {
     socket.on("shipment.locked", invalidateShipments);
     socket.on("shipment.unlocked", invalidateShipments);
 
-    // Pallet events — each event only invalidates its own query
-    const invalidatePalletMovements = () =>
-      queryClient.invalidateQueries({ queryKey: getListPalletMovementsQueryKey() });
-    const invalidatePalletBalances = () =>
-      queryClient.invalidateQueries({ queryKey: getListPalletBalancesQueryKey() });
+    // Pallet events — debounced so rapid back-to-back socket events (e.g. pallet_movement.created
+    // followed immediately by pallet_balance.updated) only trigger one refetch per query.
+    // cancelRefetch:false prevents cancelling an already in-flight request.
+    let palletMovementsTimer: ReturnType<typeof setTimeout> | null = null;
+    let palletBalancesTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const invalidatePalletMovements = () => {
+      if (palletMovementsTimer) clearTimeout(palletMovementsTimer);
+      palletMovementsTimer = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: getListPalletMovementsQueryKey(), cancelRefetch: false });
+        palletMovementsTimer = null;
+      }, 80);
+    };
+    const invalidatePalletBalances = () => {
+      if (palletBalancesTimer) clearTimeout(palletBalancesTimer);
+      palletBalancesTimer = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: getListPalletBalancesQueryKey(), cancelRefetch: false });
+        palletBalancesTimer = null;
+      }, 80);
+    };
+
     socket.on("pallet_movement.created", invalidatePalletMovements);
     socket.on("pallet_movement.created", invalidatePalletBalances);
     socket.on("pallet_balance.updated", invalidatePalletBalances);
