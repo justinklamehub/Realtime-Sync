@@ -36,7 +36,6 @@ router.get("/scanner/find-shipment", async (req, res) => {
         speditionId: shipmentsTable.speditionId,
         status: shipmentsTable.status,
         tor: shipmentsTable.tor,
-        wareStatus: shipmentsTable.wareStatus,
       })
       .from(shipmentsTable)
       .where(eq(shipmentsTable.id, numId))
@@ -46,7 +45,22 @@ router.get("/scanner/find-shipment", async (req, res) => {
       return res.json({ found: false, shipment: null, spedition: null, checklistCount: 0 });
     }
 
-    const shipment = shipments[0];
+    const shipmentBase = shipments[0];
+
+    // wareStatus separat abfragen — Spalte fehlt möglicherweise auf älteren Installationen
+    let wareStatusValue: string | null = null;
+    try {
+      const ws = await db
+        .select({ wareStatus: shipmentsTable.wareStatus })
+        .from(shipmentsTable)
+        .where(eq(shipmentsTable.id, shipmentBase.id))
+        .limit(1);
+      if (ws.length > 0) wareStatusValue = ws[0].wareStatus ?? null;
+    } catch {
+      // ware_status-Spalte existiert nicht auf dieser Installation
+    }
+
+    const shipment = { ...shipmentBase, wareStatus: wareStatusValue };
     let speditionName: string | null = null;
     if (shipment.speditionId) {
       const speds = await db

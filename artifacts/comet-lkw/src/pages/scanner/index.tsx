@@ -291,12 +291,15 @@ export default function ScannerLandingPage() {
           <input
             ref={inputRef}
             style={S.input}
-            type="number"
+            type="text"
             inputMode="numeric"
+            pattern="[0-9]*"
             autoCorrect="off"
+            autoCapitalize="off"
             value={idInput}
             onChange={(e) => {
-              setIdInput(e.target.value);
+              const v = e.target.value.replace(/\D/g, "");
+              setIdInput(v);
               setSearched(false);
               setShipment(null);
               setSearchError(null);
