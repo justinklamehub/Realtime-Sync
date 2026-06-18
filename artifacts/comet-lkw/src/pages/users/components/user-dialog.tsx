@@ -41,6 +41,7 @@ interface RoleInfo {
 }
 
 const SPED_GROUP = "Speditionen";
+const SPED_GROUP_ALIASES = new Set(["Speditionen", "Spedition"]);
 
 export function UserDialog({ open, onOpenChange, editUser }: UserDialogProps) {
   const queryClient = useQueryClient();
@@ -164,7 +165,7 @@ export function UserDialog({ open, onOpenChange, editUser }: UserDialogProps) {
   // Determine if selected role needs spedition picker
   const selectedRoleInfo = allRoles.find((r) => r.roleKey === role);
   const needsSpedition = isCometAdmin
-    ? selectedRoleInfo?.roleGroup === SPED_GROUP
+    ? SPED_GROUP_ALIASES.has(selectedRoleInfo?.roleGroup ?? "")
     : role.startsWith("speditions_");
 
   return (

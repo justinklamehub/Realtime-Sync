@@ -43,6 +43,8 @@ const CATEGORY_COLORS: Record<string, string> = {
 const VIEWER_LOCKED = new Set(["comet_viewer", "speditions_viewer"]);
 
 const BUILT_IN_GROUPS = ["COMET intern", "Speditionen"];
+const COMET_GROUP_ALIASES = new Set(["COMET intern", "COMET"]);
+const SPED_GROUP_ALIASES  = new Set(["Speditionen", "Spedition"]);
 
 function slugify(s: string) {
   return s.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "").replace(/^_+|_+$/g, "");
@@ -163,8 +165,8 @@ export default function BerechtigungenPage() {
   // Sort roles: superadmin first, then by group order, then others
   const roleOrder = (r: RoleInfo) => {
     if (r.roleKey === SUPERADMIN) return 0;
-    if (r.roleGroup === "COMET intern") return 1;
-    if (r.roleGroup === "Speditionen") return 2;
+    if (COMET_GROUP_ALIASES.has(r.roleGroup)) return 1;
+    if (SPED_GROUP_ALIASES.has(r.roleGroup))  return 2;
     return 3;
   };
   const displayRoles = [...data.roles]
