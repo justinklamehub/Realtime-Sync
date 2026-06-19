@@ -430,6 +430,48 @@ router.get("/pallet-plant-count", requireAuth, async (req, res) => {
   }
 });
 
+router.get("/pallet-balance-at", requireAuth, async (req, res) => {
+  try {
+    const speditionId = Number(req.query.speditionId);
+    const asOf = req.query.asOf as string;
+    if (!speditionId || !asOf) {
+      return res.status(400).json({ error: "speditionId und asOf erforderlich" });
+    }
+    const [sped] = await db
+      .select({ palletFaktor: speditionenTable.palletFaktor })
+      .from(speditionenTable)
+      .where(eq(speditionenTable.id, speditionId));
+    const f = sped?.palletFaktor ?? 1;
+
+    const [r] = await db
+      .select({
+        sumEingang:        sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementType}='eingang'        THEN ${palletMovementsTable.amount} ELSE 0 END)`.mapWith(Number),
+        sumAusgang:        sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementType}='ausgang'        THEN ${palletMovementsTable.amount} ELSE 0 END)`.mapWith(Number),
+        sumKorrektur:      sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementType}='korrektur'      THEN ${palletMovementsTable.amount} ELSE 0 END)`.mapWith(Number),
+        sumAnfangsbestand: sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementType}='anfangsbestand' THEN ${palletMovementsTable.amount} ELSE 0 END)`.mapWith(Number),
+        sumAbstimmung:     sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementType}='abstimmung'     THEN ${palletMovementsTable.amount} ELSE 0 END)`.mapWith(Number),
+        neutralAnNet:      sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementType}='neutral' THEN COALESCE(${palletMovementsTable.anCometEuropaletten},0)+COALESCE(${palletMovementsTable.anCometLadungssicherung},0)-COALESCE(${palletMovementsTable.anDefektePaletten},0) ELSE 0 END)`.mapWith(Number),
+        neutralVonNet:     sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementType}='neutral' THEN COALESCE(${palletMovementsTable.vonCometEuropaletten},0)+COALESCE(${palletMovementsTable.vonCometLadungssicherung},0)-COALESCE(${palletMovementsTable.vonDefektePaletten},0) ELSE 0 END)`.mapWith(Number),
+        neutralAnGross:    sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementType}='neutral' THEN COALESCE(${palletMovementsTable.anCometEuropaletten},0)+COALESCE(${palletMovementsTable.anCometLadungssicherung},0) ELSE 0 END)`.mapWith(Number),
+        neutralVonGross:   sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementType}='neutral' THEN COALESCE(${palletMovementsTable.vonCometEuropaletten},0)+COALESCE(${palletMovementsTable.vonCometLadungssicherung},0) ELSE 0 END)`.mapWith(Number),
+      })
+      .from(palletMovementsTable)
+      .where(and(
+        eq(palletMovementsTable.speditionId, speditionId),
+        lte(palletMovementsTable.movementDate, asOf),
+      ));
+
+    const balance = f > 1
+      ? r.sumEingang * f - r.sumAusgang + r.sumKorrektur + r.sumAnfangsbestand + r.sumAbstimmung + (r.neutralAnGross * f - r.neutralVonGross)
+      : r.sumEingang - r.sumAusgang + r.sumKorrektur + r.sumAnfangsbestand + r.sumAbstimmung + (r.neutralAnNet - r.neutralVonNet);
+
+    return res.json({ balance });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.post("/pallet-recalculate", requireAuth, async (req, res) => {
   try {
     const role = req.session.role!;

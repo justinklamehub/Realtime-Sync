@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useListPalletBalances, useListPalletMovements, useListSpeditionen } from "@workspace/api-client-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +43,25 @@ export default function PalettenPage() {
   const [closeAccountAmount, setCloseAccountAmount] = useState<number | "">(0);
   const [closeAccountNote, setCloseAccountNote] = useState("");
   const [closeAccountSaving, setCloseAccountSaving] = useState(false);
+  const [closeAccountBalanceLoading, setCloseAccountBalanceLoading] = useState(false);
+  const closeAccountAmountManualRef = useRef(false);
+
+  useEffect(() => {
+    if (!closeAccountData || !closeAccountDate) return;
+    let cancelled = false;
+    setCloseAccountBalanceLoading(true);
+    closeAccountAmountManualRef.current = false;
+    fetch(`/api/pallet-balance-at?speditionId=${closeAccountData.speditionId}&asOf=${closeAccountDate}`, { credentials: "include" })
+      .then(r => r.json())
+      .then(d => {
+        if (!cancelled && !closeAccountAmountManualRef.current) {
+          setCloseAccountAmount(d.balance ?? 0);
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setCloseAccountBalanceLoading(false); });
+    return () => { cancelled = true; };
+  }, [closeAccountDate, closeAccountData?.speditionId]);
 
   const openCloseAccount = (speditionId: number, speditionName: string, balance: number) => {
     const today = new Date();
@@ -937,11 +956,17 @@ export default function PalettenPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Neuer Anfangsbestand</Label>
+                <Label className="flex items-center gap-1.5">
+                  Neuer Anfangsbestand
+                  {closeAccountBalanceLoading && <Loader2 className="w-3 h-3 animate-spin text-slate-400" />}
+                </Label>
                 <Input
                   type="number"
                   value={closeAccountAmount}
-                  onChange={e => setCloseAccountAmount(e.target.value === "" ? "" : Number(e.target.value))}
+                  onChange={e => {
+                    closeAccountAmountManualRef.current = true;
+                    setCloseAccountAmount(e.target.value === "" ? "" : Number(e.target.value));
+                  }}
                   placeholder="Betrag"
                 />
               </div>
