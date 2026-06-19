@@ -106,6 +106,7 @@ export default function PalettenPage() {
       if (!res.ok) throw new Error("Fehler beim Laden der Buchungen");
       const movs: any[] = await res.json();
       const f = exportAccountDialog.faktor;
+      const bal = exportAccountDialog.balance;
       const now = new Date();
 
       const typeLabel = (t: string) =>
@@ -127,19 +128,114 @@ export default function PalettenPage() {
         ? `${exportFrom ? format(new Date(exportFrom), "dd.MM.yyyy") : "—"} – ${exportTo ? format(new Date(exportTo), "dd.MM.yyyy") : "—"}`
         : "Alle Buchungen";
 
-      const aoa: any[][] = [
-        ["Spedition:", exportAccountDialog.speditionName],
-        ["Zeitraum:", periodLabel],
-        ["Export-Datum:", format(now, "dd.MM.yyyy 'um' HH:mm 'Uhr'")],
-        ["Saldo zum Zeitpunkt:", exportAccountDialog.balance],
-        [],
-        [
-          "Datum", "Art", "Palettenschein-Nr.", "Verladung",
-          "Von Euro", "Von LS", "Von Defekt",
-          "An Euro", "An LS", "An Defekt",
-          "Betrag", "Bemerkung", "Erstellt von",
-        ],
-        ...movs.map(m => [
+      const balanceLabel = bal > 0 ? "Ihr Guthaben" : bal < 0 ? "Ihre Schulden" : "Ihr Saldo";
+      const balanceDisplay = bal > 0 ? `+${bal} Paletten` : `${bal} Paletten`;
+
+      const ExcelJS = (await import("exceljs")).default;
+      const wb = new ExcelJS.Workbook();
+      wb.creator = "COMET LKW-Verladungsverwaltung";
+      wb.created = now;
+
+      const ws = wb.addWorksheet(exportAccountDialog.speditionName.slice(0, 31), {
+        views: [{ state: "frozen", ySplit: 7 }],
+      });
+
+      ws.columns = [
+        { width: 13 }, { width: 15 }, { width: 23 }, { width: 26 },
+        { width: 17 }, { width: 14 }, { width: 18 },
+        { width: 14 }, { width: 13 }, { width: 17 },
+        { width: 10 }, { width: 34 }, { width: 22 },
+      ];
+
+      const NAVY      = "FF1A3A5C";
+      const NAVY_MID  = "FF2D5A8E";
+      const INFO_BG   = "FFF0F4F8";
+      const WHITE     = "FFFFFFFF";
+      const ALT_ROW   = "FFF8FAFB";
+      const BORDER_C  = "FFCBD5E1";
+      const GREEN     = "FF166534";
+      const RED       = "FF991B1B";
+      const SLATE     = "FF374151";
+
+      const thin = (c = BORDER_C) => ({
+        top:    { style: "thin" as const, color: { argb: c } },
+        bottom: { style: "thin" as const, color: { argb: c } },
+        left:   { style: "thin" as const, color: { argb: c } },
+        right:  { style: "thin" as const, color: { argb: c } },
+      });
+
+      const solid = (argb: string) => ({ type: "pattern" as const, pattern: "solid" as const, fgColor: { argb } });
+
+      const LAST = "M";
+
+      ws.addRow(["COMET Palettenkonto"]);
+      ws.mergeCells(`A1:${LAST}1`);
+      Object.assign(ws.getCell("A1"), {
+        value: "COMET Palettenkonto",
+        font: { bold: true, size: 16, color: { argb: WHITE } },
+        fill: solid(NAVY),
+        alignment: { vertical: "middle", horizontal: "center" },
+      });
+      ws.getRow(1).height = 30;
+
+      ws.addRow([exportAccountDialog.speditionName]);
+      ws.mergeCells(`A2:${LAST}2`);
+      Object.assign(ws.getCell("A2"), {
+        value: exportAccountDialog.speditionName,
+        font: { size: 12, color: { argb: WHITE } },
+        fill: solid(NAVY_MID),
+        alignment: { vertical: "middle", horizontal: "center" },
+      });
+      ws.getRow(2).height = 22;
+
+      ws.addRow([]);
+      ws.getRow(3).height = 5;
+
+      ws.addRow(["Spedition:", exportAccountDialog.speditionName, "", "", "Zeitraum:", periodLabel]);
+      ws.getRow(4).height = 18;
+      for (const col of ["A", "E"] as const) {
+        Object.assign(ws.getCell(`${col}4`), {
+          font: { bold: true, size: 10, color: { argb: SLATE } },
+          fill: solid(INFO_BG),
+        });
+      }
+      ws.getCell("B4").font = { size: 10 };
+      ws.getCell("F4").font = { size: 10 };
+
+      ws.addRow(["Export-Datum:", format(now, "dd.MM.yyyy 'um' HH:mm 'Uhr'"), "", "", `${balanceLabel}:`, balanceDisplay]);
+      ws.getRow(5).height = 18;
+      for (const col of ["A", "E"] as const) {
+        Object.assign(ws.getCell(`${col}5`), {
+          font: { bold: true, size: 10, color: { argb: SLATE } },
+          fill: solid(INFO_BG),
+        });
+      }
+      ws.getCell("B5").font = { size: 10 };
+      Object.assign(ws.getCell("F5"), {
+        font: { bold: true, size: 11, color: { argb: bal > 0 ? GREEN : bal < 0 ? RED : SLATE } },
+      });
+
+      ws.addRow([]);
+      ws.getRow(6).height = 5;
+
+      const headers = [
+        "Datum", "Art", "Palettenschein-Nr.", "Verladung",
+        "Von COMET Euro", "Von COMET LS", "Von COMET defekt",
+        "an COMET Euro", "an COMET LS", "An COMET defekt",
+        "Betrag", "Bemerkung", "Erstellt von",
+      ];
+      ws.addRow(headers);
+      ws.getRow(7).height = 22;
+      ws.getRow(7).eachCell(cell => {
+        cell.font = { bold: true, size: 10, color: { argb: WHITE } };
+        cell.fill = solid(NAVY);
+        cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+        cell.border = thin("FF0D2442");
+      });
+
+      movs.forEach((m, i) => {
+        const amt = signedAmt(m);
+        const row = ws.addRow([
           format(new Date(m.movementDate), "dd.MM.yyyy"),
           typeLabel(m.movementType),
           m.palettenscheinnummer || "",
@@ -150,23 +246,40 @@ export default function PalettenPage() {
           m.anCometEuropaletten ?? "",
           m.anCometLadungssicherung ?? "",
           m.anDefektePaletten ?? "",
-          signedAmt(m),
+          amt,
           m.bemerkungen || "",
           m.createdByName || "",
-        ]),
-      ];
+        ]);
+        row.height = 16;
+        const bg = i % 2 === 1 ? ALT_ROW : WHITE;
+        row.eachCell({ includeEmpty: true }, (cell, col) => {
+          cell.fill = solid(bg);
+          cell.border = thin();
+          cell.font = { size: 10 };
+          cell.alignment = { vertical: "middle" };
+          if (col === 11) {
+            const v = cell.value as number;
+            cell.font = { bold: true, size: 10, color: { argb: v < 0 ? RED : v > 0 ? GREEN : SLATE } };
+            cell.alignment = { vertical: "middle", horizontal: "right" };
+            cell.numFmt = '+#,##0;-#,##0;0';
+          }
+          if (col >= 5 && col <= 10) {
+            cell.alignment = { vertical: "middle", horizontal: "center" };
+          }
+        });
+      });
 
-      const ws = XLSX.utils.aoa_to_sheet(aoa);
-      ws["!cols"] = [
-        { wch: 20 }, { wch: 16 }, { wch: 22 }, { wch: 26 },
-        { wch: 10 }, { wch: 10 }, { wch: 12 },
-        { wch: 10 }, { wch: 10 }, { wch: 12 },
-        { wch: 10 }, { wch: 34 }, { wch: 22 },
-      ];
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, exportAccountDialog.speditionName.slice(0, 31));
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer as ArrayBuffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
       const safeName = exportAccountDialog.speditionName.replace(/[^\w\-]/g, "-");
-      XLSX.writeFile(wb, `paletten-${safeName}-${exportFrom || "alle"}-bis-${exportTo || "alle"}.xlsx`);
+      a.download = `paletten-${safeName}-${exportFrom || "alle"}-bis-${exportTo || "alle"}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
       setExportAccountDialog(null);
     } catch (e: any) {
       toast({ title: e.message ?? "Export fehlgeschlagen", variant: "destructive" });
