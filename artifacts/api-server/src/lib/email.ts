@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import { db } from "@workspace/db";
 import { settingsTable } from "@workspace/db";
+import { eq, notLike, and } from "drizzle-orm";
 
 export type EmailEvent = "shipment" | "bulk" | "user";
 
@@ -190,6 +191,7 @@ Ihr Konto wurde im System COMET LKW-Verladungsverwaltung angelegt.
 
 Benutzername:  {{username}}
 E-Mail:        {{email}}
+Passwort:      {{passwort}}
 Rolle:         {{rolle}}
 Spedition:     {{spedition}}
 
@@ -205,4 +207,29 @@ Diese E-Mail wurde automatisch generiert.`,
       .values({ key, value })
       .onConflictDoNothing();
   }
+
+  // Migration: {{passwort}} in bestehende Benutzer-Vorlage einfügen falls noch nicht vorhanden
+  await db
+    .update(settingsTable)
+    .set({
+      value: `Guten Tag {{username}},
+
+Ihr Konto wurde im System COMET LKW-Verladungsverwaltung angelegt.
+
+Benutzername:  {{username}}
+E-Mail:        {{email}}
+Passwort:      {{passwort}}
+Rolle:         {{rolle}}
+Spedition:     {{spedition}}
+
+Bitte wenden Sie sich bei Fragen an Ihren Administrator.
+
+Diese E-Mail wurde automatisch generiert.`,
+    })
+    .where(
+      and(
+        eq(settingsTable.key, "email_tpl_user_body"),
+        notLike(settingsTable.value, "%{{passwort}}%"),
+      ),
+    );
 }

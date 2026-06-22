@@ -112,6 +112,7 @@ router.post("/users", requireAuth, async (req, res) => {
           {
             username,
             email: email || "",
+            passwort: password,
             rolle: newRole,
             spedition: spedName,
           },
