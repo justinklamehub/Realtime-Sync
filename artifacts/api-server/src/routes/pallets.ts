@@ -415,20 +415,40 @@ router.get("/pallet-export", requireAuth, async (req, res) => {
 
 router.get("/pallet-werkbestand", requireAuth, async (req, res) => {
   try {
+    // Step 1: find the latest manual inventory entry
+    const [latest] = await db
+      .select({ recordedAt: palletPlantCountsTable.recordedAt, amount: palletPlantCountsTable.amount })
+      .from(palletPlantCountsTable)
+      .orderBy(sql`${palletPlantCountsTable.recordedAt} DESC`)
+      .limit(1);
+
+    if (!latest) {
+      return res.json({ werkbestand: null, inventurDate: null, hasInventur: false });
+    }
+
+    // Step 2: sum all physical movements AFTER the inventory date
+    // Only eingang/ausgang/korrektur/neutral count — anfangsbestand & abstimmung are
+    // purely financial customer-account entries, not physical pallet movements.
     const [r] = await db
       .select({
-        sumEingang:        sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementType}='eingang'        THEN ${palletMovementsTable.amount} ELSE 0 END)`.mapWith(Number),
-        sumAusgang:        sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementType}='ausgang'        THEN ${palletMovementsTable.amount} ELSE 0 END)`.mapWith(Number),
-        sumKorrektur:      sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementType}='korrektur'      THEN ${palletMovementsTable.amount} ELSE 0 END)`.mapWith(Number),
-        sumAnfangsbestand: sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementType}='anfangsbestand' THEN ${palletMovementsTable.amount} ELSE 0 END)`.mapWith(Number),
-        neutralAnGross:    sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementType}='neutral' THEN COALESCE(${palletMovementsTable.anCometEuropaletten},0)+COALESCE(${palletMovementsTable.anCometLadungssicherung},0)+COALESCE(${palletMovementsTable.anDefektePaletten},0) ELSE 0 END)`.mapWith(Number),
-        neutralVonGross:   sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementType}='neutral' THEN COALESCE(${palletMovementsTable.vonCometEuropaletten},0)+COALESCE(${palletMovementsTable.vonCometLadungssicherung},0)+COALESCE(${palletMovementsTable.vonDefektePaletten},0) ELSE 0 END)`.mapWith(Number),
+        sumEingang:    sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementType}='eingang'   THEN ${palletMovementsTable.amount} ELSE 0 END)`.mapWith(Number),
+        sumAusgang:    sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementType}='ausgang'   THEN ${palletMovementsTable.amount} ELSE 0 END)`.mapWith(Number),
+        sumKorrektur:  sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementType}='korrektur' THEN ${palletMovementsTable.amount} ELSE 0 END)`.mapWith(Number),
+        neutralAnGross: sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementType}='neutral' THEN COALESCE(${palletMovementsTable.anCometEuropaletten},0)+COALESCE(${palletMovementsTable.anCometLadungssicherung},0)+COALESCE(${palletMovementsTable.anDefektePaletten},0) ELSE 0 END)`.mapWith(Number),
+        neutralVonGross:sql<number>`SUM(CASE WHEN ${palletMovementsTable.movementType}='neutral' THEN COALESCE(${palletMovementsTable.vonCometEuropaletten},0)+COALESCE(${palletMovementsTable.vonCometLadungssicherung},0)+COALESCE(${palletMovementsTable.vonDefektePaletten},0) ELSE 0 END)`.mapWith(Number),
       })
-      .from(palletMovementsTable);
-    const werkbestand =
-      r.sumEingang - r.sumAusgang + r.sumKorrektur + r.sumAnfangsbestand
+      .from(palletMovementsTable)
+      .where(sql`${palletMovementsTable.movementDate} > ${latest.recordedAt}`);
+
+    const delta =
+      r.sumEingang - r.sumAusgang + r.sumKorrektur
       + (r.neutralAnGross - r.neutralVonGross);
-    return res.json({ werkbestand });
+
+    return res.json({
+      werkbestand: latest.amount + delta,
+      inventurDate: latest.recordedAt,
+      hasInventur: true,
+    });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Internal server error" });

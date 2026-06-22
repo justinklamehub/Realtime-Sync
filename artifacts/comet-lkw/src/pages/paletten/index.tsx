@@ -39,13 +39,20 @@ export default function PalettenPage() {
   const [reportError, setReportError] = useState("");
 
   const [werkbestand, setWerkbestand] = useState<number | null>(null);
+  const [werkbestandInventurDate, setWerkbestandInventurDate] = useState<string | null>(null);
+  const [werkbestandHasInventur, setWerkbestandHasInventur] = useState<boolean | null>(null);
   const [werkbestandLoading, setWerkbestandLoading] = useState(false);
 
   const loadWerkbestand = async () => {
     setWerkbestandLoading(true);
     try {
       const res = await fetch("/api/pallet-werkbestand", { credentials: "include" });
-      if (res.ok) { const d = await res.json(); setWerkbestand(d.werkbestand ?? 0); }
+      if (res.ok) {
+        const d = await res.json();
+        setWerkbestandHasInventur(d.hasInventur ?? false);
+        setWerkbestand(d.werkbestand ?? null);
+        setWerkbestandInventurDate(d.inventurDate ?? null);
+      }
     } catch { /* ignore */ } finally { setWerkbestandLoading(false); }
   };
 
@@ -567,12 +574,20 @@ export default function PalettenPage() {
           <CardContent>
             {werkbestandLoading ? (
               <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
-            ) : (
-              <div className={`text-3xl font-bold ${(werkbestand ?? 0) < 0 ? "text-red-600" : (werkbestand ?? 0) > 0 ? "text-indigo-700" : "text-slate-800"}`}>
-                {(werkbestand ?? 0) > 0 ? "+" : ""}{werkbestand ?? 0}
+            ) : werkbestandHasInventur === false ? (
+              <div className="text-sm text-slate-400 italic">Keine Inventur vorhanden</div>
+            ) : werkbestand !== null ? (
+              <div className={`text-3xl font-bold ${werkbestand < 0 ? "text-red-600" : werkbestand > 0 ? "text-indigo-700" : "text-slate-800"}`}>
+                {werkbestand > 0 ? "+" : ""}{werkbestand}
               </div>
+            ) : (
+              <div className="text-sm text-slate-400 italic">–</div>
             )}
-            <p className="text-xs text-indigo-400 mt-1">Automatisch aus allen Buchungen</p>
+            <p className="text-xs text-indigo-400 mt-1">
+              {werkbestandInventurDate
+                ? `Inventur vom ${format(new Date(werkbestandInventurDate), "dd.MM.yyyy")} + Buchungen danach`
+                : "Basierend auf letzter Inventur"}
+            </p>
           </CardContent>
         </Card>
       )}
