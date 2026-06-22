@@ -74,8 +74,6 @@ export default function PalettenPage() {
     return () => { cancelled = true; };
   }, [closeAccountDate, closeAccountData?.speditionId]);
 
-  useEffect(() => { loadWerkbestand(); }, [balances]);
-
   const openCloseAccount = (speditionId: number, speditionName: string, balance: number) => {
     const today = new Date();
     setCloseAccountDate(today.toISOString().slice(0, 10));
@@ -477,6 +475,7 @@ export default function PalettenPage() {
 
   const { data: speditionen } = useListSpeditionen();
   const { data: balances, isLoading: loadingBalances, refetch: refetchBalances } = useListPalletBalances();
+  useEffect(() => { loadWerkbestand(); }, [balances]);
   const { data: movements, isLoading: loadingMovements, refetch: refetchMovements } = useListPalletMovements({
     speditionId: (filterSpeditionId && filterSpeditionId !== "__all__") ? Number(filterSpeditionId) : undefined,
     dateFrom: dateFrom || undefined,
