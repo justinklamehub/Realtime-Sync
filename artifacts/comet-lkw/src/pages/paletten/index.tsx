@@ -564,53 +564,69 @@ export default function PalettenPage() {
       </div>
 
       {isCometUser && (() => {
-        const saldoSum = (balances ?? []).reduce((s, b) => s + (b.balance ?? 0), 0);
-        const cometEigentum = werkbestand !== null ? werkbestand + saldoSum : null;
+        // Positive saldi → abziehen (Paletten bei Kunden, COMET hat Forderung aber nicht die Paletten)
+        // Negative saldi → addieren (als negativer Wert, d.h. ebenfalls Reduktion)
+        const saldoAdjustment = (balances ?? []).reduce((s, b) => {
+          const bal = b.balance ?? 0;
+          return bal > 0 ? s - bal : s + bal;
+        }, 0);
+        const cometEigentum = werkbestand !== null ? werkbestand + saldoAdjustment : null;
         return (
-          <Card className="border-indigo-200 shadow-sm bg-gradient-to-br from-indigo-50 to-blue-50">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-indigo-600 flex items-center gap-1.5">
-                <Building2 className="w-4 h-4" />
-                Palettenbestand Werk
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {werkbestandLoading ? (
-                <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
-              ) : werkbestandHasInventur === false ? (
-                <div className="text-sm text-slate-400 italic">Keine Inventur vorhanden</div>
-              ) : werkbestand !== null ? (
-                <>
-                  {/* Row 1: physical count */}
-                  <div>
-                    <div className="text-xs text-slate-500 mb-0.5">Physisch im Werk</div>
-                    <div className={`text-2xl font-bold ${werkbestand < 0 ? "text-red-600" : werkbestand > 0 ? "text-indigo-700" : "text-slate-800"}`}>
-                      {werkbestand > 0 ? "+" : ""}{werkbestand}
-                    </div>
-                    <p className="text-xs text-indigo-400">
-                      {werkbestandInventurDate
-                        ? `Inventur ${format(new Date(werkbestandInventurDate), "dd.MM.yyyy")} + Buchungen danach`
-                        : "Basierend auf letzter Inventur"}
-                    </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {/* Kachel 1: Palettenbestand Werk */}
+            <Card className="border-indigo-200 shadow-sm bg-gradient-to-br from-indigo-50 to-blue-50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-indigo-600 flex items-center gap-1.5">
+                  <Building2 className="w-4 h-4" />
+                  Palettenbestand Werk
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {werkbestandLoading ? (
+                  <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
+                ) : werkbestandHasInventur === false ? (
+                  <div className="text-sm text-slate-400 italic">Keine Inventur vorhanden</div>
+                ) : werkbestand !== null ? (
+                  <div className={`text-3xl font-bold ${werkbestand < 0 ? "text-red-600" : werkbestand > 0 ? "text-indigo-700" : "text-slate-800"}`}>
+                    {werkbestand > 0 ? "+" : ""}{werkbestand}
                   </div>
-                  {/* Divider */}
-                  <div className="border-t border-indigo-100" />
-                  {/* Row 2: COMET ownership */}
-                  <div>
-                    <div className="text-xs text-slate-500 mb-0.5">COMET Eigentum gesamt</div>
-                    <div className={`text-2xl font-bold ${cometEigentum !== null && cometEigentum < 0 ? "text-red-600" : cometEigentum !== null && cometEigentum > 0 ? "text-indigo-700" : "text-slate-800"}`}>
-                      {cometEigentum !== null ? (cometEigentum > 0 ? "+" : "") + cometEigentum : "–"}
-                    </div>
-                    <p className="text-xs text-indigo-400">
-                      Werk {werkbestand > 0 ? "+" : ""}{werkbestand} {saldoSum >= 0 ? "+" : "−"} Salden {Math.abs(saldoSum)}
-                    </p>
+                ) : (
+                  <div className="text-sm text-slate-400 italic">–</div>
+                )}
+                <p className="text-xs text-indigo-400 mt-1">
+                  {werkbestandInventurDate
+                    ? `Inventur ${format(new Date(werkbestandInventurDate), "dd.MM.yyyy")} + Buchungen danach`
+                    : "Basierend auf letzter Inventur"}
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Kachel 2: COMET Eigentum gesamt */}
+            <Card className="border-violet-200 shadow-sm bg-gradient-to-br from-violet-50 to-indigo-50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-violet-600 flex items-center gap-1.5">
+                  <Building2 className="w-4 h-4" />
+                  COMET Eigentum gesamt
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {werkbestandLoading || loadingBalances ? (
+                  <Loader2 className="w-6 h-6 animate-spin text-violet-400" />
+                ) : werkbestandHasInventur === false ? (
+                  <div className="text-sm text-slate-400 italic">Keine Inventur vorhanden</div>
+                ) : cometEigentum !== null ? (
+                  <div className={`text-3xl font-bold ${cometEigentum < 0 ? "text-red-600" : cometEigentum > 0 ? "text-violet-700" : "text-slate-800"}`}>
+                    {cometEigentum > 0 ? "+" : ""}{cometEigentum}
                   </div>
-                </>
-              ) : (
-                <div className="text-sm text-slate-400 italic">–</div>
-              )}
-            </CardContent>
-          </Card>
+                ) : (
+                  <div className="text-sm text-slate-400 italic">–</div>
+                )}
+                <p className="text-xs text-violet-400 mt-1">
+                  Werk {werkbestand !== null ? (werkbestand >= 0 ? "+" : "") + werkbestand : "–"} / Salden {saldoAdjustment >= 0 ? "+" : ""}{saldoAdjustment}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
         );
       })()}
 
