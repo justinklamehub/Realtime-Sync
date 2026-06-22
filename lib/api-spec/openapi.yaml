@@ -543,6 +543,10 @@ paths:
           in: query
           schema:
             type: ["integer", "null"]
+        - name: palettenscheinnummer
+          in: query
+          schema:
+            type: ["string", "null"]
       responses:
         "200":
           description: Pallet movements

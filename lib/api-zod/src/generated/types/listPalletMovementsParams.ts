@@ -23,4 +23,8 @@ dateTo?: string | null;
  * @nullable
  */
 shipmentId?: number | null;
+/**
+ * @nullable
+ */
+palettenscheinnummer?: string | null;
 };

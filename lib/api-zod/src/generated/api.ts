@@ -550,7 +550,8 @@ export const ListPalletMovementsQueryParams = zod.object({
   "speditionId": zod.coerce.number().nullish(),
   "dateFrom": zod.coerce.string().nullish(),
   "dateTo": zod.coerce.string().nullish(),
-  "shipmentId": zod.coerce.number().nullish()
+  "shipmentId": zod.coerce.number().nullish(),
+  "palettenscheinnummer": zod.coerce.string().nullish()
 })
 
 export const ListPalletMovementsResponseItem = zod.object({

@@ -7,7 +7,7 @@ import {
   usersTable,
   shipmentsTable,
 } from "@workspace/db";
-import { and, eq, gte, lte, inArray, sql, desc } from "drizzle-orm";
+import { and, eq, gte, lte, ilike, inArray, sql, desc } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { logAudit } from "../lib/audit";
 import { emitToRooms } from "../lib/socket-emit";
@@ -29,7 +29,7 @@ function emit(req: any, event: string, data: any, speditionId?: number | null) {
 
 router.get("/pallet-movements", requireAuth, async (req, res) => {
   try {
-    const { speditionId, dateFrom, dateTo, shipmentId } = req.query as Record<string, string>;
+    const { speditionId, dateFrom, dateTo, shipmentId, palettenscheinnummer } = req.query as Record<string, string>;
     const role = req.session.role!;
     const sessionSpeditionId = req.session.speditionId;
 
@@ -42,6 +42,7 @@ router.get("/pallet-movements", requireAuth, async (req, res) => {
     if (dateFrom) conditions.push(gte(palletMovementsTable.movementDate, dateFrom));
     if (dateTo) conditions.push(lte(palletMovementsTable.movementDate, dateTo));
     if (shipmentId) conditions.push(eq(palletMovementsTable.shipmentId, Number(shipmentId)));
+    if (palettenscheinnummer) conditions.push(ilike(palletMovementsTable.palettenscheinnummer, `%${palettenscheinnummer}%`));
 
     const rows = await db
       .select()

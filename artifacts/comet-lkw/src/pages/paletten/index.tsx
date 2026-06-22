@@ -26,6 +26,7 @@ export default function PalettenPage() {
   const [filterSpeditionId, setFilterSpeditionId] = useState<string>("__all__");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [filterSchein, setFilterSchein] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedMovement, setSelectedMovement] = useState<any | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -487,6 +488,7 @@ export default function PalettenPage() {
     speditionId: (filterSpeditionId && filterSpeditionId !== "__all__") ? Number(filterSpeditionId) : undefined,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
+    palettenscheinnummer: filterSchein.trim() || undefined,
   });
 
   const handleExport = () => {
@@ -706,8 +708,17 @@ export default function PalettenPage() {
             <label className="text-xs font-medium text-slate-500">Bis</label>
             <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-9 w-36 bg-white" />
           </div>
-          {(filterSpeditionId !== "__all__" || dateFrom || dateTo) && (
-            <Button variant="ghost" size="sm" onClick={() => { setFilterSpeditionId("__all__"); setDateFrom(""); setDateTo(""); }}>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500">Palettenschein-Nr.</label>
+            <Input
+              placeholder="Suchen…"
+              value={filterSchein}
+              onChange={e => setFilterSchein(e.target.value)}
+              className="h-9 w-44 bg-white"
+            />
+          </div>
+          {(filterSpeditionId !== "__all__" || dateFrom || dateTo || filterSchein) && (
+            <Button variant="ghost" size="sm" onClick={() => { setFilterSpeditionId("__all__"); setDateFrom(""); setDateTo(""); setFilterSchein(""); }}>
               Zurücksetzen
             </Button>
           )}
