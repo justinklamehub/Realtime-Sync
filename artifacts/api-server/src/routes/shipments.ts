@@ -13,6 +13,7 @@ import { logAudit } from "../lib/audit";
 import { emitToRooms } from "../lib/socket-emit";
 import { can } from "../lib/permissions";
 import { notify } from "../lib/notify";
+import { sendEventEmail } from "../lib/email";
 import type { Server as IOServer } from "socket.io";
 
 const router = Router();
@@ -162,6 +163,22 @@ router.post("/shipments", requireAuth, async (req, res) => {
     await logAudit(req.session.userId!, "shipment", shipment.id, "created", null, shipment.bezeichnung);
     emit(req, "shipment.created", { id: shipment.id }, shipment.speditionId);
 
+    // E-Mail-Benachrichtigung (fire-and-forget)
+    (async () => {
+      try {
+        const spedName = shipment.speditionId
+          ? (await db.select({ name: speditionenTable.name }).from(speditionenTable).where(eq(speditionenTable.id, shipment.speditionId)).limit(1))[0]?.name ?? ""
+          : "";
+        await sendEventEmail("shipment", {
+          bezeichnung: shipment.bezeichnung ?? "",
+          kennzeichen: shipment.kennzeichen ?? "",
+          status: shipment.status ?? "",
+          datum: new Date().toLocaleDateString("de-DE"),
+          spedition: spedName,
+        });
+      } catch {}
+    })();
+
     if (SPED_ROLES.includes(role)) {
       const io = getIO(req);
       if (io) {
@@ -226,6 +243,21 @@ router.post("/shipments/bulk", requireAuth, async (req, res) => {
       await logAudit(req.session.userId!, "shipment", s.id, "bulk_created", null, s.bezeichnung);
       emit(req, "shipment.created", { id: s.id }, s.speditionId);
     }
+
+    // E-Mail-Benachrichtigung (fire-and-forget)
+    (async () => {
+      try {
+        const bulkSpedId = inserted[0]?.speditionId;
+        const spedName = bulkSpedId
+          ? (await db.select({ name: speditionenTable.name }).from(speditionenTable).where(eq(speditionenTable.id, bulkSpedId)).limit(1))[0]?.name ?? ""
+          : "";
+        await sendEventEmail("bulk", {
+          anzahl: String(inserted.length),
+          datum: new Date().toLocaleDateString("de-DE"),
+          spedition: spedName,
+        });
+      } catch {}
+    })();
 
     return res.status(201).json(inserted);
   } catch (err) {

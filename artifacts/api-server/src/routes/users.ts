@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { logAudit } from "../lib/audit";
 import { emitToRooms } from "../lib/socket-emit";
+import { sendEventEmail } from "../lib/email";
 import type { Server as IOServer } from "socket.io";
 
 const router = Router();
@@ -99,6 +100,25 @@ router.post("/users", requireAuth, async (req, res) => {
 
     await logAudit(req.session.userId!, "user", user.id, "created", null, username);
     emit(req, "user.created", { id: user.id });
+
+    // E-Mail-Benachrichtigung (fire-and-forget)
+    (async () => {
+      try {
+        const spedName = resolvedSpeditionId
+          ? (await db.select({ name: speditionenTable.name }).from(speditionenTable).where(eq(speditionenTable.id, resolvedSpeditionId)).limit(1))[0]?.name ?? ""
+          : "";
+        await sendEventEmail(
+          "user",
+          {
+            username,
+            email: email || "",
+            rolle: newRole,
+            spedition: spedName,
+          },
+          email || undefined,
+        );
+      } catch {}
+    })();
 
     return res.status(201).json({
       id: user.id,

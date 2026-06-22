@@ -6,8 +6,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, Settings, Type, Mail, Building2 } from "lucide-react";
+import { Loader2, Save, Settings, Type, Mail } from "lucide-react";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
@@ -18,8 +20,6 @@ const SETTING_LABELS: Record<string, { label: string; description?: string; mult
   company_name: { label: "Unternehmen", description: "Name des Unternehmens" },
   login_subtitle: { label: "Login-Untertitel", description: "Untertitel auf der Login-Seite" },
   default_bemerkung: { label: "Standard-Bemerkung", description: "Wird bei neuen Verladungen vorausgefüllt", multiline: true },
-  email_subject_template: { label: "E-Mail-Betreff-Vorlage", description: "Vorlage für den Betreff von Benachrichtigungen" },
-  email_body_template: { label: "E-Mail-Text-Vorlage", description: "Vorlage für den Inhalt von Benachrichtigungen", multiline: true },
 };
 
 const SECTIONS = [
@@ -34,12 +34,6 @@ const SECTIONS = [
     description: "Standardtexte und Vorlagen für Formulare",
     icon: Type,
     keys: ["default_bemerkung"],
-  },
-  {
-    title: "E-Mail-Entwürfe",
-    description: "Vorlagen für automatische E-Mail-Benachrichtigungen",
-    icon: Mail,
-    keys: ["email_subject_template", "email_body_template"],
   },
 ];
 
@@ -99,6 +93,149 @@ function SettingField({
   );
 }
 
+const EMAIL_EVENTS = [
+  {
+    key: "shipment",
+    label: "Einzel-Verladung angelegt",
+    description: "Wird gesendet, wenn eine neue Einzelverladung angelegt wird",
+    placeholders: ["{{bezeichnung}}", "{{kennzeichen}}", "{{spedition}}", "{{status}}", "{{datum}}"],
+    recipientNote: null,
+  },
+  {
+    key: "bulk",
+    label: "Massen-Verladung angelegt",
+    description: "Wird gesendet, wenn Verladungen per Massenanlage erstellt werden",
+    placeholders: ["{{anzahl}}", "{{spedition}}", "{{datum}}"],
+    recipientNote: null,
+  },
+  {
+    key: "user",
+    label: "Benutzer angelegt",
+    description: "Wird gesendet, wenn ein neuer Benutzer angelegt wird",
+    placeholders: ["{{username}}", "{{email}}", "{{rolle}}", "{{spedition}}"],
+    recipientNote: "Die E-Mail-Adresse des neuen Benutzers wird automatisch als Empfänger hinzugefügt (sofern angegeben).",
+  },
+];
+
+function EmailEventSection({
+  eventKey,
+  label,
+  description,
+  placeholders,
+  recipientNote,
+  settings,
+  onSave,
+  isSaving,
+}: {
+  eventKey: string;
+  label: string;
+  description: string;
+  placeholders: string[];
+  recipientNote: string | null;
+  settings: SettingsMap;
+  onSave: (key: string, val: string) => void;
+  isSaving: (key: string) => boolean;
+}) {
+  const enabledKey = `email_tpl_${eventKey}_enabled`;
+  const toKey = `email_tpl_${eventKey}_to`;
+  const subjectKey = `email_tpl_${eventKey}_subject`;
+  const bodyKey = `email_tpl_${eventKey}_body`;
+
+  const enabled = settings[enabledKey] === "1";
+
+  const [to, setTo] = useState(settings[toKey] ?? "");
+  const [subject, setSubject] = useState(settings[subjectKey] ?? "");
+  const [body, setBody] = useState(settings[bodyKey] ?? "");
+
+  const toDirty = to !== (settings[toKey] ?? "");
+  const subjectDirty = subject !== (settings[subjectKey] ?? "");
+  const bodyDirty = body !== (settings[bodyKey] ?? "");
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-slate-800">{label}</p>
+          <p className="text-xs text-slate-400 mt-0.5">{description}</p>
+        </div>
+        <Switch
+          checked={enabled}
+          onCheckedChange={(v) => onSave(enabledKey, v ? "1" : "")}
+          disabled={isSaving(enabledKey)}
+        />
+      </div>
+
+      {enabled && (
+        <div className="space-y-3 pl-1">
+          {/* Empfänger */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label className="text-sm font-medium text-slate-700">Empfänger (An)</Label>
+                <p className="text-xs text-slate-400 mt-0.5">Mehrere Adressen kommagetrennt</p>
+                {recipientNote && (
+                  <p className="text-xs text-amber-600 mt-0.5">{recipientNote}</p>
+                )}
+              </div>
+              {toDirty && (
+                <Button size="sm" className="h-7 px-3 text-xs shrink-0" onClick={() => onSave(toKey, to)} disabled={isSaving(toKey)}>
+                  {isSaving(toKey) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3 mr-1" />}
+                  Speichern
+                </Button>
+              )}
+            </div>
+            <Input value={to} onChange={e => setTo(e.target.value)} placeholder="empfaenger@firma.de, zweiter@firma.de" className="text-sm" />
+          </div>
+
+          {/* Betreff */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-4">
+              <Label className="text-sm font-medium text-slate-700">Betreff</Label>
+              {subjectDirty && (
+                <Button size="sm" className="h-7 px-3 text-xs shrink-0" onClick={() => onSave(subjectKey, subject)} disabled={isSaving(subjectKey)}>
+                  {isSaving(subjectKey) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3 mr-1" />}
+                  Speichern
+                </Button>
+              )}
+            </div>
+            <Input value={subject} onChange={e => setSubject(e.target.value)} placeholder="z.B. Neue Verladung: {{bezeichnung}}" className="text-sm" />
+          </div>
+
+          {/* Text */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-4">
+              <Label className="text-sm font-medium text-slate-700">E-Mail-Text</Label>
+              {bodyDirty && (
+                <Button size="sm" className="h-7 px-3 text-xs shrink-0" onClick={() => onSave(bodyKey, body)} disabled={isSaving(bodyKey)}>
+                  {isSaving(bodyKey) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3 mr-1" />}
+                  Speichern
+                </Button>
+              )}
+            </div>
+            <Textarea
+              value={body}
+              onChange={e => setBody(e.target.value)}
+              placeholder="Nachrichtentext…"
+              className="text-sm resize-none min-h-[100px]"
+              rows={4}
+            />
+          </div>
+
+          {/* Platzhalter */}
+          <div>
+            <p className="text-xs text-slate-400 mb-1.5">Verfügbare Platzhalter:</p>
+            <div className="flex flex-wrap gap-1">
+              {placeholders.map(p => (
+                <Badge key={p} variant="secondary" className="font-mono text-xs cursor-default">{p}</Badge>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -133,6 +270,9 @@ export default function SettingsPage() {
       toast({ title: e?.response?.data?.error ?? "Fehler beim Speichern", variant: "destructive" });
     },
   });
+
+  const handleSave = (key: string, value: string) => saveMutation.mutate({ key, value });
+  const isSavingKey = (key: string) => saveMutation.isPending && (saveMutation.variables as any)?.key === key;
 
   if (isLoading) {
     return (
@@ -169,8 +309,8 @@ export default function SettingsPage() {
                   <SettingField
                     settingKey={key}
                     value={s[key] ?? ""}
-                    onSave={(k, v) => saveMutation.mutate({ key: k, value: v })}
-                    isSaving={saveMutation.isPending && (saveMutation.variables as any)?.key === key}
+                    onSave={handleSave}
+                    isSaving={isSavingKey(key)}
                   />
                 </div>
               ))}
@@ -178,6 +318,63 @@ export default function SettingsPage() {
           </Card>
         );
       })}
+
+      {/* E-Mail-Benachrichtigungen */}
+      <Card className="shadow-sm">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <Mail className="w-4 h-4 text-primary" />
+            <CardTitle className="text-base">E-Mail-Benachrichtigungen</CardTitle>
+          </div>
+          <CardDescription className="text-xs">
+            Automatische E-Mails bei bestimmten Ereignissen. Der Server versendet E-Mails über den lokalen Mailserver (wie PHP mail()).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Absender */}
+          <EmailFromField value={s["email_from"] ?? ""} onSave={handleSave} isSaving={isSavingKey("email_from")} />
+
+          <Separator />
+
+          {EMAIL_EVENTS.map((ev, i) => (
+            <div key={ev.key}>
+              {i > 0 && <Separator />}
+              <EmailEventSection
+                eventKey={ev.key}
+                label={ev.label}
+                description={ev.description}
+                placeholders={ev.placeholders}
+                recipientNote={ev.recipientNote}
+                settings={s}
+                onSave={handleSave}
+                isSaving={isSavingKey}
+              />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function EmailFromField({ value, onSave, isSaving }: { value: string; onSave: (k: string, v: string) => void; isSaving: boolean }) {
+  const [local, setLocal] = useState(value);
+  const dirty = local !== value;
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <Label className="text-sm font-medium text-slate-700">Absender (Von)</Label>
+          <p className="text-xs text-slate-400 mt-0.5">Adresse, von der alle automatischen E-Mails verschickt werden</p>
+        </div>
+        {dirty && (
+          <Button size="sm" className="h-7 px-3 text-xs shrink-0" onClick={() => onSave("email_from", local)} disabled={isSaving}>
+            {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3 mr-1" />}
+            Speichern
+          </Button>
+        )}
+      </div>
+      <Input value={local} onChange={e => setLocal(e.target.value)} placeholder="noreply-easy-verladung@comet-seasonal.de" className="text-sm" />
     </div>
   );
 }

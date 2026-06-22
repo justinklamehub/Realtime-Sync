@@ -36,8 +36,19 @@ router.put("/settings/:key", requireAuth, async (req, res) => {
       "company_name",
       "login_subtitle",
       "default_bemerkung",
-      "email_subject_template",
-      "email_body_template",
+      "email_from",
+      "email_tpl_shipment_enabled",
+      "email_tpl_shipment_subject",
+      "email_tpl_shipment_body",
+      "email_tpl_shipment_to",
+      "email_tpl_bulk_enabled",
+      "email_tpl_bulk_subject",
+      "email_tpl_bulk_body",
+      "email_tpl_bulk_to",
+      "email_tpl_user_enabled",
+      "email_tpl_user_subject",
+      "email_tpl_user_body",
+      "email_tpl_user_to",
     ];
     if (!ALLOWED_KEYS.includes(key)) {
       return res.status(400).json({ error: "Unbekannter Einstellungsschlüssel" });
