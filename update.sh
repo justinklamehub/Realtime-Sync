@@ -12,15 +12,10 @@ sudo -u comet git -C "$APP" pull origin main
 echo "==> Abhaengigkeiten aktualisieren..."
 sudo -u comet pnpm --dir "$APP" install --frozen-lockfile
 
-echo "==> Datenbankschema synchronisieren (neue Tabellen/Spalten hinzufuegen)..."
-sudo -u comet bash -c "
-  set -a
-  source /opt/comet/app/artifacts/api-server/.env
-  set +a
-  # WICHTIG: 'push' statt 'push-force' – niemals automatisch Tabellen loeschen!
-  # Bei interaktiven Rueckfragen immer '+ create table' waehlen, niemals 'rename'.
-  pnpm --filter @workspace/db --dir \"$APP\" push
-"
+echo "==> Datenbankschema: neue Tabellen werden automatisch beim Server-Start angelegt..."
+# drizzle-kit push erfordert ein interaktives TTY und kann in diesem Skript nicht
+# ausgefuehrt werden. Neue Tabellen werden stattdessen direkt im Server-Code per
+# CREATE TABLE IF NOT EXISTS beim Start angelegt (ensureEmailLogTable u.ae.).
 
 echo "==> Backend bauen..."
 sudo -u comet pnpm --filter @workspace/api-server --dir "$APP" run build
