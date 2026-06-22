@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { format, addDays } from "date-fns";
-import { Loader2, Plus, Download, BarChart2, FileDown, ClipboardList, RefreshCw, Archive, FileSpreadsheet } from "lucide-react";
+import { Loader2, Plus, Download, BarChart2, FileDown, ClipboardList, RefreshCw, Archive, FileSpreadsheet, Warehouse } from "lucide-react";
 import * as XLSX from "xlsx";
 import { MovementDialog } from "./components/movement-dialog";
 import { MovementDetailSheet } from "./components/movement-detail-sheet";
@@ -38,6 +38,17 @@ export default function PalettenPage() {
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState("");
 
+  const [werkbestand, setWerkbestand] = useState<number | null>(null);
+  const [werkbestandLoading, setWerkbestandLoading] = useState(false);
+
+  const loadWerkbestand = async () => {
+    setWerkbestandLoading(true);
+    try {
+      const res = await fetch("/api/pallet-werkbestand", { credentials: "include" });
+      if (res.ok) { const d = await res.json(); setWerkbestand(d.werkbestand ?? 0); }
+    } catch { /* ignore */ } finally { setWerkbestandLoading(false); }
+  };
+
   const [closeAccountData, setCloseAccountData] = useState<{ speditionId: number; speditionName: string; balance: number } | null>(null);
   const [closeAccountDate, setCloseAccountDate] = useState("");
   const [closeAccountAmount, setCloseAccountAmount] = useState<number | "">(0);
@@ -62,6 +73,8 @@ export default function PalettenPage() {
       .finally(() => { if (!cancelled) setCloseAccountBalanceLoading(false); });
     return () => { cancelled = true; };
   }, [closeAccountDate, closeAccountData?.speditionId]);
+
+  useEffect(() => { loadWerkbestand(); }, [balances]);
 
   const openCloseAccount = (speditionId: number, speditionName: string, balance: number) => {
     const today = new Date();
@@ -543,6 +556,27 @@ export default function PalettenPage() {
           )}
         </div>
       </div>
+
+      {isCometUser && (
+        <Card className="border-indigo-200 shadow-sm bg-gradient-to-br from-indigo-50 to-blue-50">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-indigo-600 flex items-center gap-1.5">
+              <Warehouse className="w-4 h-4" />
+              Palettenbestand Werk
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {werkbestandLoading ? (
+              <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
+            ) : (
+              <div className={`text-3xl font-bold ${(werkbestand ?? 0) < 0 ? "text-red-600" : (werkbestand ?? 0) > 0 ? "text-indigo-700" : "text-slate-800"}`}>
+                {(werkbestand ?? 0) > 0 ? "+" : ""}{werkbestand ?? 0}
+              </div>
+            )}
+            <p className="text-xs text-indigo-400 mt-1">Automatisch aus allen Buchungen</p>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
         {loadingBalances ? (
