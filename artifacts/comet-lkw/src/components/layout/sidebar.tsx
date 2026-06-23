@@ -273,7 +273,7 @@ export function AppSidebar({ collapsed, onToggle, isDark, onToggleTheme }: AppSi
   const [showNotifications, setShowNotifications] = useState(false);
   const [showOnline, setShowOnline] = useState(false);
   const { notifications, unreadCount, markRead, markAllRead, dismiss, dismissAll } = useNotifications();
-  const { onlineUsers, onPage } = usePresence(user?.id);
+  const { onlineUsers } = usePresence(user?.id);
 
   const logoutMutation = useLogout({
     mutation: {
@@ -449,15 +449,13 @@ export function AppSidebar({ collapsed, onToggle, isDark, onToggleTheme }: AppSi
                   (item.href === "/shipments" &&
                     (location === "/shipments" || location.startsWith("/shipments/")));
 
-                const usersHere = onPage(item.href).length;
-
                 const linkEl = (
                   <Link
                     key={item.name}
                     href={item.href}
                     className={cn(
                       "flex items-center rounded-md text-sm font-medium transition-all duration-150",
-                      collapsed ? "justify-center w-9 h-9 mx-auto relative" : "gap-3 px-3 py-2.5",
+                      collapsed ? "justify-center w-9 h-9 mx-auto" : "gap-3 px-3 py-2.5",
                       isActive
                         ? "bg-primary text-white shadow-sm dark:bg-white/15 dark:text-white dark:shadow-none"
                         : "text-slate-400 hover:text-slate-100 hover:bg-slate-800"
@@ -470,26 +468,7 @@ export function AppSidebar({ collapsed, onToggle, isDark, onToggleTheme }: AppSi
                         isActive ? "text-white" : "text-slate-500"
                       )}
                     />
-                    {collapsed && usersHere > 0 && (
-                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
-                        {usersHere > 9 ? "9+" : usersHere}
-                      </span>
-                    )}
-                    {!collapsed && (
-                      <>
-                        <span className="flex-1">{item.name}</span>
-                        {usersHere > 0 && (
-                          <span className={cn(
-                            "text-[9px] font-semibold rounded-full px-1.5 py-0.5 min-w-[18px] text-center",
-                            isActive
-                              ? "bg-white/20 text-white"
-                              : "bg-emerald-600/30 text-emerald-400"
-                          )}>
-                            {usersHere}
-                          </span>
-                        )}
-                      </>
-                    )}
+                    {!collapsed && item.name}
                   </Link>
                 );
 
@@ -497,7 +476,7 @@ export function AppSidebar({ collapsed, onToggle, isDark, onToggleTheme }: AppSi
                   <Tooltip key={item.name}>
                     <TooltipTrigger asChild>{linkEl}</TooltipTrigger>
                     <TooltipContent side="right" className="text-xs">
-                      {item.name}{usersHere > 0 ? ` · ${usersHere} online` : ""}
+                      {item.name}
                     </TooltipContent>
                   </Tooltip>
                 ) : (
