@@ -43,7 +43,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 const CATEGORIES = ["Verladung", "System", "Sonstiges"];
 const PRIORITIES = ["Niedrig", "Mittel", "Hoch", "Kritisch"];
@@ -126,6 +126,7 @@ type TicketDetail = TicketRow & { comments: Comment[] };
 export default function TicketsPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const { toast } = useToast();
   const canManage = user && ["comet_admin", "comet_leitstand"].includes(user.role);
 
   const [activeStatus, setActiveStatus] = useState("Offen");
