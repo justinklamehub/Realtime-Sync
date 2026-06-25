@@ -169,7 +169,7 @@ function AssignDialog({
 }: {
   cl: any;
   onClose: () => void;
-  onAssigned: () => void;
+  onAssigned: (shipmentId: number) => void;
 }) {
   const { toast } = useToast();
   const [search, setSearch] = useState(cl.kennzeichen ?? "");
@@ -192,7 +192,7 @@ function AssignDialog({
       }),
     onSuccess: () => {
       toast({ title: `Checkliste #${cl.id} wurde Verladung #${selected!.id} zugeordnet` });
-      onAssigned();
+      onAssigned(selected!.id);
       onClose();
     },
     onError: (e: any) =>
@@ -340,8 +340,10 @@ export default function GefahrgutPage() {
     onError: (e: any) => toast({ title: e.message ?? "Fehler", variant: "destructive" }),
   });
 
-  const handleAssigned = useCallback(() => {
+  const handleAssigned = useCallback((shipmentId: number) => {
     queryClient.invalidateQueries({ queryKey: ["gefahrgut-checklisten-blanko"] });
+    queryClient.invalidateQueries({ queryKey: ["gefahrgut-status"] });
+    queryClient.invalidateQueries({ queryKey: ["gefahrgut-checklisten", shipmentId] });
     refetch();
   }, [queryClient, refetch]);
 
