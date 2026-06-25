@@ -1,6 +1,33 @@
 import { Router } from "express";
-import { db, ticketsTable, ticketCommentsTable, usersTable } from "@workspace/db";
+import { db, pool, ticketsTable, ticketCommentsTable, usersTable } from "@workspace/db";
 import { eq, desc, and, or, sql } from "drizzle-orm";
+
+export async function ensureTicketsTables(): Promise<void> {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tickets (
+      id          SERIAL PRIMARY KEY,
+      title       TEXT        NOT NULL,
+      description TEXT        NOT NULL,
+      category    TEXT        NOT NULL DEFAULT 'System',
+      priority    TEXT        NOT NULL DEFAULT 'Mittel',
+      status      TEXT        NOT NULL DEFAULT 'Offen',
+      created_by  INTEGER     NOT NULL,
+      assigned_to INTEGER,
+      shipment_id INTEGER,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ticket_comments (
+      id         SERIAL PRIMARY KEY,
+      ticket_id  INTEGER     NOT NULL,
+      user_id    INTEGER     NOT NULL,
+      body       TEXT        NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+}
 
 const router = Router();
 

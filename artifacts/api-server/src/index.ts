@@ -4,6 +4,7 @@ import app, { sessionMiddleware } from "./app";
 import { logger } from "./lib/logger";
 import { seedMissingPermissions } from "./lib/permissions";
 import { seedEmailTemplates, ensureEmailLogTable } from "./lib/email";
+import { ensureTicketsTables } from "./routes/tickets";
 import { startScheduler } from "./lib/scheduler";
 
 const rawPort = process.env["PORT"];
@@ -229,6 +230,12 @@ httpServer.listen(port, async (err?: Error) => {
     logger.info("email_log table ensured");
   } catch (e) {
     logger.warn({ err: e }, "ensureEmailLogTable failed — non-fatal");
+  }
+  try {
+    await ensureTicketsTables();
+    logger.info("tickets tables ensured");
+  } catch (e) {
+    logger.warn({ err: e }, "ensureTicketsTables failed — non-fatal");
   }
   try {
     await seedMissingPermissions();
