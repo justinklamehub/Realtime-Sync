@@ -250,6 +250,46 @@ router.get("/gefahrgut-checklisten/:id", requireAuth, async (req, res) => {
   }
 });
 
+router.patch("/gefahrgut-checklisten/:id/assign", requireAuth, async (req, res) => {
+  try {
+    if (!isCometRole(req.session.role!)) {
+      return res.status(403).json({ error: "Kein Zugriff" });
+    }
+    const allowed = await can(req.session.role!, "gefahrgut.assign_shipment");
+    if (!allowed) {
+      return res.status(403).json({ error: "Keine Berechtigung (gefahrgut.assign_shipment)" });
+    }
+    const id = Number(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "Ungültige ID" });
+
+    const { shipmentId } = req.body;
+    if (!shipmentId && shipmentId !== null) {
+      return res.status(400).json({ error: "shipmentId erforderlich" });
+    }
+
+    const sid = shipmentId !== null ? Number(shipmentId) : null;
+
+    // Verify shipment exists if assigning
+    if (sid !== null) {
+      const ship = await db.select({ id: shipmentsTable.id, kennzeichen: shipmentsTable.kennzeichen })
+        .from(shipmentsTable).where(eq(shipmentsTable.id, sid)).limit(1);
+      if (ship.length === 0) return res.status(404).json({ error: "Verladung nicht gefunden" });
+    }
+
+    const [updated] = await db
+      .update(gefahrgutChecklistenTable)
+      .set({ shipmentId: sid })
+      .where(eq(gefahrgutChecklistenTable.id, id))
+      .returning();
+
+    if (!updated) return res.status(404).json({ error: "Checkliste nicht gefunden" });
+    return res.json({ success: true, checkliste: updated });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Serverfehler" });
+  }
+});
+
 router.delete("/gefahrgut-checklisten/:id", requireAuth, async (req, res) => {
   try {
     if (!isCometRole(req.session.role!)) {

@@ -1,15 +1,17 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, ShieldAlert, Trash2, Eye, ClipboardCheck, Printer } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Loader2, ShieldAlert, Trash2, Eye, ClipboardCheck, Printer, Link2, Search, X, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { useAuth } from "@/contexts/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { printGefahrgutCheckliste } from "@/lib/print-gefahrgut";
+import { customFetch } from "@workspace/api-client-react";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
@@ -151,18 +153,164 @@ function ChecklistDetail({ cl, onClose }: { cl: any; onClose: () => void }) {
   );
 }
 
+type Shipment = {
+  id: number;
+  kennzeichen: string | null;
+  bezeichnung: string | null;
+  relation: string | null;
+  status: string;
+  etaDate: string | null;
+};
+
+function AssignDialog({
+  cl,
+  onClose,
+  onAssigned,
+}: {
+  cl: any;
+  onClose: () => void;
+  onAssigned: () => void;
+}) {
+  const { toast } = useToast();
+  const [search, setSearch] = useState(cl.kennzeichen ?? "");
+  const [selected, setSelected] = useState<Shipment | null>(null);
+
+  const { data: shipments = [], isFetching } = useQuery<Shipment[]>({
+    queryKey: ["shipments-assign-search", search],
+    queryFn: () =>
+      customFetch<Shipment[]>(`/api/shipments?search=${encodeURIComponent(search)}&limit=30`),
+    enabled: search.trim().length >= 1,
+    staleTime: 10_000,
+  });
+
+  const assignMutation = useMutation({
+    mutationFn: () =>
+      customFetch<{ success: boolean }>(`/api/gefahrgut-checklisten/${cl.id}/assign`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shipmentId: selected!.id }),
+      }),
+    onSuccess: () => {
+      toast({ title: `Checkliste #${cl.id} wurde Verladung #${selected!.id} zugeordnet` });
+      onAssigned();
+      onClose();
+    },
+    onError: (e: any) =>
+      toast({ title: e?.data?.error ?? "Fehler bei der Zuordnung", variant: "destructive" }),
+  });
+
+  return (
+    <DialogContent className="sm:max-w-lg">
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2">
+          <Link2 className="w-4 h-4 text-blue-500" />
+          Checkliste #{cl.id} einem LKW zuordnen
+        </DialogTitle>
+      </DialogHeader>
+
+      <div className="space-y-3 py-1">
+        <div className="text-xs text-slate-500 bg-slate-50 rounded p-2 flex items-center gap-2">
+          <ShieldAlert className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+          Kennzeichen: <span className="font-medium text-slate-700">{cl.kennzeichen || "—"}</span>
+          · Fahrer: <span className="font-medium text-slate-700">{cl.nameFahrer ?? cl.name_fahrer ?? "—"}</span>
+        </div>
+
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+          <Input
+            className="pl-8 text-sm"
+            placeholder="Kennzeichen, Bezeichnung oder ID suchen..."
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setSelected(null); }}
+            autoFocus
+          />
+          {isFetching && (
+            <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 animate-spin text-slate-400" />
+          )}
+        </div>
+
+        <div className="border rounded-md overflow-hidden max-h-64 overflow-y-auto">
+          {shipments.length === 0 && search.trim().length >= 1 && !isFetching && (
+            <div className="py-8 text-center text-sm text-slate-400">Keine Verladungen gefunden</div>
+          )}
+          {search.trim().length < 1 && (
+            <div className="py-8 text-center text-sm text-slate-400">Suchbegriff eingeben um Verladungen zu finden</div>
+          )}
+          {shipments.map((s) => {
+            const isSelected = selected?.id === s.id;
+            const label = s.bezeichnung || s.kennzeichen || `#${s.id}`;
+            return (
+              <button
+                key={s.id}
+                onClick={() => setSelected(isSelected ? null : s)}
+                className={`w-full text-left px-3 py-2.5 text-sm flex items-center justify-between gap-2 transition-colors border-b last:border-0 ${
+                  isSelected
+                    ? "bg-blue-50 border-l-2 border-l-blue-500"
+                    : "hover:bg-slate-50"
+                }`}
+              >
+                <div className="min-w-0">
+                  <div className="font-medium text-slate-800 truncate">{label}</div>
+                  <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
+                    <span>#{s.id}</span>
+                    {s.kennzeichen && s.bezeichnung && <span>{s.kennzeichen}</span>}
+                    {s.relation && <span>{s.relation}</span>}
+                    {s.etaDate && <span>{format(new Date(s.etaDate), "dd.MM.yyyy")}</span>}
+                    <span className="px-1 py-0.5 rounded bg-slate-100 text-slate-500">{s.status}</span>
+                  </div>
+                </div>
+                {isSelected && <CheckCircle2 className="w-4 h-4 text-blue-500 shrink-0" />}
+              </button>
+            );
+          })}
+        </div>
+
+        {selected && (
+          <div className="flex items-center gap-2 text-xs bg-blue-50 border border-blue-200 rounded p-2">
+            <CheckCircle2 className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+            <span className="text-slate-700">
+              Zuordnen zu: <strong>#{selected.id} – {selected.bezeichnung || selected.kennzeichen}</strong>
+            </span>
+          </div>
+        )}
+      </div>
+
+      <DialogFooter>
+        <Button variant="outline" onClick={onClose}>Abbrechen</Button>
+        <Button
+          disabled={!selected || assignMutation.isPending}
+          onClick={() => assignMutation.mutate()}
+          className="gap-1.5"
+        >
+          {assignMutation.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+          <Link2 className="w-3.5 h-3.5" />
+          Zuordnen
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  );
+}
+
 export default function GefahrgutPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState<any | null>(null);
+  const [assigning, setAssigning] = useState<any | null>(null);
 
   const canReset = useMemo(() => {
     const resetRoles = ["comet_admin", "comet_leitstand"];
     return resetRoles.includes(user?.role ?? "");
   }, [user?.role]);
 
-  const { data: checklisten, isLoading } = useQuery({
+  // Load permission for assigning shipments
+  const { data: permsData } = useQuery({
+    queryKey: ["auth-permissions"],
+    queryFn: () => customFetch<{ [key: string]: boolean }>("/api/auth/permissions"),
+  });
+  const canAssign = permsData?.["gefahrgut.assign_shipment"] === true;
+
+  const { data: checklisten, isLoading, refetch } = useQuery({
     queryKey: ["gefahrgut-checklisten-blanko"],
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/gefahrgut-checklisten?blanko=true`, { credentials: "include" });
@@ -191,6 +339,11 @@ export default function GefahrgutPage() {
     },
     onError: (e: any) => toast({ title: e.message ?? "Fehler", variant: "destructive" }),
   });
+
+  const handleAssigned = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["gefahrgut-checklisten-blanko"] });
+    refetch();
+  }, [queryClient, refetch]);
 
   return (
     <div className="space-y-6">
@@ -231,7 +384,7 @@ export default function GefahrgutPage() {
                 <TableHead>Datum</TableHead>
                 <TableHead>Eingereicht</TableHead>
                 <TableHead className="text-center">Prüfpunkte</TableHead>
-                <TableHead className="w-[100px]"></TableHead>
+                <TableHead className="w-[120px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -278,6 +431,17 @@ export default function GefahrgutPage() {
                         >
                           <Eye className="w-3.5 h-3.5" />
                         </Button>
+                        {canAssign && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-blue-400 hover:text-blue-600"
+                            onClick={(e) => { e.stopPropagation(); setAssigning(cl); }}
+                            title="LKW zuordnen"
+                          >
+                            <Link2 className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
                         {canReset && (
                           <Button
                             variant="ghost"
@@ -306,6 +470,16 @@ export default function GefahrgutPage() {
       {selected && (
         <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
           <ChecklistDetail cl={selected} onClose={() => setSelected(null)} />
+        </Dialog>
+      )}
+
+      {assigning && (
+        <Dialog open={!!assigning} onOpenChange={(o) => !o && setAssigning(null)}>
+          <AssignDialog
+            cl={assigning}
+            onClose={() => setAssigning(null)}
+            onAssigned={handleAssigned}
+          />
         </Dialog>
       )}
     </div>
