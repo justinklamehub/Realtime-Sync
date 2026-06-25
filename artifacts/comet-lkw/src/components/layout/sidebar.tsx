@@ -32,6 +32,7 @@ import {
   Moon,
   ShieldAlert,
   Radio,
+  HelpCircle,
 } from "lucide-react";
 import { useLogout } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -319,6 +320,7 @@ export function AppSidebar({ collapsed, onToggle, isDark, onToggleTheme }: AppSi
     { name: "Speditionsfreigabe", href: "/speditionsfreigabe", icon: Share2, show: user.role === "speditions_admin" },
     { name: "Einstellungen", href: "/settings", icon: Settings, show: user.role === "comet_admin" },
     { name: "Berechtigungen", href: "/berechtigungen", icon: ShieldCheck, show: user.role === "comet_admin" },
+    { name: "Hilfe & Anleitung", href: "/hilfe", icon: HelpCircle, show: true },
   ];
 
   const initials = user.username.substring(0, 2).toUpperCase();
@@ -421,6 +423,7 @@ export function AppSidebar({ collapsed, onToggle, isDark, onToggleTheme }: AppSi
                   <Link
                     key={item.name}
                     href={item.href}
+                    data-tour={item.href === "/hilfe" ? "help-link" : undefined}
                     className={cn(
                       "flex items-center rounded-md text-sm font-medium transition-all duration-150",
                       collapsed ? "justify-center w-9 h-9 mx-auto" : "gap-3 px-3 py-2.5",
@@ -455,7 +458,7 @@ export function AppSidebar({ collapsed, onToggle, isDark, onToggleTheme }: AppSi
           </div>
 
           {/* User footer */}
-          <div className={cn("border-t border-slate-800 bg-slate-900/30 shrink-0", collapsed ? "p-2" : "p-3")}>
+          <div data-tour="sidebar-footer" className={cn("border-t border-slate-800 bg-slate-900/30 shrink-0", collapsed ? "p-2" : "p-3")}>
             {/* ── Expanded footer ── */}
             {!collapsed && (
               <>
