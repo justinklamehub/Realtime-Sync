@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Search, Loader2, Plus, Lock, ArrowRight, ArrowUp, ArrowDown, ChevronsUpDown, X, Download, FileSpreadsheet, Wifi, WifiOff, ClipboardCheck, SlidersHorizontal, RotateCcw } from "lucide-react";
+import { Search, Loader2, Plus, Lock, ArrowRight, ArrowUp, ArrowDown, ChevronsUpDown, X, Download, FileSpreadsheet, Wifi, WifiOff, ClipboardCheck, SlidersHorizontal, RotateCcw, GripVertical } from "lucide-react";
 import * as XLSX from "xlsx";
 import { ShipmentDrawer } from "./components/shipment-drawer";
 import { BulkCreateDialog } from "./components/bulk-create-dialog";
@@ -78,19 +78,30 @@ const DEFAULT_COLS: Record<ColKey, boolean> = {
   updatedAt: false,
 };
 
-const STORAGE_KEY = "shipments_col_vis_v2";
+const DEFAULT_ORDER: ColKey[] = COLUMN_DEFS.map((c) => c.key);
+
+const STORAGE_KEY = "shipments_col_vis_v3";
 const SERVER_PREF_KEY = "shipments_col_visibility";
 
-function loadColVisibility(): Record<ColKey, boolean> {
+type ColPrefs = { visibility: Record<ColKey, boolean>; order: ColKey[] };
+
+function loadColPrefs(): ColPrefs {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return { ...DEFAULT_COLS, ...JSON.parse(raw) };
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const visibility = { ...DEFAULT_COLS, ...(parsed.visibility ?? parsed) };
+      const order: ColKey[] = Array.isArray(parsed.order)
+        ? [...new Set([...parsed.order.filter((k: string) => DEFAULT_ORDER.includes(k as ColKey)), ...DEFAULT_ORDER])] as ColKey[]
+        : [...DEFAULT_ORDER];
+      return { visibility, order };
+    }
   } catch {}
-  return { ...DEFAULT_COLS };
+  return { visibility: { ...DEFAULT_COLS }, order: [...DEFAULT_ORDER] };
 }
 
-function saveColVisibilityLocal(v: Record<ColKey, boolean>) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(v)); } catch {}
+function saveColPrefsLocal(prefs: ColPrefs) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs)); } catch {}
 }
 
 function SortIcon({ field, sortField, sortDir }: { field: SortField; sortField: SortField; sortDir: SortDir }) {
@@ -136,19 +147,23 @@ export default function ShipmentsPage() {
   const [selectedShipmentId, setSelectedShipmentId] = useState<number | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isBulkOpen, setIsBulkOpen] = useState(false);
-  const [cols, setCols] = useState<Record<ColKey, boolean>>(loadColVisibility);
+  const initPrefs = loadColPrefs();
+  const [cols, setCols] = useState<Record<ColKey, boolean>>(initPrefs.visibility);
+  const [colOrder, setColOrder] = useState<ColKey[]>(initPrefs.order);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dragItem = useRef<number | null>(null);
+  const dragOver = useRef<number | null>(null);
 
   const API_BASE_FOR_PREFS = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
-  const saveColsToServer = useCallback((v: Record<ColKey, boolean>) => {
+  const savePrefsToServer = useCallback((prefs: ColPrefs) => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
       fetch(`${API_BASE_FOR_PREFS}/user-preferences/${SERVER_PREF_KEY}`, {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ value: v }),
+        body: JSON.stringify({ value: { visibility: prefs.visibility, order: prefs.order } }),
       }).catch(() => {});
     }, 600);
   }, [API_BASE_FOR_PREFS]);
@@ -160,9 +175,14 @@ export default function ShipmentsPage() {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data?.value && typeof data.value === "object") {
-          const merged = { ...DEFAULT_COLS, ...data.value };
-          setCols(merged);
-          saveColVisibilityLocal(merged);
+          const v = data.value;
+          const visibility = { ...DEFAULT_COLS, ...(v.visibility ?? v) };
+          const order: ColKey[] = Array.isArray(v.order)
+            ? [...new Set([...v.order.filter((k: string) => DEFAULT_ORDER.includes(k as ColKey)), ...DEFAULT_ORDER])] as ColKey[]
+            : [...DEFAULT_ORDER];
+          setCols(visibility);
+          setColOrder(order);
+          saveColPrefsLocal({ visibility, order });
         }
       })
       .catch(() => {});
@@ -171,17 +191,44 @@ export default function ShipmentsPage() {
   function toggleCol(key: ColKey) {
     setCols((prev) => {
       const next = { ...prev, [key]: !prev[key] };
-      saveColVisibilityLocal(next);
-      saveColsToServer(next);
+      const prefs = { visibility: next, order: colOrder };
+      saveColPrefsLocal(prefs);
+      savePrefsToServer(prefs);
       return next;
     });
   }
 
   function resetCols() {
-    const defaults = { ...DEFAULT_COLS };
-    setCols(defaults);
-    saveColVisibilityLocal(defaults);
-    saveColsToServer(defaults);
+    const prefs: ColPrefs = { visibility: { ...DEFAULT_COLS }, order: [...DEFAULT_ORDER] };
+    setCols(prefs.visibility);
+    setColOrder(prefs.order);
+    saveColPrefsLocal(prefs);
+    savePrefsToServer(prefs);
+  }
+
+  function handleDragStart(index: number) {
+    dragItem.current = index;
+  }
+
+  function handleDragEnter(index: number) {
+    dragOver.current = index;
+  }
+
+  function handleDragEnd() {
+    if (dragItem.current === null || dragOver.current === null || dragItem.current === dragOver.current) {
+      dragItem.current = null;
+      dragOver.current = null;
+      return;
+    }
+    const newOrder = [...colOrder];
+    const [moved] = newOrder.splice(dragItem.current, 1);
+    newOrder.splice(dragOver.current, 0, moved);
+    dragItem.current = null;
+    dragOver.current = null;
+    setColOrder(newOrder);
+    const prefs = { visibility: cols, order: newOrder };
+    saveColPrefsLocal(prefs);
+    savePrefsToServer(prefs);
   }
 
   const visibleColCount = useMemo(
@@ -500,20 +547,31 @@ export default function ShipmentsPage() {
                   </Button>
                 )}
               </div>
-              <div className="space-y-1.5">
-                {COLUMN_DEFS.map(({ key, label }) => (
-                  <label
-                    key={key}
-                    className="flex items-center gap-2.5 px-1 py-1 rounded cursor-pointer hover:bg-slate-50 select-none"
-                  >
-                    <Checkbox
-                      checked={cols[key]}
-                      onCheckedChange={() => toggleCol(key)}
-                      className="shrink-0"
-                    />
-                    <span className="text-sm text-slate-700">{label}</span>
-                  </label>
-                ))}
+              <div className="space-y-0.5">
+                {colOrder.map((key, idx) => {
+                  const label = COLUMN_DEFS.find((c) => c.key === key)?.label ?? key;
+                  return (
+                    <div
+                      key={key}
+                      draggable
+                      onDragStart={() => handleDragStart(idx)}
+                      onDragEnter={() => handleDragEnter(idx)}
+                      onDragEnd={handleDragEnd}
+                      onDragOver={(e) => e.preventDefault()}
+                      className="flex items-center gap-2 px-1 py-1 rounded hover:bg-slate-50 select-none group"
+                    >
+                      <GripVertical className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-400 cursor-grab shrink-0" />
+                      <Checkbox
+                        checked={cols[key]}
+                        onCheckedChange={() => toggleCol(key)}
+                        className="shrink-0"
+                      />
+                      <span className="text-sm text-slate-700 cursor-pointer flex-1" onClick={() => toggleCol(key)}>
+                        {label}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </PopoverContent>
           </Popover>
@@ -612,48 +670,31 @@ export default function ShipmentsPage() {
                   />
                 </TableHead>
               )}
-              {cols.id && (
-                <TableHead className="w-[60px] text-slate-400 font-normal text-xs">ID</TableHead>
-              )}
-              {cols.kennzeichen && (
-                <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("kennzeichen")}>
-                  Kennzeichen <SortIcon field="kennzeichen" sortField={sortField} sortDir={sortDir} />
-                </TableHead>
-              )}
-              {cols.spedition && (
-                <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("speditionName")}>
-                  Spedition <SortIcon field="speditionName" sortField={sortField} sortDir={sortDir} />
-                </TableHead>
-              )}
-              {cols.subspedition && <TableHead>Sub-Spedition</TableHead>}
-              {cols.art && <TableHead>Art</TableHead>}
-              {cols.relation && <TableHead>Relation</TableHead>}
-              {cols.bezeichnung && <TableHead>Bezeichnung</TableHead>}
-              {cols.eta && (
-                <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("etaDate")}>
-                  ETA <SortIcon field="etaDate" sortField={sortField} sortDir={sortDir} />
-                </TableHead>
-              )}
-              {cols.ata && <TableHead>ATA</TableHead>}
-              {cols.status && (
-                <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("status")}>
-                  Status <SortIcon field="status" sortField={sortField} sortDir={sortDir} />
-                </TableHead>
-              )}
-              {cols.ware && <TableHead>Ware</TableHead>}
-              {cols.tor && (
-                <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("tor")}>
-                  Tor <SortIcon field="tor" sortField={sortField} sortDir={sortDir} />
-                </TableHead>
-              )}
-              {cols.gesperrt && <TableHead>Gesperrt</TableHead>}
-              {cols.cometBearbeitet && <TableHead>COMET bearb.</TableHead>}
-              {cols.telefon && <TableHead>Telefon</TableHead>}
-              {cols.bemerkungen && <TableHead>Bemerkungen</TableHead>}
-              {cols.createdBy && <TableHead>Erstellt von</TableHead>}
-              {cols.createdAt && <TableHead>Erstellt am</TableHead>}
-              {cols.updatedBy && <TableHead>Aktual. von</TableHead>}
-              {cols.updatedAt && <TableHead>Aktual. am</TableHead>}
+              {colOrder.filter((k) => cols[k]).map((key) => {
+                switch (key) {
+                  case "id": return <TableHead key="id" className="w-[60px] text-slate-400 font-normal text-xs">ID</TableHead>;
+                  case "kennzeichen": return <TableHead key="kennzeichen" className="cursor-pointer select-none" onClick={() => toggleSort("kennzeichen")}>Kennzeichen <SortIcon field="kennzeichen" sortField={sortField} sortDir={sortDir} /></TableHead>;
+                  case "spedition": return <TableHead key="spedition" className="cursor-pointer select-none" onClick={() => toggleSort("speditionName")}>Spedition <SortIcon field="speditionName" sortField={sortField} sortDir={sortDir} /></TableHead>;
+                  case "subspedition": return <TableHead key="subspedition">Sub-Spedition</TableHead>;
+                  case "art": return <TableHead key="art">Art</TableHead>;
+                  case "relation": return <TableHead key="relation">Relation</TableHead>;
+                  case "bezeichnung": return <TableHead key="bezeichnung">Bezeichnung</TableHead>;
+                  case "eta": return <TableHead key="eta" className="cursor-pointer select-none" onClick={() => toggleSort("etaDate")}>ETA <SortIcon field="etaDate" sortField={sortField} sortDir={sortDir} /></TableHead>;
+                  case "ata": return <TableHead key="ata">ATA</TableHead>;
+                  case "status": return <TableHead key="status" className="cursor-pointer select-none" onClick={() => toggleSort("status")}>Status <SortIcon field="status" sortField={sortField} sortDir={sortDir} /></TableHead>;
+                  case "ware": return <TableHead key="ware">Ware</TableHead>;
+                  case "tor": return <TableHead key="tor" className="cursor-pointer select-none" onClick={() => toggleSort("tor")}>Tor <SortIcon field="tor" sortField={sortField} sortDir={sortDir} /></TableHead>;
+                  case "gesperrt": return <TableHead key="gesperrt">Gesperrt</TableHead>;
+                  case "cometBearbeitet": return <TableHead key="cometBearbeitet">COMET bearb.</TableHead>;
+                  case "telefon": return <TableHead key="telefon">Telefon</TableHead>;
+                  case "bemerkungen": return <TableHead key="bemerkungen">Bemerkungen</TableHead>;
+                  case "createdBy": return <TableHead key="createdBy">Erstellt von</TableHead>;
+                  case "createdAt": return <TableHead key="createdAt">Erstellt am</TableHead>;
+                  case "updatedBy": return <TableHead key="updatedBy">Aktual. von</TableHead>;
+                  case "updatedAt": return <TableHead key="updatedAt">Aktual. am</TableHead>;
+                  default: return null;
+                }
+              })}
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -691,112 +732,57 @@ export default function ShipmentsPage() {
                       />
                     </TableCell>
                   )}
-                  {cols.id && (
-                    <TableCell className="text-xs text-slate-400 font-mono">{shipment.id}</TableCell>
-                  )}
-                  {cols.kennzeichen && (
-                    <TableCell className="font-medium">{shipment.kennzeichen || "-"}</TableCell>
-                  )}
-                  {cols.spedition && (
-                    <TableCell>{(shipment as any).speditionName || "-"}</TableCell>
-                  )}
-                  {cols.subspedition && (
-                    <TableCell>{(shipment as any).subSpeditionName || "-"}</TableCell>
-                  )}
-                  {cols.art && (
-                    <TableCell>{shipment.lkwArt || "-"}</TableCell>
-                  )}
-                  {cols.relation && (
-                    <TableCell className="text-slate-600 text-sm">{shipment.relation || "-"}</TableCell>
-                  )}
-                  {cols.bezeichnung && (
-                    <TableCell className="text-slate-600 text-sm">{shipment.bezeichnung || "-"}</TableCell>
-                  )}
-                  {cols.eta && (
-                    <TableCell className="text-xs">
-                      {shipment.etaDate ? (
-                        <span className="font-medium text-slate-700">
-                          {format(new Date(shipment.etaDate), "dd.MM.yy")}
-                          {shipment.etaTime ? ` ${shipment.etaTime}` : ""}
-                        </span>
-                      ) : "-"}
-                    </TableCell>
-                  )}
-                  {cols.ata && (
-                    <TableCell className="text-xs">
-                      {(shipment as any).ataDate ? (
-                        <span className="font-medium text-green-700">
-                          {format(new Date((shipment as any).ataDate), "dd.MM.yy")}
-                          {(shipment as any).ataTime ? ` ${(shipment as any).ataTime}` : ""}
-                        </span>
-                      ) : "-"}
-                    </TableCell>
-                  )}
-                  {cols.status && (
-                    <TableCell>
-                      <Badge variant="outline" className={STATUS_COLOR[shipment.status] ?? "bg-slate-100 text-slate-700"}>
-                        {shipment.status}
-                      </Badge>
-                    </TableCell>
-                  )}
-                  {cols.ware && (
-                    <TableCell>
-                      {(() => {
-                        const ws = (shipment as any).wareStatus || "nicht bereit";
-                        const cls = ws === "vorbereitet" ? "bg-green-100 text-green-700 border-green-200"
-                          : ws === "in bearbeitung" ? "bg-amber-100 text-amber-700 border-amber-200"
-                          : ws === "ausgedruckt" ? "bg-blue-100 text-blue-700 border-blue-200"
-                          : "bg-red-100 text-red-700 border-red-200";
-                        const label = ws === "nicht bereit" ? "Nicht bereit"
-                          : ws === "ausgedruckt" ? "Ausgedruckt"
-                          : ws === "in bearbeitung" ? "In Bearbeitung"
-                          : ws === "vorbereitet" ? "Vorbereitet"
-                          : ws;
-                        return <Badge variant="outline" className={`text-xs ${cls}`}>{label}</Badge>;
-                      })()}
-                    </TableCell>
-                  )}
-                  {cols.tor && (
-                    <TableCell className="font-medium">{shipment.tor || "-"}</TableCell>
-                  )}
-                  {cols.gesperrt && (
-                    <TableCell>
-                      {shipment.gesperrtFuerSpedition
-                        ? <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">Gesperrt</Badge>
-                        : <span className="text-xs text-slate-400">Nein</span>}
-                    </TableCell>
-                  )}
-                  {cols.cometBearbeitet && (
-                    <TableCell>
-                      {(shipment as any).cometBearbeitet
-                        ? <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">Ja</Badge>
-                        : <span className="text-xs text-slate-400">Nein</span>}
-                    </TableCell>
-                  )}
-                  {cols.telefon && (
-                    <TableCell className="text-sm">{(shipment as any).telefon || "-"}</TableCell>
-                  )}
-                  {cols.bemerkungen && (
-                    <TableCell className="text-xs text-slate-600 max-w-[200px] truncate" title={(shipment as any).bemerkungen || ""}>
-                      {(shipment as any).bemerkungen || "-"}
-                    </TableCell>
-                  )}
-                  {cols.createdBy && (
-                    <TableCell className="text-xs text-slate-500">{(shipment as any).createdByName || "-"}</TableCell>
-                  )}
-                  {cols.createdAt && (
-                    <TableCell className="text-xs text-slate-500">
-                      {(shipment as any).createdAt ? format(new Date((shipment as any).createdAt), "dd.MM.yy HH:mm") : "-"}
-                    </TableCell>
-                  )}
-                  {cols.updatedBy && (
-                    <TableCell className="text-xs text-slate-500">{(shipment as any).updatedByName || "-"}</TableCell>
-                  )}
-                  {cols.updatedAt && (
-                    <TableCell className="text-xs text-slate-500">
-                      {(shipment as any).updatedAt ? format(new Date((shipment as any).updatedAt), "dd.MM.yy HH:mm") : "-"}
-                    </TableCell>
-                  )}
+                  {colOrder.filter((k) => cols[k]).map((key) => {
+                    const s = shipment as any;
+                    switch (key) {
+                      case "id": return <TableCell key="id" className="text-xs text-slate-400 font-mono">{shipment.id}</TableCell>;
+                      case "kennzeichen": return <TableCell key="kennzeichen" className="font-medium">{shipment.kennzeichen || "-"}</TableCell>;
+                      case "spedition": return <TableCell key="spedition">{s.speditionName || "-"}</TableCell>;
+                      case "subspedition": return <TableCell key="subspedition">{s.subSpeditionName || "-"}</TableCell>;
+                      case "art": return <TableCell key="art">{shipment.lkwArt || "-"}</TableCell>;
+                      case "relation": return <TableCell key="relation" className="text-slate-600 text-sm">{shipment.relation || "-"}</TableCell>;
+                      case "bezeichnung": return <TableCell key="bezeichnung" className="text-slate-600 text-sm">{shipment.bezeichnung || "-"}</TableCell>;
+                      case "eta": return (
+                        <TableCell key="eta" className="text-xs">
+                          {shipment.etaDate ? <span className="font-medium text-slate-700">{format(new Date(shipment.etaDate), "dd.MM.yy")}{shipment.etaTime ? ` ${shipment.etaTime}` : ""}</span> : "-"}
+                        </TableCell>
+                      );
+                      case "ata": return (
+                        <TableCell key="ata" className="text-xs">
+                          {s.ataDate ? <span className="font-medium text-green-700">{format(new Date(s.ataDate), "dd.MM.yy")}{s.ataTime ? ` ${s.ataTime}` : ""}</span> : "-"}
+                        </TableCell>
+                      );
+                      case "status": return (
+                        <TableCell key="status">
+                          <Badge variant="outline" className={STATUS_COLOR[shipment.status] ?? "bg-slate-100 text-slate-700"}>{shipment.status}</Badge>
+                        </TableCell>
+                      );
+                      case "ware": {
+                        const ws = s.wareStatus || "nicht bereit";
+                        const cls = ws === "vorbereitet" ? "bg-green-100 text-green-700 border-green-200" : ws === "in bearbeitung" ? "bg-amber-100 text-amber-700 border-amber-200" : ws === "ausgedruckt" ? "bg-blue-100 text-blue-700 border-blue-200" : "bg-red-100 text-red-700 border-red-200";
+                        const lbl = ws === "nicht bereit" ? "Nicht bereit" : ws === "ausgedruckt" ? "Ausgedruckt" : ws === "in bearbeitung" ? "In Bearbeitung" : ws === "vorbereitet" ? "Vorbereitet" : ws;
+                        return <TableCell key="ware"><Badge variant="outline" className={`text-xs ${cls}`}>{lbl}</Badge></TableCell>;
+                      }
+                      case "tor": return <TableCell key="tor" className="font-medium">{shipment.tor || "-"}</TableCell>;
+                      case "gesperrt": return (
+                        <TableCell key="gesperrt">
+                          {shipment.gesperrtFuerSpedition ? <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">Gesperrt</Badge> : <span className="text-xs text-slate-400">Nein</span>}
+                        </TableCell>
+                      );
+                      case "cometBearbeitet": return (
+                        <TableCell key="cometBearbeitet">
+                          {s.cometBearbeitet ? <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">Ja</Badge> : <span className="text-xs text-slate-400">Nein</span>}
+                        </TableCell>
+                      );
+                      case "telefon": return <TableCell key="telefon" className="text-sm">{s.telefon || "-"}</TableCell>;
+                      case "bemerkungen": return <TableCell key="bemerkungen" className="text-xs text-slate-600 max-w-[200px] truncate" title={s.bemerkungen || ""}>{s.bemerkungen || "-"}</TableCell>;
+                      case "createdBy": return <TableCell key="createdBy" className="text-xs text-slate-500">{s.createdByName || "-"}</TableCell>;
+                      case "createdAt": return <TableCell key="createdAt" className="text-xs text-slate-500">{s.createdAt ? format(new Date(s.createdAt), "dd.MM.yy HH:mm") : "-"}</TableCell>;
+                      case "updatedBy": return <TableCell key="updatedBy" className="text-xs text-slate-500">{s.updatedByName || "-"}</TableCell>;
+                      case "updatedAt": return <TableCell key="updatedAt" className="text-xs text-slate-500">{s.updatedAt ? format(new Date(s.updatedAt), "dd.MM.yy HH:mm") : "-"}</TableCell>;
+                      default: return null;
+                    }
+                  })}
                   <TableCell>
                     <div className="flex items-center gap-1.5">
                       {isCometUser && gefahrgutSet.has(shipment.id) && (
