@@ -121,16 +121,58 @@ function WareStatusSelect({
   );
 }
 
+function TorSelect({
+  tor,
+  canEdit,
+  onChange,
+}: {
+  tor: string | null;
+  canEdit: boolean;
+  onChange: (value: string | null) => void;
+}) {
+  if (!canEdit) {
+    return tor ? (
+      <span className="inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-semibold bg-indigo-50 text-indigo-700 border-indigo-200">
+        {tor}
+      </span>
+    ) : null;
+  }
+
+  return (
+    <Select
+      value={tor ?? "__none__"}
+      onValueChange={(v) => onChange(v === "__none__" ? null : v)}
+    >
+      <SelectTrigger
+        className={`h-auto px-1.5 py-0.5 text-[10px] font-semibold rounded border gap-0.5 shadow-none focus:ring-0 focus:ring-offset-0 ${tor ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-slate-100 text-slate-400 border-slate-200"}`}
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <SelectValue>{tor ?? "Tor —"}</SelectValue>
+        <ChevronDown className="w-2.5 h-2.5 opacity-60 shrink-0" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="__none__">—</SelectItem>
+        {TOR_OPTIONS.map((t) => (
+          <SelectItem key={t} value={t}>{t}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 function ShipmentCard({
   shipment,
   canDrag,
   canEditWare,
   onWareStatusChange,
+  onTorChange,
 }: {
   shipment: any;
   canDrag: boolean;
   canEditWare: boolean;
   onWareStatusChange: (id: number, value: string | null) => void;
+  onTorChange: (id: number, value: string | null) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: shipment.id, disabled: !canDrag });
@@ -151,9 +193,16 @@ function ShipmentCard({
         <CardContent className="p-3 space-y-1.5">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-mono text-slate-400">#{shipment.id}</span>
-            {shipment.gesperrtFuerSpedition && (
-              <Lock className="w-3 h-3 text-red-400 shrink-0" />
-            )}
+            <div className="flex items-center gap-1.5">
+              <TorSelect
+                tor={shipment.tor ?? null}
+                canEdit={canEditWare}
+                onChange={(v) => onTorChange(shipment.id, v)}
+              />
+              {shipment.gesperrtFuerSpedition && (
+                <Lock className="w-3 h-3 text-red-400 shrink-0" />
+              )}
+            </div>
           </div>
           <div className="font-semibold text-slate-900 text-sm leading-tight truncate">
             {shipment.kennzeichen || (
@@ -197,6 +246,7 @@ function KanbanColumn({
   canEditWare,
   isLoading,
   onWareStatusChange,
+  onTorChange,
 }: {
   status: KanbanStatus;
   items: any[];
@@ -204,6 +254,7 @@ function KanbanColumn({
   canEditWare: boolean;
   isLoading: boolean;
   onWareStatusChange: (id: number, value: string | null) => void;
+  onTorChange: (id: number, value: string | null) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
   const colors = STATUS_COLORS[status];
@@ -242,6 +293,7 @@ function KanbanColumn({
                 canDrag={canDrag}
                 canEditWare={canEditWare}
                 onWareStatusChange={onWareStatusChange}
+                onTorChange={onTorChange}
               />
             ))
           )}
@@ -345,6 +397,10 @@ export default function KanbanPage() {
 
   const handleWareStatusChange = (id: number, value: string | null) => {
     updateShipment.mutate({ id, data: { wareStatus: value ?? "" } as any });
+  };
+
+  const handleTorChange = (id: number, value: string | null) => {
+    updateShipment.mutate({ id, data: { tor: value ?? "" } as any });
   };
 
   function resetFilters() {
@@ -499,6 +555,7 @@ export default function KanbanPage() {
               canEditWare={canEditWare}
               isLoading={isLoading}
               onWareStatusChange={handleWareStatusChange}
+              onTorChange={handleTorChange}
             />
           ))}
         </div>
