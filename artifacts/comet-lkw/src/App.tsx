@@ -81,7 +81,7 @@ function Router() {
         <Redirect to="/dashboard" />
       </Route>
 
-      <Route path="/:path*">
+      <Route path="*">
         <AppLayout>
           <Switch>
             <Route path="/dashboard"><ProtectedRoute component={DashboardPage} /></Route>
