@@ -31,6 +31,12 @@ interface Spedition {
   status?: string;
   bemerkungen?: string | null;
   palletFaktor?: number | null;
+  preisProKm?: number | null;
+  mindestpreisProFahrt?: number | null;
+  palettenAufschlag?: number | null;
+  kraftstoffzuschlagProzent?: number | null;
+  fixkostenProFahrt?: number | null;
+  mautProKm?: number | null;
 }
 
 interface SpeditionDialogProps {
@@ -48,6 +54,8 @@ export function SpeditionDialog({ open, onOpenChange, editSpedition, permissions
 
   const [form, setForm] = useState({
     name: "", kuerzel: "", ansprechpartner: "", email: "", telefon: "", status: "aktiv", bemerkungen: "", palletFaktor: 1,
+    preisProKm: "", mindestpreisProFahrt: "", palettenAufschlag: "",
+    kraftstoffzuschlagProzent: "", fixkostenProFahrt: "", mautProKm: "",
   });
 
   useEffect(() => {
@@ -62,9 +70,19 @@ export function SpeditionDialog({ open, onOpenChange, editSpedition, permissions
           status: editSpedition.status || "aktiv",
           bemerkungen: editSpedition.bemerkungen || "",
           palletFaktor: editSpedition.palletFaktor ?? 1,
+          preisProKm: editSpedition.preisProKm != null ? String(editSpedition.preisProKm) : "",
+          mindestpreisProFahrt: editSpedition.mindestpreisProFahrt != null ? String(editSpedition.mindestpreisProFahrt) : "",
+          palettenAufschlag: editSpedition.palettenAufschlag != null ? String(editSpedition.palettenAufschlag) : "",
+          kraftstoffzuschlagProzent: editSpedition.kraftstoffzuschlagProzent != null ? String(editSpedition.kraftstoffzuschlagProzent) : "",
+          fixkostenProFahrt: editSpedition.fixkostenProFahrt != null ? String(editSpedition.fixkostenProFahrt) : "",
+          mautProKm: editSpedition.mautProKm != null ? String(editSpedition.mautProKm) : "",
         });
       } else {
-        setForm({ name: "", kuerzel: "", ansprechpartner: "", email: "", telefon: "", status: "aktiv", bemerkungen: "", palletFaktor: 1 });
+        setForm({
+          name: "", kuerzel: "", ansprechpartner: "", email: "", telefon: "", status: "aktiv", bemerkungen: "", palletFaktor: 1,
+          preisProKm: "", mindestpreisProFahrt: "", palettenAufschlag: "",
+          kraftstoffzuschlagProzent: "", fixkostenProFahrt: "", mautProKm: "",
+        });
       }
     }
   }, [open, editSpedition]);
@@ -119,15 +137,26 @@ export function SpeditionDialog({ open, onOpenChange, editSpedition, permissions
     },
   });
 
+  const toNum = (v: string) => v.trim() === "" ? null : parseFloat(v.replace(",", "."));
+
   const handleSave = () => {
     if (!form.name.trim()) {
       toast({ title: "Name erforderlich", variant: "destructive" });
       return;
     }
+    const payload = {
+      ...form,
+      preisProKm: toNum(form.preisProKm),
+      mindestpreisProFahrt: toNum(form.mindestpreisProFahrt),
+      palettenAufschlag: toNum(form.palettenAufschlag),
+      kraftstoffzuschlagProzent: toNum(form.kraftstoffzuschlagProzent),
+      fixkostenProFahrt: toNum(form.fixkostenProFahrt),
+      mautProKm: toNum(form.mautProKm),
+    };
     if (isEditing && editSpedition) {
-      updateMutation.mutate({ id: editSpedition.id, data: form as any });
+      updateMutation.mutate({ id: editSpedition.id, data: payload as any });
     } else {
-      createMutation.mutate({ data: { ...form, status: form.status as any } });
+      createMutation.mutate({ data: { ...payload, status: payload.status as any } });
     }
   };
 
@@ -295,6 +324,7 @@ export function SpeditionDialog({ open, onOpenChange, editSpedition, permissions
         <Tabs defaultValue="stamm">
           <TabsList className="mb-4 w-full">
             <TabsTrigger value="stamm" className="flex-1">Stammdaten</TabsTrigger>
+            <TabsTrigger value="tarife" className="flex-1">Tarife</TabsTrigger>
             {isEditing && <TabsTrigger value="kontakte" className="flex-1">Ansprechpartner</TabsTrigger>}
             {isEditing && <TabsTrigger value="rechte" className="flex-1">Zugriffsrechte</TabsTrigger>}
           </TabsList>
@@ -353,6 +383,45 @@ export function SpeditionDialog({ open, onOpenChange, editSpedition, permissions
                 <p className="text-xs text-slate-400 mt-1">
                   N:1 = für 1 abgegebene COMET-Palette zählt jede zurückerhaltene Speditions-Palette N-fach. Defekte Paletten werden bei aktivem Faktor nicht mitgerechnet.
                 </p>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="tarife" className="space-y-3">
+            <p className="text-xs text-slate-500">
+              Diese Tarife werden für den Spediteur-Kostenvergleich auf der Kalkulations-Seite verwendet.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Preis pro km (€/km)</Label>
+                <Input type="number" min="0" step="any" placeholder="0.00"
+                  value={form.preisProKm} onChange={e => setForm(f => ({ ...f, preisProKm: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Mindestpreis pro Fahrt (€)</Label>
+                <Input type="number" min="0" step="any" placeholder="0.00"
+                  value={form.mindestpreisProFahrt} onChange={e => setForm(f => ({ ...f, mindestpreisProFahrt: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Palettenaufschlag (€/Palette)</Label>
+                <Input type="number" min="0" step="any" placeholder="0.00"
+                  value={form.palettenAufschlag} onChange={e => setForm(f => ({ ...f, palettenAufschlag: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Kraftstoffzuschlag (%)</Label>
+                <Input type="number" min="0" step="any" placeholder="0.00"
+                  value={form.kraftstoffzuschlagProzent} onChange={e => setForm(f => ({ ...f, kraftstoffzuschlagProzent: e.target.value }))} />
+                <p className="text-xs text-slate-400">% auf den Transportpreis</p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Fixkosten pro Fahrt (€)</Label>
+                <Input type="number" min="0" step="any" placeholder="0.00"
+                  value={form.fixkostenProFahrt} onChange={e => setForm(f => ({ ...f, fixkostenProFahrt: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Maut pro km (€/km)</Label>
+                <Input type="number" min="0" step="any" placeholder="0.00"
+                  value={form.mautProKm} onChange={e => setForm(f => ({ ...f, mautProKm: e.target.value }))} />
               </div>
             </div>
           </TabsContent>

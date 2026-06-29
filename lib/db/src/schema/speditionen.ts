@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, timestamp, unique } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, timestamp, unique, doublePrecision } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -12,6 +12,12 @@ export const speditionenTable = pgTable("speditionen", {
   status: text("status").notNull().default("aktiv"),
   bemerkungen: text("bemerkungen"),
   palletFaktor: integer("pallet_faktor").notNull().default(1),
+  preisProKm: doublePrecision("preis_pro_km"),
+  mindestpreisProFahrt: doublePrecision("mindestpreis_pro_fahrt"),
+  palettenAufschlag: doublePrecision("paletten_aufschlag"),
+  kraftstoffzuschlagProzent: doublePrecision("kraftstoffzuschlag_prozent"),
+  fixkostenProFahrt: doublePrecision("fixkosten_pro_fahrt"),
+  mautProKm: doublePrecision("maut_pro_km"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

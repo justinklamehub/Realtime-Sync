@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, Settings, Type, Mail, Inbox, CheckCircle2, XCircle, Eye, EyeOff, Image, Upload, Trash2 as TrashIcon, PanelLeft, Send, Server, ChevronUp, ChevronDown, Table2 } from "lucide-react";
+import { Loader2, Save, Settings, Type, Mail, Inbox, CheckCircle2, XCircle, Eye, EyeOff, Image, Upload, Trash2 as TrashIcon, PanelLeft, Send, Server, ChevronUp, ChevronDown, Table2, Calculator } from "lucide-react";
 import { SidebarNavConfig } from "./sidebar-nav-config";
 import { useAuth } from "@/contexts/auth-context";
 
@@ -247,6 +247,25 @@ function LogoUploadField({ value, onSave, isSaving }: {
         </div>
       </div>
       <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+    </div>
+  );
+}
+
+// ── KalkulationStartortField ──────────────────────────────────────────────────
+
+function KalkulationStartortField({ value, onSave, isSaving }: { value: string; onSave: (k: string, v: string) => void; isSaving: boolean }) {
+  const [local, setLocal] = useState(value);
+  useEffect(() => { setLocal(value); }, [value]);
+  return (
+    <div className="flex gap-2">
+      <Input
+        value={local}
+        onChange={e => setLocal(e.target.value)}
+        placeholder="z.B. Musterstraße 1, 12345 Musterstadt"
+        onBlur={() => { if (local !== value) onSave("kalkulation_startort", local); }}
+        className="flex-1"
+      />
+      {isSaving && <Loader2 className="w-4 h-4 animate-spin text-slate-400 self-center" />}
     </div>
   );
 }
@@ -957,6 +976,25 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent>
               <LogoUploadField value={s["company_logo"] ?? ""} onSave={handleSave} isSaving={isSavingKey("company_logo")} />
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <Calculator className="w-4 h-4 text-primary" />
+                <CardTitle className="text-base">Kalkulation</CardTitle>
+              </div>
+              <CardDescription className="text-xs">
+                Einstellungen für den Spediteur-Kostenvergleich
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Fester Startort</label>
+                <p className="text-xs text-slate-500">Wird auf der Kalkulations-Seite als Standard-Startpunkt vorausgefüllt (z.&thinsp;B. Firmenadresse oder Lagerstandort).</p>
+                <KalkulationStartortField value={s["kalkulation_startort"] ?? ""} onSave={handleSave} isSaving={isSavingKey("kalkulation_startort")} />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

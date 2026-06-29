@@ -44,6 +44,7 @@ import ScannerGefahrgutPage from "@/pages/scanner/gefahrgut";
 import GefahrgutPage from "@/pages/gefahrgut/index";
 import HilfePage from "@/pages/hilfe";
 import TicketsPage from "@/pages/tickets";
+import KalkulationPage from "@/pages/kalkulation";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -101,6 +102,7 @@ function Router() {
             <Route path="/gefahrgut"><ProtectedRoute component={GefahrgutPage} roles={["comet_admin", "comet_leitstand", "comet_lager", "comet_viewer"]} /></Route>
             <Route path="/hilfe"><ProtectedRoute component={HilfePage} /></Route>
             <Route path="/tickets"><ProtectedRoute component={TicketsPage} /></Route>
+            <Route path="/kalkulation"><ProtectedRoute component={KalkulationPage} roles={["comet_admin", "comet_leitstand", "comet_lager", "comet_viewer"]} /></Route>
             <Route component={NotFound} />
           </Switch>
         </AppLayout>

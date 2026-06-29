@@ -77,6 +77,7 @@ router.put("/settings/:key", requireAuth, async (req, res) => {
       "smtp_pass",
       "email_tpl_shipment_tabelle_felder",
       "email_tpl_bulk_tabelle_felder",
+      "kalkulation_startort",
     ];
     if (!ALLOWED_KEYS.includes(key)) {
       return res.status(400).json({ error: "Unbekannter Einstellungsschlüssel" });
