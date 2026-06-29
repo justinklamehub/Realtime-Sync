@@ -11,8 +11,9 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, Settings, Type, Mail, Inbox, CheckCircle2, XCircle, Eye, Image, Upload, Trash2 as TrashIcon, PanelLeft } from "lucide-react";
+import { Loader2, Save, Settings, Type, Mail, Inbox, CheckCircle2, XCircle, Eye, Image, Upload, Trash2 as TrashIcon, PanelLeft, Send } from "lucide-react";
 import { SidebarNavConfig } from "./sidebar-nav-config";
+import { useAuth } from "@/contexts/auth-context";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
@@ -329,7 +330,13 @@ function EmailEventSection({ eventKey, label, description, placeholders, recipie
 // ── EmailLog (Postausgang) ────────────────────────────────────────────────────
 
 function EmailLogSection() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+
   const [preview, setPreview] = useState<EmailLogEntry | null>(null);
+  const [resendEntry, setResendEntry] = useState<EmailLogEntry | null>(null);
+  const [resendEmail, setResendEmail] = useState("");
+  const [resendLoading, setResendLoading] = useState(false);
 
   const { data: logs = [], isLoading, refetch } = useQuery<EmailLogEntry[]>({
     queryKey: ["email-log"],
@@ -342,6 +349,34 @@ function EmailLogSection() {
 
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+  function openResend(entry: EmailLogEntry) {
+    setResendEntry(entry);
+    setResendEmail(user?.email ?? "");
+  }
+
+  async function handleResend() {
+    if (!resendEntry || !resendEmail.trim()) return;
+    setResendLoading(true);
+    try {
+      const res = await fetch(`${API}/email-log/${resendEntry.id}/resend`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: resendEmail.trim() }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? "Fehler");
+      }
+      toast({ title: "E-Mail erneut gesendet", description: `An: ${resendEmail.trim()}` });
+      setResendEntry(null);
+    } catch (e: unknown) {
+      toast({ title: "Fehler beim Senden", description: e instanceof Error ? e.message : "Unbekannter Fehler", variant: "destructive" });
+    } finally {
+      setResendLoading(false);
+    }
+  }
 
   return (
     <>
@@ -401,11 +436,16 @@ function EmailLogSection() {
                         )}
                       </td>
                       <td className="px-4 py-2.5">
-                        {(entry.bodyHtml || entry.bodyText) && (
-                          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setPreview(entry)}>
-                            <Eye className="w-3.5 h-3.5 mr-1" /> Vorschau
+                        <div className="flex items-center gap-1">
+                          {(entry.bodyHtml || entry.bodyText) && (
+                            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setPreview(entry)}>
+                              <Eye className="w-3.5 h-3.5 mr-1" /> Vorschau
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-slate-500 hover:text-primary" onClick={() => openResend(entry)}>
+                            <Send className="w-3.5 h-3.5 mr-1" /> Senden
                           </Button>
-                        )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -416,6 +456,7 @@ function EmailLogSection() {
         </CardContent>
       </Card>
 
+      {/* Vorschau-Dialog */}
       <Dialog open={!!preview} onOpenChange={(o) => !o && setPreview(null)}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -437,6 +478,47 @@ function EmailLogSection() {
           ) : (
             <pre className="text-xs text-slate-700 whitespace-pre-wrap bg-slate-50 rounded p-4 border">{preview?.bodyText}</pre>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Erneut senden-Dialog */}
+      <Dialog open={!!resendEntry} onOpenChange={(o) => !o && setResendEntry(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-semibold flex items-center gap-2">
+              <Send className="w-4 h-4 text-primary" />
+              E-Mail erneut senden
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-1">
+            <div className="rounded-md bg-slate-50 border px-3 py-2.5 space-y-1">
+              <p className="text-xs text-slate-500 font-medium">Betreff</p>
+              <p className="text-sm text-slate-800 truncate">{resendEntry?.subject}</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Empfänger-E-Mail-Adresse</Label>
+              <Input
+                type="email"
+                value={resendEmail}
+                onChange={(e) => setResendEmail(e.target.value)}
+                placeholder="name@beispiel.de"
+                className="text-sm"
+                onKeyDown={(e) => { if (e.key === "Enter" && !resendLoading) handleResend(); }}
+                autoFocus
+              />
+              <p className="text-xs text-slate-400">Die E-Mail wird mit dem Präfix [Weiterleitung] im Betreff gesendet.</p>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" size="sm" className="h-8 px-4 text-xs" onClick={() => setResendEntry(null)} disabled={resendLoading}>
+                Abbrechen
+              </Button>
+              <Button size="sm" className="h-8 px-4 text-xs" onClick={handleResend}
+                disabled={resendLoading || !resendEmail.trim()}>
+                {resendLoading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Send className="w-3 h-3 mr-1" />}
+                Jetzt senden
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </>
