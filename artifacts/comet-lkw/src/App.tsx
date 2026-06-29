@@ -1,5 +1,5 @@
 import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { useEffect } from "react";
 import { toast as sonnerToast } from "sonner";
@@ -8,6 +8,21 @@ import { AuthProvider, useAuth } from "@/contexts/auth-context";
 import { AppLayout } from "@/components/layout/app-layout";
 import { useSocket } from "@/hooks/use-socket";
 import NotFound from "@/pages/not-found";
+
+const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
+
+function TitleSetter() {
+  const { data } = useQuery<Record<string, string>>({
+    queryKey: ["settings-public"],
+    queryFn: () => fetch(`${API}/settings/public`).then((r) => r.json()),
+    staleTime: 5 * 60 * 1000,
+  });
+  useEffect(() => {
+    const title = data?.page_title || data?.app_name || "Easy-Verladung";
+    document.title = title;
+  }, [data]);
+  return null;
+}
 
 import LoginPage from "@/pages/login";
 import DashboardPage from "@/pages/dashboard";
@@ -108,6 +123,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
+        <TitleSetter />
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <AuthProvider>
             <Router />

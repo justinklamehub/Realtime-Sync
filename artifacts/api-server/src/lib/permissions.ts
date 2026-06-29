@@ -17,7 +17,8 @@ export type Permission =
   | "spedition.create"
   | "spedition.edit"
   | "gefahrgut.reset"
-  | "gefahrgut.assign_shipment";
+  | "gefahrgut.assign_shipment"
+  | "kanban.use";
 
 export type ConfigurableRole =
   | "comet_leitstand"
@@ -53,6 +54,7 @@ export const ALL_PERMISSIONS: Permission[] = [
   "spedition.edit",
   "gefahrgut.reset",
   "gefahrgut.assign_shipment",
+  "kanban.use",
 ];
 
 export const PERMISSION_LABELS: Record<Permission, { label: string; category: string }> = {
@@ -72,6 +74,7 @@ export const PERMISSION_LABELS: Record<Permission, { label: string; category: st
   "spedition.edit":       { label: "Spedition bearbeiten",     category: "Speditionsverwaltung" },
   "gefahrgut.reset":            { label: "Checkliste zurücksetzen",       category: "Gefahrgut" },
   "gefahrgut.assign_shipment":  { label: "Checkliste LKW zuordnen",      category: "Gefahrgut" },
+  "kanban.use":                 { label: "Kanban-Board nutzen (Drag & Drop)", category: "Kanban" },
 };
 
 export const ROLE_LABELS: Record<string, string> = {
@@ -117,6 +120,13 @@ export async function seedMissingPermissions(): Promise<void> {
           ON CONFLICT (role, permission) DO NOTHING`
     );
   }
+  // Smart defaults: kanban.use enabled by default for lager & leitstand
+  await db.execute(
+    sql`INSERT INTO role_permissions (role, permission, allowed)
+        SELECT role_key, 'kanban.use', true FROM roles
+        WHERE role_key IN ('comet_lager', 'comet_leitstand')
+        ON CONFLICT (role, permission) DO NOTHING`
+  );
 }
 
 async function ensureCache(): Promise<Map<string, Map<string, boolean>>> {

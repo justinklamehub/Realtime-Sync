@@ -33,6 +33,7 @@ const SETTING_LABELS: Record<string, { label: string; description?: string; mult
   app_name: { label: "App-Name", description: "Wird in der Seitenleiste und auf der Login-Seite angezeigt" },
   company_name: { label: "Unternehmen", description: "Name des Unternehmens" },
   login_subtitle: { label: "Login-Untertitel", description: "Untertitel auf der Login-Seite" },
+  page_title: { label: "Browser-Titel (<title>)", description: "Wird im Tab des Browsers angezeigt" },
   default_bemerkung: { label: "Standard-Bemerkung", description: "Wird bei neuen Verladungen vorausgefüllt", multiline: true },
 };
 
@@ -41,7 +42,7 @@ const SECTIONS = [
     title: "Allgemein",
     description: "Grundlegende Einstellungen für das System",
     icon: Settings,
-    keys: ["app_name", "company_name", "login_subtitle"],
+    keys: ["app_name", "company_name", "login_subtitle", "page_title"],
   },
   {
     title: "Texte & Vorlagen",

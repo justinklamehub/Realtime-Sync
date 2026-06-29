@@ -34,6 +34,7 @@ import {
   Radio,
   HelpCircle,
   TicketIcon,
+  LayoutGrid,
 } from "lucide-react";
 import { useLogout } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -310,6 +311,7 @@ export function AppSidebar({ collapsed, onToggle, isDark, onToggleTheme }: AppSi
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, show: true },
     { name: "Verladungen", href: "/shipments", icon: Truck, show: true },
+    { name: "Kanban-Board", href: "/shipments/kanban", icon: LayoutGrid, show: ["comet_admin", "comet_leitstand", "comet_lager"].includes(user.role) },
     { name: "Wochenplan", href: "/wochenansicht", icon: CalendarDays, show: true },
     { name: "Speditionen", href: "/speditionen", icon: Building2, show: canManageSpeditionen },
     { name: "Benutzer", href: "/users", icon: Users, show: canManageUsers },

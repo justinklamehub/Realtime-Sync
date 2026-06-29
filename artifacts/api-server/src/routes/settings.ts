@@ -6,7 +6,7 @@ import { requireAuth } from "../lib/auth";
 
 const router = Router();
 
-const PUBLIC_KEYS = ["app_name", "company_name", "login_subtitle", "company_logo"] as const;
+const PUBLIC_KEYS = ["app_name", "company_name", "login_subtitle", "company_logo", "page_title"] as const;
 
 router.get("/settings/public", async (_req, res) => {
   try {
@@ -53,6 +53,7 @@ router.put("/settings/:key", requireAuth, async (req, res) => {
       "company_name",
       "login_subtitle",
       "company_logo",
+      "page_title",
       "default_bemerkung",
       "email_from",
       "email_tpl_shipment_enabled",
