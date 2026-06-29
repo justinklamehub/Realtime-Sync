@@ -179,7 +179,7 @@ router.patch("/reconciliations/:id", requireAuth, async (req, res) => {
       }
       updates.status = status;
     }
-    if (speditionBalance !== undefined && role === "speditions_admin") {
+    if (speditionBalance !== undefined && ["speditions_admin", "speditions_bearbeiter"].includes(role)) {
       if (existing.speditionBalance !== null && existing.speditionBalance !== undefined) {
         return res.status(403).json({ error: "Speditionssaldo wurde bereits eingetragen und kann nicht mehr geaendert werden" });
       }

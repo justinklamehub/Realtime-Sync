@@ -206,7 +206,7 @@ function ReconciliationDetail({ id, open, onOpenChange }: { id: number; open: bo
   const { user } = useAuth();
   const role = user?.role ?? "";
   const isCometAdmin = ["comet_admin", "comet_leitstand"].includes(role);
-  const isSpedAdmin = role === "speditions_admin";
+  const isSpedAdmin = ["speditions_admin", "speditions_bearbeiter"].includes(role);
 
   const { data: rec, isLoading } = useGetReconciliation(id, {
     query: { enabled: open, queryKey: getGetReconciliationQueryKey(id) },
