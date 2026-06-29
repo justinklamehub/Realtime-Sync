@@ -10,7 +10,7 @@ import {
   LayoutDashboard, Truck, CalendarDays, PackageSearch,
   FileCheck2, Users, ShieldAlert, BarChart2, Settings,
   Play, ChevronRight, ChevronLeft, BookOpen, X,
-  MousePointerClick, Lightbulb, CheckCircle2, HelpCircle,
+  MousePointerClick, Lightbulb, CheckCircle2, HelpCircle, Calculator,
 } from "lucide-react";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -358,6 +358,48 @@ const TOPICS: Topic[] = [
         title: "Excel-Export",
         text: "Klicken Sie auf Export fuer eine Excel-Datei mit allen gefilterten Daten - fuer externe Berichte.",
         tip: "Der Export enthaelt alle Spalten - auch interne Bemerkungen.",
+      },
+    ],
+  },
+  {
+    key: "kalkulation",
+    icon: Calculator,
+    color: "text-sky-600",
+    bg: "bg-sky-50",
+    label: "Spediteur-Kostenvergleich",
+    description: "Transportkosten aller Speditionen fuer eine Route auf einen Blick berechnen und vergleichen",
+    roles: ["comet_admin", "comet_leitstand"],
+    tourPath: "/kalkulation",
+    steps: [
+      {
+        title: "Kalkulation aufrufen",
+        text: "Klicken Sie auf Kalkulation in der linken Seitenleiste. Die Seite zeigt links Eingabefelder und rechts eine interaktive Karte.",
+      },
+      {
+        title: "Route eingeben",
+        text: "Tragen Sie Startort und Zielort ein - zum Beispiel 'Hamburg' und 'Muenchen'. Druecken Sie auf Route berechnen oder Enter.",
+        tip: "Den Standard-Startort koennen Sie dauerhaft unter Einstellungen → Kalkulation hinterlegen, damit er automatisch vorausgefuellt wird.",
+      },
+      {
+        title: "Karte mit Route",
+        text: "Nach der Berechnung zeichnet die Karte automatisch die Fahrtstrecke als blaue Linie ein. Der gruene Punkt ist der Startort, der rote Punkt das Ziel. Die Karte zoomt sich automatisch auf die Route.",
+      },
+      {
+        title: "Kilometer anpassen",
+        text: "Die errechneten Kilometer werden automatisch eingetragen. Sie koennen den Wert bei Bedarf auch manuell ueberschreiben - zum Beispiel wenn eine andere Route gefahren wird.",
+      },
+      {
+        title: "Paletten eingeben",
+        text: "Tragen Sie die Anzahl der Paletten ein. Dieser Wert beeinflusst den Palettenaufschlag, sofern er bei der Spedition hinterlegt ist.",
+      },
+      {
+        title: "Kosten vergleichen",
+        text: "Klicken Sie auf Kosten vergleichen. Die Tabelle zeigt alle aktiven Speditionen sortiert nach Gesamtkosten - die guenstigste wird gruen hervorgehoben.",
+        tip: "Speditionen ohne hinterlegte Tarife erscheinen separat mit einem Hinweis. Tarife werden unter Speditionen → Tarife gepflegt.",
+      },
+      {
+        title: "Ergebnis lesen",
+        text: "Die Tabelle schluessel die Kosten auf: Transportkosten, Kraftstoffzuschlag, Palettenaufschlag, Fixkosten und Maut. Ganz rechts steht der Gesamtbetrag. Unten erscheint die Ersparnis gegenueber der teuersten Option.",
       },
     ],
   },
