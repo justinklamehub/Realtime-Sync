@@ -18,17 +18,19 @@ function interpolate(template: string, vars: Record<string, string>): string {
 }
 
 function createTransport() {
-  if (process.env.SMTP_HOST) {
-    return nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT ?? 587),
-      secure: process.env.SMTP_PORT === "465",
-      auth: process.env.SMTP_USER
-        ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
-        : undefined,
-    });
+  if (!process.env.SMTP_HOST) {
+    throw new Error(
+      "SMTP nicht konfiguriert: Bitte SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS und SMTP_FROM als Umgebungsvariablen setzen."
+    );
   }
-  return nodemailer.createTransport({ sendmail: true, newline: "unix" });
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT ?? 587),
+    secure: process.env.SMTP_PORT === "465",
+    auth: process.env.SMTP_USER
+      ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+      : undefined,
+  });
 }
 
 // ── HTML table: single shipment (label/value rows) ───────────────────────────
