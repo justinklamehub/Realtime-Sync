@@ -379,6 +379,43 @@ export function AppSidebar({ collapsed, onToggle, isDark, onToggleTheme }: AppSi
   }
   const activeCategories = sidebarCategories.filter((c) => byCategoryId.has(c.id));
 
+  // Parse sidebar_order for unified top-level rendering
+  const sidebarOrderConfig: Array<{ type: "item" | "category"; href?: string; id?: string }> = (() => {
+    try { return pubSettings?.sidebar_order ? JSON.parse(pubSettings.sidebar_order) : []; }
+    catch { return []; }
+  })();
+
+  // Build ordered top-level list (categories + uncategorized items mixed)
+  function buildTopLevelOrder() {
+    const catIdSet = new Set(activeCategories.map((c) => c.id));
+    const uncatHrefSet = new Set(uncategorizedItems.map((i) => i.href));
+
+    if (sidebarOrderConfig.length === 0) {
+      // Fallback: uncategorized items then categories
+      return [
+        ...uncategorizedItems.map((i) => ({ type: "item" as const, href: i.href })),
+        ...activeCategories.map((c) => ({ type: "category" as const, id: c.id })),
+      ];
+    }
+
+    // Use configured order, append any unaccounted items/categories at end
+    const result = sidebarOrderConfig.filter((e) => {
+      if (e.type === "category") return e.id && catIdSet.has(e.id);
+      if (e.type === "item") return e.href && uncatHrefSet.has(e.href);
+      return false;
+    });
+    const accountedCatIds = new Set(result.filter((e) => e.type === "category").map((e) => e.id!));
+    const accountedHrefs = new Set(result.filter((e) => e.type === "item").map((e) => e.href!));
+    for (const cat of activeCategories) {
+      if (!accountedCatIds.has(cat.id)) result.push({ type: "category", id: cat.id });
+    }
+    for (const item of uncategorizedItems) {
+      if (!accountedHrefs.has(item.href)) result.push({ type: "item", href: item.href });
+    }
+    return result;
+  }
+  const topLevelOrder = buildTopLevelOrder();
+
   function toggleCategory(id: string) {
     setCollapsedCategories((prev) => {
       const next = new Set(prev);
@@ -540,43 +577,50 @@ export function AppSidebar({ collapsed, onToggle, isDark, onToggleTheme }: AppSi
                   return customizedNavigation.map((item) => renderItem(item));
                 }
 
-                // Expanded sidebar: uncategorized items first, then grouped categories
+                // Expanded sidebar: render unified topLevelOrder (items + categories interleaved)
                 return (
                   <>
-                    {uncategorizedItems.map((item) => renderItem(item))}
-
-                    {activeCategories.map((cat) => {
-                      const items = byCategoryId.get(cat.id) ?? [];
-                      const CatIcon = cat.iconName && NAV_ICONS[cat.iconName]
-                        ? NAV_ICONS[cat.iconName]!
-                        : Folder;
-                      const isCatCollapsed = collapsedCategories.has(cat.id);
-
-                      return (
-                        <div key={cat.id} className="mt-2">
-                          <button
-                            onClick={() => toggleCategory(cat.id)}
-                            className="flex items-center gap-2 w-full px-2 py-1 rounded-md text-[11px] font-semibold text-slate-500 uppercase tracking-wider hover:bg-slate-800/40 hover:text-slate-300 transition-colors"
-                          >
-                            <CatIcon
-                              className="w-3.5 h-3.5 shrink-0"
-                              style={cat.color ? { color: cat.color } : undefined}
-                            />
-                            <span className="flex-1 text-left truncate">{cat.name}</span>
-                            <ChevronRight
-                              className={cn(
-                                "w-3.5 h-3.5 shrink-0 transition-transform duration-150",
-                                !isCatCollapsed && "rotate-90"
-                              )}
-                            />
-                          </button>
-                          {!isCatCollapsed && (
-                            <div className="mt-0.5 space-y-0.5">
-                              {items.map((item) => renderItem(item))}
-                            </div>
-                          )}
-                        </div>
-                      );
+                    {topLevelOrder.map((entry) => {
+                      if (entry.type === "item") {
+                        const item = customizedNavigation.find((i) => i.href === entry.href && !i.categoryId);
+                        if (!item) return null;
+                        return renderItem(item);
+                      }
+                      if (entry.type === "category") {
+                        const cat = sidebarCategories.find((c) => c.id === entry.id);
+                        if (!cat || !byCategoryId.has(cat.id)) return null;
+                        const catItems = byCategoryId.get(cat.id) ?? [];
+                        const CatIcon = cat.iconName && NAV_ICONS[cat.iconName]
+                          ? NAV_ICONS[cat.iconName]!
+                          : Folder;
+                        const isCatCollapsed = collapsedCategories.has(cat.id);
+                        return (
+                          <div key={cat.id} className="mt-2">
+                            <button
+                              onClick={() => toggleCategory(cat.id)}
+                              className="flex items-center gap-2 w-full px-2 py-1 rounded-md text-[11px] font-semibold text-slate-500 uppercase tracking-wider hover:bg-slate-800/40 hover:text-slate-300 transition-colors"
+                            >
+                              <CatIcon
+                                className="w-3.5 h-3.5 shrink-0"
+                                style={cat.color ? { color: cat.color } : undefined}
+                              />
+                              <span className="flex-1 text-left truncate">{cat.name}</span>
+                              <ChevronRight
+                                className={cn(
+                                  "w-3.5 h-3.5 shrink-0 transition-transform duration-150",
+                                  !isCatCollapsed && "rotate-90"
+                                )}
+                              />
+                            </button>
+                            {!isCatCollapsed && (
+                              <div className="mt-0.5 space-y-0.5">
+                                {catItems.map((item) => renderItem(item))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+                      return null;
                     })}
                   </>
                 );

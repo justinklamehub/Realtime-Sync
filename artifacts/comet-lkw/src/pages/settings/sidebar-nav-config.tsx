@@ -32,7 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, RotateCcw, GripVertical, Plus, Trash2, Folder } from "lucide-react";
+import { Loader2, Save, RotateCcw, GripVertical, Plus, Trash2, Folder, Layers } from "lucide-react";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
@@ -95,6 +95,10 @@ export interface NavCategory {
   color: string;
 }
 
+export type OrderEntry =
+  | { type: "item"; href: string }
+  | { type: "category"; id: string };
+
 interface NavItemState {
   href: string;
   defaultLabel: string;
@@ -109,9 +113,7 @@ interface NavItemState {
 
 function buildInitialState(savedConfig: string): NavItemState[] {
   let overrides: NavItemOverride[] = [];
-  try {
-    if (savedConfig) overrides = JSON.parse(savedConfig);
-  } catch { /* ignore */ }
+  try { if (savedConfig) overrides = JSON.parse(savedConfig); } catch { /* ignore */ }
 
   const overrideMap = new Map(overrides.map((o) => [o.href, o]));
   const remaining = new Set(DEFAULT_NAV_ITEMS.map((n) => n.href));
@@ -132,7 +134,6 @@ function buildInitialState(savedConfig: string): NavItemState[] {
       remaining.delete(def.href);
     }
   }
-
   for (const def of DEFAULT_NAV_ITEMS) {
     if (remaining.has(def.href)) {
       ordered.push({
@@ -146,17 +147,54 @@ function buildInitialState(savedConfig: string): NavItemState[] {
       });
     }
   }
-
   void overrideMap;
   return ordered;
 }
 
 function buildInitialCategories(savedCategories: string): NavCategory[] {
-  try {
-    return savedCategories ? JSON.parse(savedCategories) : [];
-  } catch {
-    return [];
+  try { return savedCategories ? JSON.parse(savedCategories) : []; } catch { return []; }
+}
+
+function buildInitialOrder(
+  savedOrder: string,
+  navItems: NavItemState[],
+  cats: NavCategory[]
+): OrderEntry[] {
+  let order: OrderEntry[] = [];
+  try { if (savedOrder) order = JSON.parse(savedOrder); } catch { /* ignore */ }
+
+  const catIdSet = new Set(cats.map((c) => c.id));
+  const uncategorizedHrefs = new Set(navItems.filter((i) => !i.categoryId).map((i) => i.href));
+
+  // Remove stale entries (deleted categories, categorized items, missing items)
+  order = order.filter((e) => {
+    if (e.type === "category") return catIdSet.has(e.id);
+    if (e.type === "item") return uncategorizedHrefs.has(e.href);
+    return false;
+  });
+
+  const orderedCatIds = new Set(
+    order.filter((e): e is { type: "category"; id: string } => e.type === "category").map((e) => e.id)
+  );
+  const orderedHrefs = new Set(
+    order.filter((e): e is { type: "item"; href: string } => e.type === "item").map((e) => e.href)
+  );
+
+  // Append missing categories
+  for (const cat of cats) {
+    if (!orderedCatIds.has(cat.id)) order.push({ type: "category", id: cat.id });
   }
+  // Append missing uncategorized items
+  for (const item of navItems) {
+    if (!item.categoryId && !orderedHrefs.has(item.href)) {
+      order.push({ type: "item", href: item.href });
+    }
+  }
+  return order;
+}
+
+function entryId(e: OrderEntry): string {
+  return e.type === "category" ? `cat:${e.id}` : `item:${e.href}`;
 }
 
 function generateId(): string {
@@ -165,16 +203,9 @@ function generateId(): string {
 
 // ── ColorPickerPopover ─────────────────────────────────────────────────────────
 
-function ColorPickerPopover({
-  color,
-  onChange,
-}: {
-  color: string;
-  onChange: (color: string) => void;
-}) {
+function ColorPickerPopover({ color, onChange }: { color: string; onChange: (color: string) => void }) {
   const [open, setOpen] = useState(false);
   const activeColor = COLOR_PALETTE.find((c) => c.value === color);
-
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -188,10 +219,7 @@ function ColorPickerPopover({
       </PopoverTrigger>
       <PopoverContent className="w-auto p-3" align="end">
         <p className="text-xs font-medium text-slate-600 mb-2">
-          Farbe
-          {activeColor && color && (
-            <span className="ml-1 text-slate-400">({activeColor.label})</span>
-          )}
+          Farbe{activeColor && color && <span className="ml-1 text-slate-400">({activeColor.label})</span>}
         </p>
         <div className="grid grid-cols-4 gap-1.5">
           {COLOR_PALETTE.map((c) => (
@@ -201,19 +229,11 @@ function ColorPickerPopover({
               onClick={() => { onChange(c.value); setOpen(false); }}
               className={cn(
                 "w-8 h-8 rounded-md transition-all hover:scale-110 border-2",
-                color === c.value
-                  ? "border-slate-700 scale-110"
-                  : "border-transparent hover:border-slate-300"
+                color === c.value ? "border-slate-700 scale-110" : "border-transparent hover:border-slate-300"
               )}
-              style={
-                c.value
-                  ? { backgroundColor: c.value }
-                  : { background: "linear-gradient(135deg, #6366f1 0%, #3b82f6 100%)" }
-              }
+              style={c.value ? { backgroundColor: c.value } : { background: "linear-gradient(135deg, #6366f1 0%, #3b82f6 100%)" }}
             >
-              {!c.value && color === "" && (
-                <span className="text-white text-[8px] font-bold leading-none">STD</span>
-              )}
+              {!c.value && color === "" && <span className="text-white text-[8px] font-bold leading-none">STD</span>}
             </button>
           ))}
         </div>
@@ -225,70 +245,34 @@ function ColorPickerPopover({
 // ── IconPickerDialog ───────────────────────────────────────────────────────────
 
 function IconPickerDialog({
-  open,
-  onClose,
-  currentIconName,
-  defaultIconName,
-  onSelect,
+  open, onClose, currentIconName, defaultIconName, onSelect,
 }: {
-  open: boolean;
-  onClose: () => void;
-  currentIconName: string;
-  defaultIconName: string;
-  onSelect: (iconName: string) => void;
+  open: boolean; onClose: () => void; currentIconName: string; defaultIconName: string; onSelect: (iconName: string) => void;
 }) {
   const [search, setSearch] = useState("");
-  const filtered = NAV_ICON_NAMES.filter((name) =>
-    name.toLowerCase().includes(search.toLowerCase())
-  );
-
+  const filtered = NAV_ICON_NAMES.filter((n) => n.toLowerCase().includes(search.toLowerCase()));
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="text-base">Icon auswählen</DialogTitle>
-        </DialogHeader>
+        <DialogHeader><DialogTitle className="text-base">Icon auswählen</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Icon suchen…"
-            className="text-sm"
-            autoFocus
-          />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Icon suchen…" className="text-sm" autoFocus />
           <div className="grid grid-cols-6 gap-1.5 max-h-72 overflow-y-auto pr-1">
             {filtered.map((name) => {
               const Icon = NAV_ICONS[name];
-              const isSelected = name === currentIconName;
-              const isDefault = name === defaultIconName;
               return (
-                <button
-                  key={name}
-                  title={name}
-                  onClick={() => { onSelect(name); onClose(); }}
-                  className={cn(
-                    "flex flex-col items-center justify-center gap-1 rounded-lg p-2 border transition-all hover:bg-slate-50",
-                    isSelected
-                      ? "border-primary bg-primary/5 text-primary"
-                      : "border-transparent text-slate-600 hover:border-slate-200"
-                  )}
-                >
+                <button key={name} title={name} onClick={() => { onSelect(name); onClose(); }}
+                  className={cn("flex flex-col items-center justify-center gap-1 rounded-lg p-2 border transition-all hover:bg-slate-50",
+                    name === currentIconName ? "border-primary bg-primary/5 text-primary" : "border-transparent text-slate-600 hover:border-slate-200"
+                  )}>
                   <Icon className="w-5 h-5" />
                   <span className="text-[9px] leading-none text-center text-slate-400 truncate w-full">
-                    {isDefault ? (
-                      <span className="text-emerald-600 font-medium">Standard</span>
-                    ) : (
-                      name
-                    )}
+                    {name === defaultIconName ? <span className="text-emerald-600 font-medium">Standard</span> : name}
                   </span>
                 </button>
               );
             })}
-            {filtered.length === 0 && (
-              <div className="col-span-6 text-center text-sm text-slate-400 py-8">
-                Kein Icon gefunden
-              </div>
-            )}
+            {filtered.length === 0 && <div className="col-span-6 text-center text-sm text-slate-400 py-8">Kein Icon gefunden</div>}
           </div>
         </div>
       </DialogContent>
@@ -296,14 +280,72 @@ function IconPickerDialog({
   );
 }
 
+// ── SortableOrderEntry ─────────────────────────────────────────────────────────
+
+function SortableOrderEntry({
+  entry, categories, items,
+}: {
+  entry: OrderEntry; categories: NavCategory[]; items: NavItemState[];
+}) {
+  const id = entryId(entry);
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+
+  if (entry.type === "category") {
+    const cat = categories.find((c) => c.id === entry.id);
+    if (!cat) return null;
+    const Icon = cat.iconName && NAV_ICONS[cat.iconName] ? NAV_ICONS[cat.iconName]! : Folder;
+    const itemCount = items.filter((i) => i.categoryId === cat.id).length;
+    return (
+      <div
+        ref={setNodeRef}
+        style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }}
+        className={cn("flex items-center gap-2.5 rounded-lg border-2 bg-white px-3 py-2.5 transition-shadow",
+          isDragging ? "shadow-xl z-50" : "shadow-sm hover:shadow-md border-slate-200"
+        )}
+      >
+        <button {...attributes} {...listeners}
+          className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 transition-colors shrink-0 touch-none">
+          <GripVertical className="w-4 h-4" />
+        </button>
+        <div className="w-7 h-7 rounded-md flex items-center justify-center shrink-0" style={{ backgroundColor: cat.color || "#6366f1" }}>
+          <Icon className="w-3.5 h-3.5 text-white" />
+        </div>
+        <span className="flex-1 text-sm font-semibold text-slate-700 truncate">{cat.name}</span>
+        <span className="text-[10px] text-slate-500 bg-slate-100 rounded px-1.5 py-0.5 shrink-0">{itemCount} Punkt{itemCount !== 1 ? "e" : ""}</span>
+        <span className="text-[10px] font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1.5 py-0.5 shrink-0">Gruppe</span>
+      </div>
+    );
+  }
+
+  // item entry
+  const item = items.find((i) => i.href === entry.href);
+  if (!item) return null;
+  const Icon = NAV_ICONS[item.iconName] ?? NAV_ICONS[item.defaultIconName];
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }}
+      className={cn("flex items-center gap-2.5 rounded-lg border bg-white px-3 py-2.5 transition-shadow",
+        isDragging ? "shadow-xl z-50" : "shadow-sm hover:shadow-md"
+      )}
+    >
+      <button {...attributes} {...listeners}
+        className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 transition-colors shrink-0 touch-none">
+        <GripVertical className="w-4 h-4" />
+      </button>
+      <div className="w-7 h-7 rounded-md flex items-center justify-center shrink-0" style={{ backgroundColor: item.color || "#6366f1" }}>
+        {Icon && <Icon className="w-3.5 h-3.5 text-white" />}
+      </div>
+      <span className="flex-1 text-sm text-slate-700 truncate">{item.label}</span>
+      <span className="text-[10px] text-slate-400 bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 shrink-0">Menüpunkt</span>
+    </div>
+  );
+}
+
 // ── SortableCategoryItem ───────────────────────────────────────────────────────
 
 function SortableCategoryItem({
-  cat,
-  onNameChange,
-  onColorChange,
-  onDelete,
-  onOpenIconPicker,
+  cat, onNameChange, onColorChange, onDelete, onOpenIconPicker,
 }: {
   cat: NavCategory;
   onNameChange: (id: string, name: string) => void;
@@ -311,60 +353,28 @@ function SortableCategoryItem({
   onDelete: (id: string) => void;
   onOpenIconPicker: (id: string) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: cat.id });
-
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: cat.id });
   const Icon = cat.iconName && NAV_ICONS[cat.iconName] ? NAV_ICONS[cat.iconName]! : Folder;
   const displayColor = cat.color || "#6366f1";
-
   return (
-    <div
-      ref={setNodeRef}
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.5 : 1,
-      }}
-      className={cn(
-        "flex items-center gap-2.5 rounded-lg border bg-white px-3 py-2.5 transition-shadow",
+    <div ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }}
+      className={cn("flex items-center gap-2.5 rounded-lg border bg-white px-3 py-2.5 transition-shadow",
         isDragging ? "shadow-xl border-primary/30 z-50" : "shadow-sm hover:shadow-md"
-      )}
-    >
-      <button
-        {...attributes}
-        {...listeners}
-        className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 transition-colors shrink-0 touch-none"
-        aria-label="Verschieben"
-      >
+      )}>
+      <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 transition-colors shrink-0 touch-none">
         <GripVertical className="w-4 h-4" />
       </button>
-
-      <button
-        onClick={() => onOpenIconPicker(cat.id)}
-        title="Icon ändern"
+      <button onClick={() => onOpenIconPicker(cat.id)} title="Icon ändern"
         className="w-8 h-8 rounded-md flex items-center justify-center shrink-0 hover:opacity-80 transition-opacity"
-        style={{ backgroundColor: displayColor }}
-      >
+        style={{ backgroundColor: displayColor }}>
         <Icon className="w-4 h-4 text-white" />
       </button>
-
-      <Input
-        value={cat.name}
-        onChange={(e) => onNameChange(cat.id, e.target.value)}
-        placeholder="Kategoriename…"
-        className="flex-1 h-8 text-sm min-w-0"
-      />
-
-      <ColorPickerPopover
-        color={cat.color}
-        onChange={(c) => onColorChange(cat.id, c)}
-      />
-
-      <button
-        onClick={() => onDelete(cat.id)}
-        title="Kategorie löschen"
-        className="shrink-0 p-1.5 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
-      >
+      <Input value={cat.name} onChange={(e) => onNameChange(cat.id, e.target.value)}
+        placeholder="Kategoriename…" className="flex-1 h-8 text-sm min-w-0" />
+      <ColorPickerPopover color={cat.color} onChange={(c) => onColorChange(cat.id, c)} />
+      <button onClick={() => onDelete(cat.id)} title="Kategorie löschen"
+        className="shrink-0 p-1.5 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all">
         <Trash2 className="w-3.5 h-3.5" />
       </button>
     </div>
@@ -374,17 +384,9 @@ function SortableCategoryItem({
 // ── SortableNavItem ────────────────────────────────────────────────────────────
 
 function SortableNavItem({
-  item,
-  categories,
-  onLabelChange,
-  onColorChange,
-  onIconChange,
-  onCategoryChange,
-  onReset,
-  onOpenIconPicker,
+  item, categories, onLabelChange, onColorChange, onIconChange, onCategoryChange, onReset, onOpenIconPicker,
 }: {
-  item: NavItemState;
-  categories: NavCategory[];
+  item: NavItemState; categories: NavCategory[];
   onLabelChange: (href: string, label: string) => void;
   onColorChange: (href: string, color: string) => void;
   onIconChange: (href: string, iconName: string) => void;
@@ -392,92 +394,42 @@ function SortableNavItem({
   onReset: (href: string) => void;
   onOpenIconPicker: (href: string) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: item.href });
-
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.href });
   const style = { transform: CSS.Transform.toString(transform), transition };
   const Icon = NAV_ICONS[item.iconName] ?? NAV_ICONS[item.defaultIconName];
-  const isCustomized =
-    item.label !== item.defaultLabel ||
-    item.color !== "" ||
-    item.iconName !== item.defaultIconName ||
-    item.categoryId !== "";
+  const isCustomized = item.label !== item.defaultLabel || item.color !== "" || item.iconName !== item.defaultIconName || item.categoryId !== "";
   const activeColor = item.color || "#6366f1";
-
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={cn(
-        "flex items-center gap-2.5 rounded-lg border bg-white px-3 py-2.5 transition-shadow",
+    <div ref={setNodeRef} style={style}
+      className={cn("flex items-center gap-2.5 rounded-lg border bg-white px-3 py-2.5 transition-shadow",
         isDragging ? "shadow-xl border-primary/30 opacity-90 z-50" : "shadow-sm hover:shadow-md"
-      )}
-    >
-      <button
-        {...attributes}
-        {...listeners}
-        className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 transition-colors shrink-0 touch-none"
-        aria-label="Verschieben"
-      >
+      )}>
+      <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 transition-colors shrink-0 touch-none">
         <GripVertical className="w-4 h-4" />
       </button>
-
-      <button
-        onClick={() => onOpenIconPicker(item.href)}
-        title="Icon ändern"
+      <button onClick={() => onOpenIconPicker(item.href)} title="Icon ändern"
         className="w-8 h-8 rounded-md flex items-center justify-center shrink-0 hover:opacity-80 transition-opacity"
-        style={{ backgroundColor: activeColor }}
-      >
+        style={{ backgroundColor: activeColor }}>
         {Icon && <Icon className="w-4 h-4 text-white" />}
       </button>
-
-      <Input
-        value={item.label}
-        onChange={(e) => onLabelChange(item.href, e.target.value)}
-        placeholder={item.defaultLabel}
-        className="flex-1 h-8 text-sm min-w-0"
-      />
-
-      <Select
-        value={item.categoryId || "__none__"}
-        onValueChange={(v) => onCategoryChange(item.href, v === "__none__" ? "" : v)}
-      >
+      <Input value={item.label} onChange={(e) => onLabelChange(item.href, e.target.value)}
+        placeholder={item.defaultLabel} className="flex-1 h-8 text-sm min-w-0" />
+      <Select value={item.categoryId || "__none__"} onValueChange={(v) => onCategoryChange(item.href, v === "__none__" ? "" : v)}>
         <SelectTrigger className="h-8 text-xs w-32 shrink-0">
           <SelectValue>
-            {item.categoryId
-              ? (categories.find((c) => c.id === item.categoryId)?.name ?? "—")
-              : <span className="text-slate-400">Keine</span>
-            }
+            {item.categoryId ? (categories.find((c) => c.id === item.categoryId)?.name ?? "—") : <span className="text-slate-400">Keine</span>}
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="__none__">
-            <span className="text-slate-400">Keine Kategorie</span>
-          </SelectItem>
-          {categories.map((c) => (
-            <SelectItem key={c.id} value={c.id}>
-              {c.name}
-            </SelectItem>
-          ))}
+          <SelectItem value="__none__"><span className="text-slate-400">Keine Kategorie</span></SelectItem>
+          {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
         </SelectContent>
       </Select>
-
-      <ColorPickerPopover
-        color={item.color}
-        onChange={(c) => onColorChange(item.href, c)}
-      />
-
-      <button
-        onClick={() => onReset(item.href)}
-        title="Zurücksetzen"
-        className={cn(
-          "shrink-0 p-1.5 rounded transition-all",
-          isCustomized
-            ? "text-slate-400 hover:text-red-500 hover:bg-red-50"
-            : "text-slate-200 cursor-default"
-        )}
-        disabled={!isCustomized}
-      >
+      <ColorPickerPopover color={item.color} onChange={(c) => onColorChange(item.href, c)} />
+      <button onClick={() => onReset(item.href)} title="Zurücksetzen"
+        className={cn("shrink-0 p-1.5 rounded transition-all",
+          isCustomized ? "text-slate-400 hover:text-red-500 hover:bg-red-50" : "text-slate-200 cursor-default"
+        )} disabled={!isCustomized}>
         <RotateCcw className="w-3.5 h-3.5" />
       </button>
     </div>
@@ -487,43 +439,65 @@ function SortableNavItem({
 // ── SidebarNavConfig (main component) ─────────────────────────────────────────
 
 export function SidebarNavConfig({
-  savedConfig,
-  savedCategories,
+  savedConfig, savedCategories, savedOrder,
 }: {
-  savedConfig: string;
-  savedCategories: string;
+  savedConfig: string; savedCategories: string; savedOrder: string;
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const [items, setItems] = useState<NavItemState[]>(() => buildInitialState(savedConfig));
-  const [categories, setCategories] = useState<NavCategory[]>(() =>
-    buildInitialCategories(savedCategories)
+  const [categories, setCategories] = useState<NavCategory[]>(() => buildInitialCategories(savedCategories));
+  const [sidebarOrder, setSidebarOrder] = useState<OrderEntry[]>(() =>
+    buildInitialOrder(savedOrder, buildInitialState(savedConfig), buildInitialCategories(savedCategories))
   );
   const [saving, setSaving] = useState(false);
   const [iconPickerFor, setIconPickerFor] = useState<string | null>(null);
   const [catIconPickerFor, setCatIconPickerFor] = useState<string | null>(null);
 
-  useEffect(() => { setItems(buildInitialState(savedConfig)); }, [savedConfig]);
-  useEffect(() => { setCategories(buildInitialCategories(savedCategories)); }, [savedCategories]);
+  useEffect(() => {
+    const newItems = buildInitialState(savedConfig);
+    const newCats = buildInitialCategories(savedCategories);
+    setItems(newItems);
+    setCategories(newCats);
+    setSidebarOrder(buildInitialOrder(savedOrder, newItems, newCats));
+  }, [savedConfig, savedCategories, savedOrder]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
+  // ── Sidebar order handlers ─────────────────────────────────────────────────
+
+  function handleOrderDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setSidebarOrder((prev) => {
+      const oldIndex = prev.findIndex((e) => entryId(e) === active.id);
+      const newIndex = prev.findIndex((e) => entryId(e) === over.id);
+      return arrayMove(prev, oldIndex, newIndex);
+    });
+  }
+
   // ── Category handlers ──────────────────────────────────────────────────────
 
   function handleAddCategory() {
-    setCategories((prev) => [
-      ...prev,
-      { id: generateId(), name: "Neue Kategorie", iconName: "Folder", color: "#6366f1" },
-    ]);
+    const newCat: NavCategory = { id: generateId(), name: "Neue Kategorie", iconName: "Folder", color: "#6366f1" };
+    setCategories((prev) => [...prev, newCat]);
+    setSidebarOrder((prev) => [...prev, { type: "category", id: newCat.id }]);
   }
 
   function handleDeleteCategory(id: string) {
+    const affectedHrefs = items.filter((i) => i.categoryId === id).map((i) => i.href);
     setCategories((prev) => prev.filter((c) => c.id !== id));
     setItems((prev) => prev.map((i) => (i.categoryId === id ? { ...i, categoryId: "" } : i)));
+    setSidebarOrder((prev) => {
+      const filtered = prev.filter((e) => !(e.type === "category" && e.id === id));
+      const existingHrefs = new Set(filtered.filter((e): e is { type: "item"; href: string } => e.type === "item").map((e) => e.href));
+      const toAdd = affectedHrefs.filter((h) => !existingHrefs.has(h)).map((h): OrderEntry => ({ type: "item", href: h }));
+      return [...filtered, ...toAdd];
+    });
   }
 
   function handleCategoryNameChange(id: string, name: string) {
@@ -573,21 +547,44 @@ export function SidebarNavConfig({
   }
 
   function handleCategoryChange(href: string, categoryId: string) {
+    const prevItem = items.find((i) => i.href === href);
+    const wasUncategorized = !prevItem?.categoryId;
+    const becomesUncategorized = !categoryId;
     setItems((prev) => prev.map((i) => (i.href === href ? { ...i, categoryId } : i)));
+    setSidebarOrder((prev) => {
+      if (categoryId && wasUncategorized) {
+        // Assign to category → remove from top-level order
+        return prev.filter((e) => !(e.type === "item" && e.href === href));
+      }
+      if (becomesUncategorized && !wasUncategorized) {
+        // Remove from category → add to top-level order (if not already there)
+        const exists = prev.some((e) => e.type === "item" && (e as { type: "item"; href: string }).href === href);
+        return exists ? prev : [...prev, { type: "item", href }];
+      }
+      return prev;
+    });
   }
 
   function handleReset(href: string) {
+    const prevItem = items.find((i) => i.href === href);
+    const hadCategory = !!prevItem?.categoryId;
     setItems((prev) =>
-      prev.map((i) => {
-        if (i.href !== href) return i;
-        return { ...i, label: i.defaultLabel, color: "", iconName: i.defaultIconName, categoryId: "" };
-      })
+      prev.map((i) => i.href !== href ? i : { ...i, label: i.defaultLabel, color: "", iconName: i.defaultIconName, categoryId: "" })
     );
+    if (hadCategory) {
+      setSidebarOrder((prev) => {
+        const exists = prev.some((e) => e.type === "item" && (e as { type: "item"; href: string }).href === href);
+        return exists ? prev : [...prev, { type: "item", href }];
+      });
+    }
   }
 
   function handleResetAll() {
-    setItems(buildInitialState(""));
-    setCategories([]);
+    const resetItems = buildInitialState("");
+    const resetCats: NavCategory[] = [];
+    setItems(resetItems);
+    setCategories(resetCats);
+    setSidebarOrder(buildInitialOrder("", resetItems, resetCats));
   }
 
   // ── Save ───────────────────────────────────────────────────────────────────
@@ -603,22 +600,25 @@ export function SidebarNavConfig({
         ...(i.categoryId && { categoryId: i.categoryId }),
       }));
 
-      const [r1, r2] = await Promise.all([
+      const results = await Promise.all([
         fetch(`${API}/settings/sidebar_nav_config`, {
-          method: "PUT",
-          credentials: "include",
+          method: "PUT", credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ value: JSON.stringify(overrides) }),
         }),
         fetch(`${API}/settings/sidebar_categories`, {
-          method: "PUT",
-          credentials: "include",
+          method: "PUT", credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ value: JSON.stringify(categories) }),
         }),
+        fetch(`${API}/settings/sidebar_order`, {
+          method: "PUT", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ value: JSON.stringify(sidebarOrder) }),
+        }),
       ]);
 
-      if (!r1.ok || !r2.ok) throw new Error("Fehler");
+      if (results.some((r) => !r.ok)) throw new Error("Fehler");
 
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["settings"] }),
@@ -634,20 +634,66 @@ export function SidebarNavConfig({
 
   const iconPickerItem = items.find((i) => i.href === iconPickerFor);
   const catIconPickerCat = categories.find((c) => c.id === catIconPickerFor);
+  const anyCustomized = categories.length > 0 || items.some(
+    (i, idx) => i.label !== i.defaultLabel || i.color !== "" || i.iconName !== i.defaultIconName ||
+      i.categoryId !== "" || i.href !== DEFAULT_NAV_ITEMS[idx]?.href
+  );
 
-  const anyCustomized =
-    categories.length > 0 ||
-    items.some(
-      (i) =>
-        i.label !== i.defaultLabel ||
-        i.color !== "" ||
-        i.iconName !== i.defaultIconName ||
-        i.categoryId !== "" ||
-        i.href !== DEFAULT_NAV_ITEMS[items.indexOf(i)]?.href
-    );
+  // Items with categoryId are "inside" a category — not shown in the order card
+  const uncategorizedItems = items.filter((i) => !i.categoryId);
 
   return (
     <>
+      {/* ── Seitenleisten-Reihenfolge ──────────────────────────────────────── */}
+      <Card className="shadow-sm">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Layers className="w-4 h-4 text-primary" />
+                Seitenleisten-Reihenfolge
+              </CardTitle>
+              <CardDescription className="text-xs mt-0.5">
+                Drag &amp; Drop — Gruppen und einzelne Menüpunkte frei mischen und sortieren
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {anyCustomized && (
+                <Button variant="ghost" size="sm" className="h-8 px-3 text-xs text-slate-500 hover:text-red-600"
+                  onClick={handleResetAll} disabled={saving}>
+                  <RotateCcw className="w-3 h-3 mr-1" /> Alles zurücksetzen
+                </Button>
+              )}
+              <Button size="sm" className="h-8 px-4 text-xs" onClick={handleSave} disabled={saving}>
+                {saving ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Save className="w-3 h-3 mr-1" />}
+                Speichern
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {sidebarOrder.length === 0 ? (
+            <div className="flex items-center justify-center py-8 border-2 border-dashed border-slate-200 rounded-lg">
+              <p className="text-sm text-slate-400">Noch keine sichtbaren Menüpunkte</p>
+            </div>
+          ) : (
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleOrderDragEnd}>
+              <SortableContext items={sidebarOrder.map(entryId)} strategy={verticalListSortingStrategy}>
+                <div className="space-y-1.5">
+                  {sidebarOrder.map((entry) => (
+                    <SortableOrderEntry key={entryId(entry)} entry={entry} categories={categories} items={items} />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          )}
+          <p className="text-[11px] text-slate-400 mt-3 leading-relaxed">
+            Hier sehen Sie alle einzelnen Menüpunkte (ohne Kategorie) und Gruppen-Header in ihrer Reihenfolge.
+            Menüpunkte, die einer Kategorie zugeordnet sind, erscheinen innerhalb ihrer Gruppe.
+          </p>
+        </CardContent>
+      </Card>
+
       {/* ── Kategorien ─────────────────────────────────────────────────────── */}
       <Card className="shadow-sm">
         <CardHeader className="pb-3">
@@ -655,15 +701,10 @@ export function SidebarNavConfig({
             <div>
               <CardTitle className="text-base">Obermenü-Kategorien</CardTitle>
               <CardDescription className="text-xs mt-0.5">
-                Erstellen Sie Gruppen und weisen Sie Menüpunkte diesen zu · Reihenfolge per Drag &amp; Drop
+                Name, Icon und Farbe der Gruppen festlegen
               </CardDescription>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 px-3 text-xs gap-1.5 shrink-0"
-              onClick={handleAddCategory}
-            >
+            <Button size="sm" variant="outline" className="h-8 px-3 text-xs gap-1.5 shrink-0" onClick={handleAddCategory}>
               <Plus className="w-3.5 h-3.5" /> Neue Kategorie
             </Button>
           </div>
@@ -673,30 +714,16 @@ export function SidebarNavConfig({
             <div className="flex flex-col items-center justify-center py-8 border-2 border-dashed border-slate-200 rounded-lg gap-2">
               <Folder className="w-8 h-8 text-slate-300" />
               <p className="text-sm text-slate-400">Noch keine Kategorien angelegt</p>
-              <p className="text-xs text-slate-400">
-                Klicken Sie auf „Neue Kategorie" und weisen Sie dann Menüpunkte zu
-              </p>
+              <p className="text-xs text-slate-400">Klicken Sie auf „Neue Kategorie" um zu beginnen</p>
             </div>
           ) : (
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleCategoryDragEnd}
-            >
-              <SortableContext
-                items={categories.map((c) => c.id)}
-                strategy={verticalListSortingStrategy}
-              >
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}>
+              <SortableContext items={categories.map((c) => c.id)} strategy={verticalListSortingStrategy}>
                 <div className="space-y-1.5">
                   {categories.map((cat) => (
-                    <SortableCategoryItem
-                      key={cat.id}
-                      cat={cat}
-                      onNameChange={handleCategoryNameChange}
-                      onColorChange={handleCategoryColorChange}
-                      onDelete={handleDeleteCategory}
-                      onOpenIconPicker={setCatIconPickerFor}
-                    />
+                    <SortableCategoryItem key={cat.id} cat={cat}
+                      onNameChange={handleCategoryNameChange} onColorChange={handleCategoryColorChange}
+                      onDelete={handleDeleteCategory} onOpenIconPicker={setCatIconPickerFor} />
                   ))}
                 </div>
               </SortableContext>
@@ -708,81 +735,34 @@ export function SidebarNavConfig({
       {/* ── Navigation ─────────────────────────────────────────────────────── */}
       <Card className="shadow-sm">
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <CardTitle className="text-base">Sidebar-Navigation anpassen</CardTitle>
-              <CardDescription className="text-xs mt-0.5">
-                Reihenfolge per Drag &amp; Drop · Beschriftung · Farbe · Icon · Kategorie zuweisen
-              </CardDescription>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {anyCustomized && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 px-3 text-xs text-slate-500 hover:text-red-600"
-                  onClick={handleResetAll}
-                  disabled={saving}
-                >
-                  <RotateCcw className="w-3 h-3 mr-1" /> Alles zurücksetzen
-                </Button>
-              )}
-              <Button
-                size="sm"
-                className="h-8 px-4 text-xs"
-                onClick={handleSave}
-                disabled={saving}
-              >
-                {saving ? (
-                  <Loader2 className="w-3 h-3 animate-spin mr-1" />
-                ) : (
-                  <Save className="w-3 h-3 mr-1" />
-                )}
-                Speichern
-              </Button>
-            </div>
+          <div>
+            <CardTitle className="text-base">Menüpunkte</CardTitle>
+            <CardDescription className="text-xs mt-0.5">
+              Beschriftung · Icon · Farbe · Kategorie zuweisen — Reihenfolge innerhalb einer Kategorie per Drag &amp; Drop
+            </CardDescription>
           </div>
         </CardHeader>
-
         <CardContent>
           <div className="flex items-center gap-2.5 mb-2 px-1">
-            <div className="w-4" />
-            <div className="w-8 text-[10px] text-slate-400 text-center">Icon</div>
+            <div className="w-4" /><div className="w-8 text-[10px] text-slate-400 text-center">Icon</div>
             <div className="flex-1 text-[10px] text-slate-400">Beschriftung</div>
             <div className="w-32 text-[10px] text-slate-400">Kategorie</div>
             <div className="w-8 text-[10px] text-slate-400 text-center">Farbe</div>
             <div className="w-7" />
           </div>
-
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={items.map((i) => i.href)}
-              strategy={verticalListSortingStrategy}
-            >
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={items.map((i) => i.href)} strategy={verticalListSortingStrategy}>
               <div className="space-y-1.5">
                 {items.map((item) => (
-                  <SortableNavItem
-                    key={item.href}
-                    item={item}
-                    categories={categories}
-                    onLabelChange={handleLabelChange}
-                    onColorChange={handleColorChange}
-                    onIconChange={handleIconChange}
-                    onCategoryChange={handleCategoryChange}
-                    onReset={handleReset}
-                    onOpenIconPicker={setIconPickerFor}
-                  />
+                  <SortableNavItem key={item.href} item={item} categories={categories}
+                    onLabelChange={handleLabelChange} onColorChange={handleColorChange}
+                    onIconChange={handleIconChange} onCategoryChange={handleCategoryChange}
+                    onReset={handleReset} onOpenIconPicker={setIconPickerFor} />
                 ))}
               </div>
             </SortableContext>
           </DndContext>
-
           <p className="text-[11px] text-slate-400 mt-3 leading-relaxed">
-            Die Reihenfolge und Anpassungen gelten für alle Benutzer.
             Rollenbasierte Zugriffsrechte bleiben unverändert — Menüpunkte ohne Zugriff werden ausgeblendet.
           </p>
         </CardContent>
@@ -790,29 +770,19 @@ export function SidebarNavConfig({
 
       {/* Nav icon picker */}
       {iconPickerItem && (
-        <IconPickerDialog
-          open={iconPickerFor !== null}
-          onClose={() => setIconPickerFor(null)}
-          currentIconName={iconPickerItem.iconName}
-          defaultIconName={iconPickerItem.defaultIconName}
-          onSelect={(name) => {
-            if (iconPickerFor) handleIconChange(iconPickerFor, name);
-          }}
-        />
+        <IconPickerDialog open={iconPickerFor !== null} onClose={() => setIconPickerFor(null)}
+          currentIconName={iconPickerItem.iconName} defaultIconName={iconPickerItem.defaultIconName}
+          onSelect={(name) => { if (iconPickerFor) handleIconChange(iconPickerFor, name); }} />
       )}
-
       {/* Category icon picker */}
       {catIconPickerCat && (
-        <IconPickerDialog
-          open={catIconPickerFor !== null}
-          onClose={() => setCatIconPickerFor(null)}
-          currentIconName={catIconPickerCat.iconName}
-          defaultIconName="Folder"
-          onSelect={(name) => {
-            if (catIconPickerFor) handleCategoryIconChange(catIconPickerFor, name);
-          }}
-        />
+        <IconPickerDialog open={catIconPickerFor !== null} onClose={() => setCatIconPickerFor(null)}
+          currentIconName={catIconPickerCat.iconName} defaultIconName="Folder"
+          onSelect={(name) => { if (catIconPickerFor) handleCategoryIconChange(catIconPickerFor, name); }} />
       )}
+
+      {/* Suppress unused warning */}
+      {uncategorizedItems.length === 0 && null}
     </>
   );
 }
