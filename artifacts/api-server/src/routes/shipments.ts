@@ -6,6 +6,7 @@ import {
   usersTable,
   speditionPermissionsTable,
   auditLogTable,
+  settingsTable,
 } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
@@ -172,18 +173,28 @@ router.post("/shipments", requireAuth, async (req, res) => {
         const creatorEmail = req.session.userId
           ? (await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, req.session.userId)).limit(1))[0]?.email ?? undefined
           : undefined;
-        const tableRows = [
-          { label: "Bezeichnung", value: shipment.bezeichnung ?? "" },
-          { label: "Kennzeichen", value: shipment.kennzeichen ?? "" },
-          { label: "Spedition", value: spedName },
-          { label: "Relation", value: shipment.relation ?? "" },
-          { label: "LKW-Art", value: shipment.lkwArt ?? "" },
-          { label: "ETA", value: [shipment.etaDate, shipment.etaTime].filter(Boolean).join(" ") },
-          { label: "Tor", value: shipment.tor ?? "" },
-          { label: "Status", value: shipment.status ?? "" },
-          { label: "Datum", value: new Date().toLocaleDateString("de-DE") },
-          { label: "Bemerkungen", value: shipment.bemerkungen ?? "" },
+        const ALL_SHIP_FIELDS = [
+          { key: "bezeichnung", label: "Bezeichnung", value: shipment.bezeichnung ?? "" },
+          { key: "kennzeichen", label: "Kennzeichen", value: shipment.kennzeichen ?? "" },
+          { key: "spedition", label: "Spedition", value: spedName },
+          { key: "relation", label: "Relation", value: shipment.relation ?? "" },
+          { key: "lkwArt", label: "LKW-Art", value: shipment.lkwArt ?? "" },
+          { key: "eta", label: "ETA", value: [shipment.etaDate, shipment.etaTime].filter(Boolean).join(" ") },
+          { key: "tor", label: "Tor", value: shipment.tor ?? "" },
+          { key: "status", label: "Status", value: shipment.status ?? "" },
+          { key: "datum", label: "Datum", value: new Date().toLocaleDateString("de-DE") },
+          { key: "bemerkungen", label: "Bemerkungen", value: shipment.bemerkungen ?? "" },
         ];
+        const tabelleSettingRow = await db.select({ value: settingsTable.value })
+          .from(settingsTable).where(eq(settingsTable.key, "email_tpl_shipment_tabelle_felder")).limit(1);
+        let enabledShipKeys: string[] = ALL_SHIP_FIELDS.map((f) => f.key);
+        if (tabelleSettingRow[0]?.value) {
+          try { enabledShipKeys = JSON.parse(tabelleSettingRow[0].value); } catch { /* keep default */ }
+        }
+        const tableRows = enabledShipKeys
+          .map((k) => ALL_SHIP_FIELDS.find((f) => f.key === k))
+          .filter((f): f is (typeof ALL_SHIP_FIELDS)[number] => f != null)
+          .map((f) => ({ label: f.label, value: f.value }));
         await sendEventEmail(
           "shipment",
           {
@@ -281,14 +292,20 @@ router.post("/shipments/bulk", requireAuth, async (req, res) => {
           spedition: spedName,
           status: s.status ?? "",
         }));
+        const bulkTabelleRow = await db.select({ value: settingsTable.value })
+          .from(settingsTable).where(eq(settingsTable.key, "email_tpl_bulk_tabelle_felder")).limit(1);
+        let enabledBulkKeys: string[] | undefined;
+        if (bulkTabelleRow[0]?.value) {
+          try { enabledBulkKeys = JSON.parse(bulkTabelleRow[0].value); } catch { /* keep default */ }
+        }
         await sendEventEmail(
           "bulk",
           {
             anzahl: String(inserted.length),
             datum: new Date().toLocaleDateString("de-DE"),
             spedition: spedName,
-            tabelle: buildBulkTableText(bulkRows),
-            tabelleHtml: buildBulkTableHtml(bulkRows),
+            tabelle: buildBulkTableText(bulkRows, enabledBulkKeys),
+            tabelleHtml: buildBulkTableHtml(bulkRows, enabledBulkKeys),
           },
           creatorEmail || undefined,
         );

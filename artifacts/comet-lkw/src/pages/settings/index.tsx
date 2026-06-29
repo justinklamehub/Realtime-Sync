@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, Settings, Type, Mail, Inbox, CheckCircle2, XCircle, Eye, EyeOff, Image, Upload, Trash2 as TrashIcon, PanelLeft, Send, Server } from "lucide-react";
+import { Loader2, Save, Settings, Type, Mail, Inbox, CheckCircle2, XCircle, Eye, EyeOff, Image, Upload, Trash2 as TrashIcon, PanelLeft, Send, Server, ChevronUp, ChevronDown, Table2 } from "lucide-react";
 import { SidebarNavConfig } from "./sidebar-nav-config";
 import { useAuth } from "@/contexts/auth-context";
 
@@ -54,6 +54,26 @@ const SECTIONS = [
   },
 ];
 
+const SHIPMENT_TABLE_FIELDS = [
+  { key: "bezeichnung", label: "Bezeichnung" },
+  { key: "kennzeichen", label: "Kennzeichen" },
+  { key: "spedition", label: "Spedition" },
+  { key: "relation", label: "Relation" },
+  { key: "lkwArt", label: "LKW-Art" },
+  { key: "eta", label: "ETA" },
+  { key: "tor", label: "Tor" },
+  { key: "status", label: "Status" },
+  { key: "datum", label: "Datum" },
+  { key: "bemerkungen", label: "Bemerkungen" },
+];
+
+const BULK_TABLE_FIELDS = [
+  { key: "bezeichnung", label: "Bezeichnung" },
+  { key: "kennzeichen", label: "Kennzeichen" },
+  { key: "spedition", label: "Spedition" },
+  { key: "status", label: "Status" },
+];
+
 const EMAIL_EVENTS = [
   {
     key: "shipment",
@@ -61,6 +81,8 @@ const EMAIL_EVENTS = [
     description: "Wird gesendet, wenn eine neue Einzelverladung angelegt wird",
     placeholders: ["{{bezeichnung}}", "{{kennzeichen}}", "{{spedition}}", "{{status}}", "{{datum}}", "{{tabelle}}"],
     recipientNote: "Die E-Mail-Adresse des anlegenden Benutzers wird automatisch als Empfänger hinzugefügt.",
+    tableFieldsKey: "email_tpl_shipment_tabelle_felder" as string,
+    availableFields: SHIPMENT_TABLE_FIELDS,
   },
   {
     key: "bulk",
@@ -68,6 +90,8 @@ const EMAIL_EVENTS = [
     description: "Wird gesendet, wenn Verladungen per Massenanlage erstellt werden",
     placeholders: ["{{anzahl}}", "{{spedition}}", "{{datum}}", "{{tabelle}}"],
     recipientNote: "Die E-Mail-Adresse des anlegenden Benutzers wird automatisch als Empfänger hinzugefügt.",
+    tableFieldsKey: "email_tpl_bulk_tabelle_felder" as string,
+    availableFields: BULK_TABLE_FIELDS,
   },
   {
     key: "user",
@@ -75,6 +99,8 @@ const EMAIL_EVENTS = [
     description: "Wird gesendet, wenn ein neuer Benutzer angelegt wird",
     placeholders: ["{{username}}", "{{email}}", "{{passwort}}", "{{rolle}}", "{{spedition}}"],
     recipientNote: "Die E-Mail-Adresse des neuen Benutzers wird automatisch als Empfänger hinzugefügt (sofern angegeben).",
+    tableFieldsKey: null as string | null,
+    availableFields: null as { key: string; label: string }[] | null,
   },
 ];
 
@@ -231,11 +257,142 @@ function EmailFromField({ value, onSave, isSaving }: { value: string; onSave: (k
   );
 }
 
+// ── TabelleFelder ─────────────────────────────────────────────────────────────
+
+function TabelleFelder({
+  availableFields,
+  settingKey,
+  settings,
+}: {
+  availableFields: { key: string; label: string }[];
+  settingKey: string;
+  settings: SettingsMap;
+}) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [saving, setSaving] = useState(false);
+
+  function parseFields(): { key: string; label: string; enabled: boolean }[] {
+    const raw = settings[settingKey];
+    let enabledKeys: string[] | null = null;
+    if (raw) {
+      try { enabledKeys = JSON.parse(raw); } catch { /* ignore */ }
+    }
+    if (!enabledKeys) return availableFields.map((f) => ({ ...f, enabled: true }));
+    const result: { key: string; label: string; enabled: boolean }[] = [];
+    for (const k of enabledKeys) {
+      const field = availableFields.find((f) => f.key === k);
+      if (field) result.push({ ...field, enabled: true });
+    }
+    for (const f of availableFields) {
+      if (!enabledKeys.includes(f.key)) result.push({ ...f, enabled: false });
+    }
+    return result;
+  }
+
+  const [fields, setFields] = useState(parseFields);
+
+  useEffect(() => { setFields(parseFields()); }, [settings[settingKey]]);
+
+  function toggle(key: string) {
+    setFields((prev) => prev.map((f) => (f.key === key ? { ...f, enabled: !f.enabled } : f)));
+  }
+
+  function move(index: number, dir: -1 | 1) {
+    setFields((prev) => {
+      const arr = [...prev];
+      const target = index + dir;
+      if (target < 0 || target >= arr.length) return arr;
+      [arr[index], arr[target]] = [arr[target], arr[index]];
+      return arr;
+    });
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      const enabledKeys = fields.filter((f) => f.enabled).map((f) => f.key);
+      const res = await fetch(`${API}/settings/${settingKey}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: JSON.stringify(enabledKeys) }),
+      });
+      if (!res.ok) throw new Error();
+      await queryClient.invalidateQueries({ queryKey: ["settings"] });
+      toast({ title: "Tabellenfelder gespeichert" });
+    } catch {
+      toast({ title: "Fehler beim Speichern", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="border rounded-lg p-3.5 bg-slate-50/60 space-y-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5">
+          <Table2 className="w-3.5 h-3.5 text-slate-500" />
+          <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+            Tabelle <span className="font-mono normal-case tracking-normal bg-slate-100 px-1 rounded text-slate-500">{"{{tabelle}}"}</span> — Felder &amp; Reihenfolge
+          </p>
+        </div>
+        <Button size="sm" className="h-7 px-3 text-xs" onClick={save} disabled={saving}>
+          {saving ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Save className="w-3 h-3 mr-1" />}
+          Speichern
+        </Button>
+      </div>
+      <p className="text-[11px] text-slate-400">Haken setzen = Feld erscheint in der Tabelle. Reihenfolge mit ↑↓ ändern.</p>
+      <div className="space-y-1">
+        {fields.map((f, i) => (
+          <div
+            key={f.key}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-md border transition-colors ${
+              f.enabled ? "bg-white border-slate-200" : "bg-slate-50 border-slate-100"
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={f.enabled}
+              onChange={() => toggle(f.key)}
+              className="h-3.5 w-3.5 accent-primary cursor-pointer"
+            />
+            <span className={`flex-1 text-xs font-medium ${f.enabled ? "text-slate-700" : "text-slate-400"}`}>
+              {f.label}
+            </span>
+            <div className="flex gap-0.5">
+              <button
+                type="button"
+                onClick={() => move(i, -1)}
+                disabled={i === 0}
+                className="p-0.5 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                title="Nach oben"
+              >
+                <ChevronUp className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => move(i, 1)}
+                disabled={i === fields.length - 1}
+                className="p-0.5 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                title="Nach unten"
+              >
+                <ChevronDown className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── EmailEventSection ─────────────────────────────────────────────────────────
 
-function EmailEventSection({ eventKey, label, description, placeholders, recipientNote, settings, onSave, isSaving }: {
+function EmailEventSection({ eventKey, label, description, placeholders, recipientNote, tableFieldsKey, availableFields, settings, onSave, isSaving }: {
   eventKey: string; label: string; description: string;
   placeholders: string[]; recipientNote: string | null;
+  tableFieldsKey: string | null; availableFields: { key: string; label: string }[] | null;
   settings: SettingsMap;
   onSave: (key: string, val: string) => void;
   isSaving: (key: string) => boolean;
@@ -321,6 +478,14 @@ function EmailEventSection({ eventKey, label, description, placeholders, recipie
               ))}
             </div>
           </div>
+
+          {tableFieldsKey && availableFields && (
+            <TabelleFelder
+              availableFields={availableFields}
+              settingKey={tableFieldsKey}
+              settings={settings}
+            />
+          )}
         </div>
       )}
     </div>
@@ -804,6 +969,8 @@ export default function SettingsPage() {
                     description={ev.description}
                     placeholders={ev.placeholders}
                     recipientNote={ev.recipientNote}
+                    tableFieldsKey={ev.tableFieldsKey}
+                    availableFields={ev.availableFields}
                     settings={s}
                     onSave={handleSave}
                     isSaving={isSavingKey}

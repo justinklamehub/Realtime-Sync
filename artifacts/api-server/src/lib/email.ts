@@ -8,6 +8,13 @@ export type EmailEvent = "shipment" | "bulk" | "user";
 export interface ShipmentRow { label: string; value: string }
 export interface BulkShipmentRow { bezeichnung: string; kennzeichen: string; spedition: string; status: string }
 
+const ALL_BULK_COLS: { key: string; label: string; get: (s: BulkShipmentRow) => string }[] = [
+  { key: "bezeichnung", label: "Bezeichnung", get: (s) => s.bezeichnung },
+  { key: "kennzeichen", label: "Kennzeichen", get: (s) => s.kennzeichen },
+  { key: "spedition", label: "Spedition", get: (s) => s.spedition },
+  { key: "status", label: "Status", get: (s) => s.status },
+];
+
 async function getSettings(): Promise<Record<string, string>> {
   const rows = await db.select().from(settingsTable);
   return Object.fromEntries(rows.map((r) => [r.key, r.value ?? ""]));
@@ -59,33 +66,30 @@ export function buildShipmentTableText(rows: ShipmentRow[]): string {
 
 // ── HTML table: bulk shipments (multi-column) ────────────────────────────────
 
-export function buildBulkTableHtml(ships: BulkShipmentRow[]): string {
+export function buildBulkTableHtml(ships: BulkShipmentRow[], enabledKeys?: string[]): string {
+  const cols = enabledKeys && enabledKeys.length > 0
+    ? enabledKeys.map((k) => ALL_BULK_COLS.find((c) => c.key === k)).filter((c): c is (typeof ALL_BULK_COLS)[number] => c != null)
+    : ALL_BULK_COLS;
   const th = (t: string) =>
     `<th style="border:1px solid #ddd;padding:7px 12px;background:#f0f4ff;text-align:left;font-size:13px">${t}</th>`;
   const td = (t: string) =>
     `<td style="border:1px solid #ddd;padding:7px 12px;font-size:13px;color:#222">${t}</td>`;
-  const header = `<tr>${[th("Bezeichnung"), th("Kennzeichen"), th("Spedition"), th("Status")].join("")}</tr>`;
+  const header = `<tr>${cols.map((c) => th(c.label)).join("")}</tr>`;
   const bodyRows = ships
-    .map((s) => `<tr>${[td(s.bezeichnung), td(s.kennzeichen), td(s.spedition), td(s.status)].join("")}</tr>`)
+    .map((s) => `<tr>${cols.map((c) => td(c.get(s))).join("")}</tr>`)
     .join("");
   return `<table style="border-collapse:collapse;width:100%;font-family:Arial,sans-serif;margin:12px 0"><thead>${header}</thead><tbody>${bodyRows}</tbody></table>`;
 }
 
-export function buildBulkTableText(ships: BulkShipmentRow[]): string {
-  const cols = [
-    ships.map((s) => s.bezeichnung),
-    ships.map((s) => s.kennzeichen),
-    ships.map((s) => s.spedition),
-    ships.map((s) => s.status),
-  ];
-  const headers = ["Bezeichnung", "Kennzeichen", "Spedition", "Status"];
-  const widths = headers.map((h, i) => Math.max(h.length, ...cols[i].map((v) => v.length)));
+export function buildBulkTableText(ships: BulkShipmentRow[], enabledKeys?: string[]): string {
+  const cols = enabledKeys && enabledKeys.length > 0
+    ? enabledKeys.map((k) => ALL_BULK_COLS.find((c) => c.key === k)).filter((c): c is (typeof ALL_BULK_COLS)[number] => c != null)
+    : ALL_BULK_COLS;
+  const headers = cols.map((c) => c.label);
+  const widths = headers.map((h, ci) => Math.max(h.length, ...ships.map((s) => cols[ci].get(s).length)));
   const sep = widths.map((w) => "-".repeat(w + 2)).join("+");
   const headerRow = headers.map((h, i) => ` ${h.padEnd(widths[i])} `).join("|");
-  const dataRows = ships.map((s) => {
-    const cells = [s.bezeichnung, s.kennzeichen, s.spedition, s.status];
-    return cells.map((c, i) => ` ${c.padEnd(widths[i])} `).join("|");
-  });
+  const dataRows = ships.map((s) => cols.map((c, i) => ` ${c.get(s).padEnd(widths[i])} `).join("|"));
   return [sep, headerRow, sep, ...dataRows, sep].join("\n");
 }
 
