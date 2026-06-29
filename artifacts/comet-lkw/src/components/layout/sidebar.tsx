@@ -97,7 +97,7 @@ function OnlinePanel({ users, currentUserId }: { users: OnlineUser[]; currentUse
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto sidebar-scroll">
         {users.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-2 text-slate-500 py-12">
             <Radio className="w-8 h-8 opacity-30" />
@@ -223,7 +223,7 @@ function NotificationPanel({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto sidebar-scroll">
         {notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-2 text-slate-500 py-12">
             <Bell className="w-8 h-8 opacity-30" />
@@ -511,7 +511,7 @@ export function AppSidebar({ collapsed, onToggle, isDark, onToggleTheme }: AppSi
           </div>
 
           {/* Navigation */}
-          <div className="flex-1 overflow-y-auto py-2">
+          <div className="flex-1 overflow-y-auto py-2 sidebar-scroll">
             <nav className={cn("space-y-0.5", collapsed ? "px-1.5" : "px-3")}>
               {(() => {
                 function renderItem(item: (typeof customizedNavigation)[number]) {

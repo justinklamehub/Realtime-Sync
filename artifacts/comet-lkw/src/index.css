@@ -287,6 +287,28 @@
   color: hsl(210 40% 78%) !important;
 }
 
+/* ── Sidebar-Scrollbar ───────────────────────────────────────────────────────
+   Schlanke, zum dunklen Sidebar-Hintergrund passende Scrollbar.
+   webkit: Chrome / Edge / Safari; Firefox via scrollbar-width/-color.
+   ─────────────────────────────────────────────────────────────────────────── */
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(222 47% 26%) transparent;
+}
+.sidebar-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: hsl(222 47% 26%);
+  border-radius: 9999px;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: hsl(222 47% 36%);
+}
+
 /* Sonner toast progress bar */
 @keyframes toast-progress {
   from { transform: scaleX(1); }
