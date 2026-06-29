@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Lock, ShieldOff, Search, X, ChevronDown } from "lucide-react";
+import { Loader2, Lock, ShieldOff, Search, X, ChevronDown, Clock, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/auth-context";
 import {
@@ -63,6 +63,18 @@ const WARE_STATUS_LABELS: Record<string, string> = {
 
 const LKW_ART_OPTIONS = ["Container", "Anlieferung", "Abholung", "Sattelzug", "Wechselbrücke", "Sonstige"];
 const TOR_OPTIONS = Array.from({ length: 18 }, (_, i) => `Tor ${i + 1}`);
+
+function fmtDate(date: string | null): string {
+  if (!date) return "";
+  const [y, m, d] = date.split("-");
+  return `${d}.${m}.${y?.slice(2)}`;
+}
+
+function sortKey(s: any): string {
+  if (s.ataDate) return `${s.ataDate}T${s.ataTime ?? "00:00"}`;
+  if (s.etaDate) return `${s.etaDate}T${s.etaTime ?? "00:00"}`;
+  return "9999-12-31T99:99";
+}
 
 function WareStatusSelect({
   wareStatus,
@@ -154,6 +166,17 @@ function ShipmentCard({
           {shipment.relation && (
             <div className="text-xs text-slate-400 truncate">{shipment.relation}</div>
           )}
+          {shipment.ataDate ? (
+            <div className="flex items-center gap-1 text-[11px] text-emerald-700 font-medium">
+              <CheckCircle2 className="w-3 h-3 shrink-0" />
+              <span>ATA {fmtDate(shipment.ataDate)}{shipment.ataTime ? ` ${shipment.ataTime}` : ""}</span>
+            </div>
+          ) : shipment.etaDate ? (
+            <div className="flex items-center gap-1 text-[11px] text-slate-500">
+              <Clock className="w-3 h-3 shrink-0" />
+              <span>ETA {fmtDate(shipment.etaDate)}{shipment.etaTime ? ` ${shipment.etaTime}` : ""}</span>
+            </div>
+          ) : null}
           <div className="pt-0.5">
             <WareStatusSelect
               wareStatus={shipment.wareStatus ?? null}
@@ -285,9 +308,9 @@ export default function KanbanPage() {
   );
 
   const shipments = (rawShipments ?? []) as any[];
-  const visibleShipments = shipments.filter((s) =>
-    (KANBAN_STATUSES as readonly string[]).includes(s.status),
-  );
+  const visibleShipments = shipments
+    .filter((s) => (KANBAN_STATUSES as readonly string[]).includes(s.status))
+    .sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
 
   const byStatus: Record<KanbanStatus, any[]> = {
     Angemeldet:     visibleShipments.filter((s) => s.status === "Angemeldet"),
