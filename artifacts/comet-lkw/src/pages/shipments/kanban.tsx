@@ -1,10 +1,14 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useListShipments, useUpdateShipment, getListShipmentsQueryKey } from "@workspace/api-client-react";
+import { useListShipments, useListSpeditionen, useUpdateShipment, getListShipmentsQueryKey } from "@workspace/api-client-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, Lock, ShieldOff } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, Lock, ShieldOff, Search, X } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/auth-context";
 import {
   DndContext,
   DragOverlay,
@@ -52,6 +56,9 @@ const WARE_STATUS_LABELS: Record<string, string> = {
   vorbereitet:    "Vorbereitet",
   ausgedruckt:    "Ausgedruckt",
 };
+
+const LKW_ART_OPTIONS = ["Container", "Anlieferung", "Abholung", "Sattelzug", "Wechselbrücke", "Sonstige"];
+const TOR_OPTIONS = Array.from({ length: 18 }, (_, i) => `Tor ${i + 1}`);
 
 function WareStatusBadge({
   wareStatus,
@@ -199,7 +206,18 @@ function KanbanColumn({
 }
 
 export default function KanbanPage() {
-  const { data: rawShipments, isLoading } = useListShipments();
+  const { user } = useAuth();
+  const role = user?.role ?? "";
+  const isCometUser = ["comet_admin", "comet_leitstand", "comet_lager"].includes(role);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const [search, setSearch] = useState("");
+  const [filterLkwArt, setFilterLkwArt] = useState("__all__");
+  const [filterTor, setFilterTor] = useState("__all__");
+  const [filterSpeditionId, setFilterSpeditionId] = useState("__all__");
+  const [filterDateFrom, setFilterDateFrom] = useState(today);
+  const [filterDateTo, setFilterDateTo] = useState(today);
+
   const queryClient = useQueryClient();
   const [activeId, setActiveId] = useState<number | null>(null);
 
@@ -210,7 +228,20 @@ export default function KanbanPage() {
     staleTime: 60_000,
   });
 
-  const canDrag    = permissions?.["kanban.use"]   ?? false;
+  const { data: speditionen } = useListSpeditionen();
+
+  const queryParams = {
+    search: search.length > 2 ? search : undefined,
+    lkwArt: filterLkwArt !== "__all__" ? filterLkwArt : undefined,
+    tor: filterTor !== "__all__" ? filterTor : undefined,
+    speditionId: filterSpeditionId !== "__all__" ? Number(filterSpeditionId) : undefined,
+    dateFrom: filterDateFrom || undefined,
+    dateTo: filterDateTo || undefined,
+  };
+
+  const { data: rawShipments, isLoading } = useListShipments(queryParams);
+
+  const canDrag     = permissions?.["kanban.use"]   ?? false;
   const canEditWare = permissions?.["shipment.edit"] ?? false;
 
   const updateShipment = useUpdateShipment({
@@ -271,7 +302,24 @@ export default function KanbanPage() {
     updateShipment.mutate({ id, data: { wareStatus: next } as any });
   };
 
-  if (isLoading || permLoading) {
+  function resetFilters() {
+    setSearch("");
+    setFilterLkwArt("__all__");
+    setFilterTor("__all__");
+    setFilterSpeditionId("__all__");
+    setFilterDateFrom(today);
+    setFilterDateTo(today);
+  }
+
+  const hasActiveFilters =
+    search.length > 0 ||
+    filterLkwArt !== "__all__" ||
+    filterTor !== "__all__" ||
+    filterSpeditionId !== "__all__" ||
+    filterDateFrom !== today ||
+    filterDateTo !== today;
+
+  if (permLoading) {
     return (
       <div className="flex h-full items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -304,8 +352,89 @@ export default function KanbanPage() {
           </p>
         </div>
         <div className="text-xs text-slate-400 tabular-nums">
-          {visibleShipments.length} aktive Verladung
+          {isLoading ? "…" : visibleShipments.length} aktive Verladung
           {visibleShipments.length !== 1 ? "en" : ""}
+        </div>
+      </div>
+
+      <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm flex-shrink-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[160px] max-w-xs">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+            <Input
+              placeholder="Kennzeichen, Tor…"
+              className="pl-8 h-8 text-sm"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          <Select value={filterLkwArt} onValueChange={setFilterLkwArt}>
+            <SelectTrigger className="w-[140px] h-8 text-sm">
+              <SelectValue placeholder="LKW-Art" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Alle Arten</SelectItem>
+              {LKW_ART_OPTIONS.map((a) => (
+                <SelectItem key={a} value={a}>{a}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={filterTor} onValueChange={setFilterTor}>
+            <SelectTrigger className="w-[110px] h-8 text-sm">
+              <SelectValue placeholder="Tor" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Alle Tore</SelectItem>
+              {TOR_OPTIONS.map((t) => (
+                <SelectItem key={t} value={t}>{t}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {isCometUser && speditionen && (
+            <Select value={filterSpeditionId} onValueChange={setFilterSpeditionId}>
+              <SelectTrigger className="w-[160px] h-8 text-sm">
+                <SelectValue placeholder="Spedition" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Alle Speditionen</SelectItem>
+                {speditionen.map((s) => (
+                  <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-slate-500 whitespace-nowrap">Von</span>
+            <Input
+              type="date"
+              className="w-[130px] h-8 text-sm"
+              value={filterDateFrom}
+              onChange={(e) => setFilterDateFrom(e.target.value)}
+            />
+            <span className="text-xs text-slate-500 whitespace-nowrap">Bis</span>
+            <Input
+              type="date"
+              className="w-[130px] h-8 text-sm"
+              value={filterDateTo}
+              onChange={(e) => setFilterDateTo(e.target.value)}
+            />
+          </div>
+
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-slate-500 hover:text-slate-700 gap-1"
+              onClick={resetFilters}
+            >
+              <X className="w-3.5 h-3.5" />
+              Zurücksetzen
+            </Button>
+          )}
         </div>
       </div>
 
