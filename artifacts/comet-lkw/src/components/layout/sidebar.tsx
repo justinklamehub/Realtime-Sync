@@ -35,6 +35,8 @@ import {
   HelpCircle,
   TicketIcon,
   LayoutGrid,
+  ChevronRight,
+  Folder,
   type LucideProps,
 } from "lucide-react";
 import { NAV_ICONS } from "@/lib/nav-icons";
@@ -280,6 +282,7 @@ export function AppSidebar({ collapsed, onToggle, isDark, onToggleTheme }: AppSi
   const [, navigate] = useWouterLocation();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showOnline, setShowOnline] = useState(false);
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const { notifications, unreadCount, markRead, markAllRead, dismiss, dismissAll } = useNotifications();
   const { onlineUsers } = usePresence(user?.id);
 
@@ -336,7 +339,7 @@ export function AppSidebar({ collapsed, onToggle, isDark, onToggleTheme }: AppSi
 
   // Apply sidebar_nav_config customizations (label, icon, color, order)
   const navConfigRaw = pubSettings?.sidebar_nav_config;
-  const navOverrides: Array<{ href: string; label?: string; color?: string; iconName?: string }> = (() => {
+  const navOverrides: Array<{ href: string; label?: string; color?: string; iconName?: string; categoryId?: string }> = (() => {
     try { return navConfigRaw ? JSON.parse(navConfigRaw) : []; }
     catch { return []; }
   })();
@@ -353,10 +356,36 @@ export function AppSidebar({ collapsed, onToggle, isDark, onToggleTheme }: AppSi
         name: cfg?.label || item.name,
         NavIcon,
         activeColor: cfg?.color ?? null,
+        categoryId: cfg?.categoryId ?? null,
         order: cfg !== undefined ? cfg.order : 99999 + defaultIdx,
       };
     })
     .sort((a, b) => a.order - b.order);
+
+  // Parse sidebar categories
+  const sidebarCategories: Array<{ id: string; name: string; iconName?: string; color?: string }> = (() => {
+    try { return pubSettings?.sidebar_categories ? JSON.parse(pubSettings.sidebar_categories) : []; }
+    catch { return []; }
+  })();
+
+  const uncategorizedItems = customizedNavigation.filter((item) => !item.categoryId);
+  const byCategoryId = new Map<string, typeof customizedNavigation>();
+  for (const item of customizedNavigation) {
+    if (item.categoryId) {
+      const list = byCategoryId.get(item.categoryId) ?? [];
+      list.push(item);
+      byCategoryId.set(item.categoryId, list);
+    }
+  }
+  const activeCategories = sidebarCategories.filter((c) => byCategoryId.has(c.id));
+
+  function toggleCategory(id: string) {
+    setCollapsedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
 
   const initials = user.username.substring(0, 2).toUpperCase();
 
@@ -445,65 +474,113 @@ export function AppSidebar({ collapsed, onToggle, isDark, onToggleTheme }: AppSi
           {/* Navigation */}
           <div className="flex-1 overflow-y-auto py-2">
             <nav className={cn("space-y-0.5", collapsed ? "px-1.5" : "px-3")}>
-              {customizedNavigation.map((item) => {
-                const isActive =
-                  location === item.href ||
-                  (item.href !== "/dashboard" &&
-                    item.href !== "/shipments" &&
-                    location.startsWith(item.href + "/")) ||
-                  (item.href === "/shipments" &&
-                    (location === "/shipments" || location.startsWith("/shipments/")));
+              {(() => {
+                function renderItem(item: (typeof customizedNavigation)[number]) {
+                  const isActive =
+                    location === item.href ||
+                    (item.href !== "/dashboard" &&
+                      item.href !== "/shipments" &&
+                      location.startsWith(item.href + "/")) ||
+                    (item.href === "/shipments" &&
+                      (location === "/shipments" || location.startsWith("/shipments/")));
 
-                const hasActiveCustomColor = isActive && !!item.activeColor;
-                const hasInactiveCustomColor = !isActive && !!item.activeColor;
+                  const hasActiveCustomColor = isActive && !!item.activeColor;
+                  const hasInactiveCustomColor = !isActive && !!item.activeColor;
 
-                const linkEl = (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    data-tour={item.href === "/hilfe" ? "help-link" : undefined}
-                    className={cn(
-                      "flex items-center rounded-md text-sm font-medium transition-all duration-150",
-                      collapsed ? "justify-center w-9 h-9 mx-auto" : "gap-3 px-3 py-2.5",
-                      isActive
-                        ? hasActiveCustomColor
-                          ? "text-white shadow-sm"
-                          : "bg-primary text-white shadow-sm dark:bg-white/15 dark:text-white dark:shadow-none"
-                        : hasInactiveCustomColor
+                  const linkEl = (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      data-tour={item.href === "/hilfe" ? "help-link" : undefined}
+                      className={cn(
+                        "flex items-center rounded-md text-sm font-medium transition-all duration-150",
+                        collapsed ? "justify-center w-9 h-9 mx-auto" : "gap-3 px-3 py-2.5",
+                        isActive
+                          ? hasActiveCustomColor
+                            ? "text-white shadow-sm"
+                            : "bg-primary text-white shadow-sm dark:bg-white/15 dark:text-white dark:shadow-none"
+                          : hasInactiveCustomColor
                           ? "hover:bg-slate-800"
                           : "text-slate-400 hover:text-slate-100 hover:bg-slate-800"
-                    )}
-                    style={
-                      hasActiveCustomColor
-                        ? { backgroundColor: item.activeColor! }
-                        : hasInactiveCustomColor
-                        ? { color: item.activeColor! }
-                        : undefined
-                    }
-                  >
-                    <item.NavIcon
-                      className={cn(
-                        "shrink-0",
-                        collapsed ? "w-5 h-5" : "w-4 h-4",
-                        isActive ? "text-white" : !item.activeColor ? "text-slate-500" : undefined
                       )}
-                      style={hasInactiveCustomColor ? { color: item.activeColor! } : undefined}
-                    />
-                    {!collapsed && item.name}
-                  </Link>
-                );
+                      style={
+                        hasActiveCustomColor
+                          ? { backgroundColor: item.activeColor! }
+                          : hasInactiveCustomColor
+                          ? { color: item.activeColor! }
+                          : undefined
+                      }
+                    >
+                      <item.NavIcon
+                        className={cn(
+                          "shrink-0",
+                          collapsed ? "w-5 h-5" : "w-4 h-4",
+                          isActive ? "text-white" : !item.activeColor ? "text-slate-500" : undefined
+                        )}
+                        style={hasInactiveCustomColor ? { color: item.activeColor! } : undefined}
+                      />
+                      {!collapsed && item.name}
+                    </Link>
+                  );
 
-                return collapsed ? (
-                  <Tooltip key={item.href}>
-                    <TooltipTrigger asChild>{linkEl}</TooltipTrigger>
-                    <TooltipContent side="right" className="text-xs">
-                      {item.name}
-                    </TooltipContent>
-                  </Tooltip>
-                ) : (
-                  linkEl
+                  return collapsed ? (
+                    <Tooltip key={item.href}>
+                      <TooltipTrigger asChild>{linkEl}</TooltipTrigger>
+                      <TooltipContent side="right" className="text-xs">
+                        {item.name}
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    linkEl
+                  );
+                }
+
+                // Collapsed sidebar: flat list of all items (no category headers)
+                if (collapsed) {
+                  return customizedNavigation.map((item) => renderItem(item));
+                }
+
+                // Expanded sidebar: uncategorized items first, then grouped categories
+                return (
+                  <>
+                    {uncategorizedItems.map((item) => renderItem(item))}
+
+                    {activeCategories.map((cat) => {
+                      const items = byCategoryId.get(cat.id) ?? [];
+                      const CatIcon = cat.iconName && NAV_ICONS[cat.iconName]
+                        ? NAV_ICONS[cat.iconName]!
+                        : Folder;
+                      const isCatCollapsed = collapsedCategories.has(cat.id);
+
+                      return (
+                        <div key={cat.id} className="mt-2">
+                          <button
+                            onClick={() => toggleCategory(cat.id)}
+                            className="flex items-center gap-2 w-full px-2 py-1 rounded-md text-[11px] font-semibold text-slate-500 uppercase tracking-wider hover:bg-slate-800/40 hover:text-slate-300 transition-colors"
+                          >
+                            <CatIcon
+                              className="w-3.5 h-3.5 shrink-0"
+                              style={cat.color ? { color: cat.color } : undefined}
+                            />
+                            <span className="flex-1 text-left truncate">{cat.name}</span>
+                            <ChevronRight
+                              className={cn(
+                                "w-3.5 h-3.5 shrink-0 transition-transform duration-150",
+                                !isCatCollapsed && "rotate-90"
+                              )}
+                            />
+                          </button>
+                          {!isCatCollapsed && (
+                            <div className="mt-0.5 space-y-0.5">
+                              {items.map((item) => renderItem(item))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </>
                 );
-              })}
+              })()}
             </nav>
           </div>
 

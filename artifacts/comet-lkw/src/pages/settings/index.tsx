@@ -557,7 +557,7 @@ export default function SettingsPage() {
 
         {/* ── Tab: Sidebar ── */}
         <TabsContent value="sidebar" className="mt-0">
-          <SidebarNavConfig savedConfig={s["sidebar_nav_config"] ?? ""} />
+          <SidebarNavConfig savedConfig={s["sidebar_nav_config"] ?? ""} savedCategories={s["sidebar_categories"] ?? ""} />
         </TabsContent>
 
         {/* ── Tab: E-Mail-Vorlagen ── */}

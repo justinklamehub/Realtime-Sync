@@ -24,12 +24,19 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, RotateCcw, GripVertical } from "lucide-react";
+import { Loader2, Save, RotateCcw, GripVertical, Plus, Trash2, Folder } from "lucide-react";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
-// ── Default nav items (determines default order & fallbacks) ───────────────────
+// ── Default nav items ──────────────────────────────────────────────────────────
 
 const DEFAULT_NAV_ITEMS: { href: string; defaultLabel: string; defaultIconName: string }[] = [
   { href: "/dashboard", defaultLabel: "Dashboard", defaultIconName: "LayoutDashboard" },
@@ -78,6 +85,14 @@ export interface NavItemOverride {
   label?: string;
   color?: string;
   iconName?: string;
+  categoryId?: string;
+}
+
+export interface NavCategory {
+  id: string;
+  name: string;
+  iconName: string;
+  color: string;
 }
 
 interface NavItemState {
@@ -87,17 +102,16 @@ interface NavItemState {
   label: string;
   color: string;
   iconName: string;
+  categoryId: string;
 }
 
-// ── Build initial state from saved JSON config ─────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
 function buildInitialState(savedConfig: string): NavItemState[] {
   let overrides: NavItemOverride[] = [];
   try {
     if (savedConfig) overrides = JSON.parse(savedConfig);
-  } catch {
-    /* ignore corrupt data */
-  }
+  } catch { /* ignore */ }
 
   const overrideMap = new Map(overrides.map((o) => [o.href, o]));
   const remaining = new Set(DEFAULT_NAV_ITEMS.map((n) => n.href));
@@ -113,6 +127,7 @@ function buildInitialState(savedConfig: string): NavItemState[] {
         label: override.label ?? def.defaultLabel,
         color: override.color ?? "",
         iconName: override.iconName ?? def.defaultIconName,
+        categoryId: override.categoryId ?? "",
       });
       remaining.delete(def.href);
     }
@@ -127,12 +142,25 @@ function buildInitialState(savedConfig: string): NavItemState[] {
         label: def.defaultLabel,
         color: "",
         iconName: def.defaultIconName,
+        categoryId: "",
       });
     }
   }
 
   void overrideMap;
   return ordered;
+}
+
+function buildInitialCategories(savedCategories: string): NavCategory[] {
+  try {
+    return savedCategories ? JSON.parse(savedCategories) : [];
+  } catch {
+    return [];
+  }
+}
+
+function generateId(): string {
+  return Math.random().toString(36).slice(2, 10);
 }
 
 // ── ColorPickerPopover ─────────────────────────────────────────────────────────
@@ -155,14 +183,12 @@ function ColorPickerPopover({
           className="w-8 h-8 rounded-md border-2 border-slate-200 hover:border-slate-400 transition-colors shrink-0 flex items-center justify-center"
           style={color ? { backgroundColor: color, borderColor: color } : undefined}
         >
-          {!color && (
-            <div className="w-4 h-4 rounded-sm bg-primary" />
-          )}
+          {!color && <div className="w-4 h-4 rounded-sm bg-primary" />}
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-3" align="end">
         <p className="text-xs font-medium text-slate-600 mb-2">
-          Farbe für aktiven Menüpunkt
+          Farbe
           {activeColor && color && (
             <span className="ml-1 text-slate-400">({activeColor.label})</span>
           )}
@@ -212,7 +238,6 @@ function IconPickerDialog({
   onSelect: (iconName: string) => void;
 }) {
   const [search, setSearch] = useState("");
-
   const filtered = NAV_ICON_NAMES.filter((name) =>
     name.toLowerCase().includes(search.toLowerCase())
   );
@@ -271,42 +296,112 @@ function IconPickerDialog({
   );
 }
 
+// ── SortableCategoryItem ───────────────────────────────────────────────────────
+
+function SortableCategoryItem({
+  cat,
+  onNameChange,
+  onColorChange,
+  onDelete,
+  onOpenIconPicker,
+}: {
+  cat: NavCategory;
+  onNameChange: (id: string, name: string) => void;
+  onColorChange: (id: string, color: string) => void;
+  onDelete: (id: string) => void;
+  onOpenIconPicker: (id: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: cat.id });
+
+  const Icon = cat.iconName && NAV_ICONS[cat.iconName] ? NAV_ICONS[cat.iconName]! : Folder;
+  const displayColor = cat.color || "#6366f1";
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+      }}
+      className={cn(
+        "flex items-center gap-2.5 rounded-lg border bg-white px-3 py-2.5 transition-shadow",
+        isDragging ? "shadow-xl border-primary/30 z-50" : "shadow-sm hover:shadow-md"
+      )}
+    >
+      <button
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 transition-colors shrink-0 touch-none"
+        aria-label="Verschieben"
+      >
+        <GripVertical className="w-4 h-4" />
+      </button>
+
+      <button
+        onClick={() => onOpenIconPicker(cat.id)}
+        title="Icon ändern"
+        className="w-8 h-8 rounded-md flex items-center justify-center shrink-0 hover:opacity-80 transition-opacity"
+        style={{ backgroundColor: displayColor }}
+      >
+        <Icon className="w-4 h-4 text-white" />
+      </button>
+
+      <Input
+        value={cat.name}
+        onChange={(e) => onNameChange(cat.id, e.target.value)}
+        placeholder="Kategoriename…"
+        className="flex-1 h-8 text-sm min-w-0"
+      />
+
+      <ColorPickerPopover
+        color={cat.color}
+        onChange={(c) => onColorChange(cat.id, c)}
+      />
+
+      <button
+        onClick={() => onDelete(cat.id)}
+        title="Kategorie löschen"
+        className="shrink-0 p-1.5 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
+
 // ── SortableNavItem ────────────────────────────────────────────────────────────
 
 function SortableNavItem({
   item,
+  categories,
   onLabelChange,
   onColorChange,
   onIconChange,
+  onCategoryChange,
   onReset,
   onOpenIconPicker,
 }: {
   item: NavItemState;
+  categories: NavCategory[];
   onLabelChange: (href: string, label: string) => void;
   onColorChange: (href: string, color: string) => void;
   onIconChange: (href: string, iconName: string) => void;
+  onCategoryChange: (href: string, categoryId: string) => void;
   onReset: (href: string) => void;
   onOpenIconPicker: (href: string) => void;
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: item.href });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: item.href });
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
-
+  const style = { transform: CSS.Transform.toString(transform), transition };
   const Icon = NAV_ICONS[item.iconName] ?? NAV_ICONS[item.defaultIconName];
   const isCustomized =
     item.label !== item.defaultLabel ||
     item.color !== "" ||
-    item.iconName !== item.defaultIconName;
+    item.iconName !== item.defaultIconName ||
+    item.categoryId !== "";
   const activeColor = item.color || "#6366f1";
 
   return (
@@ -318,7 +413,6 @@ function SortableNavItem({
         isDragging ? "shadow-xl border-primary/30 opacity-90 z-50" : "shadow-sm hover:shadow-md"
       )}
     >
-      {/* Drag handle */}
       <button
         {...attributes}
         {...listeners}
@@ -328,17 +422,15 @@ function SortableNavItem({
         <GripVertical className="w-4 h-4" />
       </button>
 
-      {/* Icon preview — click to open icon picker */}
       <button
         onClick={() => onOpenIconPicker(item.href)}
         title="Icon ändern"
-        className="w-8 h-8 rounded-md flex items-center justify-center shrink-0 transition-opacity hover:opacity-80"
+        className="w-8 h-8 rounded-md flex items-center justify-center shrink-0 hover:opacity-80 transition-opacity"
         style={{ backgroundColor: activeColor }}
       >
         {Icon && <Icon className="w-4 h-4 text-white" />}
       </button>
 
-      {/* Label input */}
       <Input
         value={item.label}
         onChange={(e) => onLabelChange(item.href, e.target.value)}
@@ -346,13 +438,35 @@ function SortableNavItem({
         className="flex-1 h-8 text-sm min-w-0"
       />
 
-      {/* Color picker */}
+      <Select
+        value={item.categoryId || "__none__"}
+        onValueChange={(v) => onCategoryChange(item.href, v === "__none__" ? "" : v)}
+      >
+        <SelectTrigger className="h-8 text-xs w-32 shrink-0">
+          <SelectValue>
+            {item.categoryId
+              ? (categories.find((c) => c.id === item.categoryId)?.name ?? "—")
+              : <span className="text-slate-400">Keine</span>
+            }
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none__">
+            <span className="text-slate-400">Keine Kategorie</span>
+          </SelectItem>
+          {categories.map((c) => (
+            <SelectItem key={c.id} value={c.id}>
+              {c.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
       <ColorPickerPopover
         color={item.color}
         onChange={(c) => onColorChange(item.href, c)}
       />
 
-      {/* Reset button — only shown when customized */}
       <button
         onClick={() => onReset(item.href)}
         title="Zurücksetzen"
@@ -372,24 +486,69 @@ function SortableNavItem({
 
 // ── SidebarNavConfig (main component) ─────────────────────────────────────────
 
-export function SidebarNavConfig({ savedConfig }: { savedConfig: string }) {
+export function SidebarNavConfig({
+  savedConfig,
+  savedCategories,
+}: {
+  savedConfig: string;
+  savedCategories: string;
+}) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [items, setItems] = useState<NavItemState[]>(() =>
-    buildInitialState(savedConfig)
+  const [items, setItems] = useState<NavItemState[]>(() => buildInitialState(savedConfig));
+  const [categories, setCategories] = useState<NavCategory[]>(() =>
+    buildInitialCategories(savedCategories)
   );
   const [saving, setSaving] = useState(false);
   const [iconPickerFor, setIconPickerFor] = useState<string | null>(null);
+  const [catIconPickerFor, setCatIconPickerFor] = useState<string | null>(null);
 
-  useEffect(() => {
-    setItems(buildInitialState(savedConfig));
-  }, [savedConfig]);
+  useEffect(() => { setItems(buildInitialState(savedConfig)); }, [savedConfig]);
+  useEffect(() => { setCategories(buildInitialCategories(savedCategories)); }, [savedCategories]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
+
+  // ── Category handlers ──────────────────────────────────────────────────────
+
+  function handleAddCategory() {
+    setCategories((prev) => [
+      ...prev,
+      { id: generateId(), name: "Neue Kategorie", iconName: "Folder", color: "#6366f1" },
+    ]);
+  }
+
+  function handleDeleteCategory(id: string) {
+    setCategories((prev) => prev.filter((c) => c.id !== id));
+    setItems((prev) => prev.map((i) => (i.categoryId === id ? { ...i, categoryId: "" } : i)));
+  }
+
+  function handleCategoryNameChange(id: string, name: string) {
+    setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, name } : c)));
+  }
+
+  function handleCategoryColorChange(id: string, color: string) {
+    setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, color } : c)));
+  }
+
+  function handleCategoryIconChange(id: string, iconName: string) {
+    setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, iconName } : c)));
+  }
+
+  function handleCategoryDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setCategories((prev) => {
+      const oldIndex = prev.findIndex((c) => c.id === active.id);
+      const newIndex = prev.findIndex((c) => c.id === over.id);
+      return arrayMove(prev, oldIndex, newIndex);
+    });
+  }
+
+  // ── Nav item handlers ──────────────────────────────────────────────────────
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -402,40 +561,36 @@ export function SidebarNavConfig({ savedConfig }: { savedConfig: string }) {
   }
 
   function handleLabelChange(href: string, label: string) {
-    setItems((prev) =>
-      prev.map((i) => (i.href === href ? { ...i, label } : i))
-    );
+    setItems((prev) => prev.map((i) => (i.href === href ? { ...i, label } : i)));
   }
 
   function handleColorChange(href: string, color: string) {
-    setItems((prev) =>
-      prev.map((i) => (i.href === href ? { ...i, color } : i))
-    );
+    setItems((prev) => prev.map((i) => (i.href === href ? { ...i, color } : i)));
   }
 
   function handleIconChange(href: string, iconName: string) {
-    setItems((prev) =>
-      prev.map((i) => (i.href === href ? { ...i, iconName } : i))
-    );
+    setItems((prev) => prev.map((i) => (i.href === href ? { ...i, iconName } : i)));
+  }
+
+  function handleCategoryChange(href: string, categoryId: string) {
+    setItems((prev) => prev.map((i) => (i.href === href ? { ...i, categoryId } : i)));
   }
 
   function handleReset(href: string) {
     setItems((prev) =>
       prev.map((i) => {
         if (i.href !== href) return i;
-        return {
-          ...i,
-          label: i.defaultLabel,
-          color: "",
-          iconName: i.defaultIconName,
-        };
+        return { ...i, label: i.defaultLabel, color: "", iconName: i.defaultIconName, categoryId: "" };
       })
     );
   }
 
   function handleResetAll() {
     setItems(buildInitialState(""));
+    setCategories([]);
   }
+
+  // ── Save ───────────────────────────────────────────────────────────────────
 
   async function handleSave() {
     setSaving(true);
@@ -445,16 +600,25 @@ export function SidebarNavConfig({ savedConfig }: { savedConfig: string }) {
         ...(i.label !== i.defaultLabel && { label: i.label }),
         ...(i.color && { color: i.color }),
         ...(i.iconName !== i.defaultIconName && { iconName: i.iconName }),
+        ...(i.categoryId && { categoryId: i.categoryId }),
       }));
 
-      const payload = JSON.stringify(overrides);
-      const res = await fetch(`${API}/settings/sidebar_nav_config`, {
-        method: "PUT",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ value: payload }),
-      });
-      if (!res.ok) throw new Error("Fehler");
+      const [r1, r2] = await Promise.all([
+        fetch(`${API}/settings/sidebar_nav_config`, {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ value: JSON.stringify(overrides) }),
+        }),
+        fetch(`${API}/settings/sidebar_categories`, {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ value: JSON.stringify(categories) }),
+        }),
+      ]);
+
+      if (!r1.ok || !r2.ok) throw new Error("Fehler");
 
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["settings"] }),
@@ -469,26 +633,86 @@ export function SidebarNavConfig({ savedConfig }: { savedConfig: string }) {
   }
 
   const iconPickerItem = items.find((i) => i.href === iconPickerFor);
+  const catIconPickerCat = categories.find((c) => c.id === catIconPickerFor);
 
-  const anyCustomized = items.some(
-    (i) =>
-      i.label !== i.defaultLabel ||
-      i.color !== "" ||
-      i.iconName !== i.defaultIconName ||
-      i.href !== DEFAULT_NAV_ITEMS[items.indexOf(i)]?.href
-  );
+  const anyCustomized =
+    categories.length > 0 ||
+    items.some(
+      (i) =>
+        i.label !== i.defaultLabel ||
+        i.color !== "" ||
+        i.iconName !== i.defaultIconName ||
+        i.categoryId !== "" ||
+        i.href !== DEFAULT_NAV_ITEMS[items.indexOf(i)]?.href
+    );
 
   return (
     <>
+      {/* ── Kategorien ─────────────────────────────────────────────────────── */}
       <Card className="shadow-sm">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <CardTitle className="text-base flex items-center gap-2">
-                Sidebar-Navigation anpassen
-              </CardTitle>
+              <CardTitle className="text-base">Obermenü-Kategorien</CardTitle>
               <CardDescription className="text-xs mt-0.5">
-                Reihenfolge per Drag &amp; Drop ändern · Beschriftung umbenennen · Farbe und Icon pro Eintrag wählen
+                Erstellen Sie Gruppen und weisen Sie Menüpunkte diesen zu · Reihenfolge per Drag &amp; Drop
+              </CardDescription>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 px-3 text-xs gap-1.5 shrink-0"
+              onClick={handleAddCategory}
+            >
+              <Plus className="w-3.5 h-3.5" /> Neue Kategorie
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {categories.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 border-2 border-dashed border-slate-200 rounded-lg gap-2">
+              <Folder className="w-8 h-8 text-slate-300" />
+              <p className="text-sm text-slate-400">Noch keine Kategorien angelegt</p>
+              <p className="text-xs text-slate-400">
+                Klicken Sie auf „Neue Kategorie" und weisen Sie dann Menüpunkte zu
+              </p>
+            </div>
+          ) : (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleCategoryDragEnd}
+            >
+              <SortableContext
+                items={categories.map((c) => c.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-1.5">
+                  {categories.map((cat) => (
+                    <SortableCategoryItem
+                      key={cat.id}
+                      cat={cat}
+                      onNameChange={handleCategoryNameChange}
+                      onColorChange={handleCategoryColorChange}
+                      onDelete={handleDeleteCategory}
+                      onOpenIconPicker={setCatIconPickerFor}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Navigation ─────────────────────────────────────────────────────── */}
+      <Card className="shadow-sm">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <CardTitle className="text-base">Sidebar-Navigation anpassen</CardTitle>
+              <CardDescription className="text-xs mt-0.5">
+                Reihenfolge per Drag &amp; Drop · Beschriftung · Farbe · Icon · Kategorie zuweisen
               </CardDescription>
             </div>
             <div className="flex items-center gap-2 shrink-0">
@@ -521,11 +745,11 @@ export function SidebarNavConfig({ savedConfig }: { savedConfig: string }) {
         </CardHeader>
 
         <CardContent>
-          {/* Column labels */}
           <div className="flex items-center gap-2.5 mb-2 px-1">
             <div className="w-4" />
             <div className="w-8 text-[10px] text-slate-400 text-center">Icon</div>
             <div className="flex-1 text-[10px] text-slate-400">Beschriftung</div>
+            <div className="w-32 text-[10px] text-slate-400">Kategorie</div>
             <div className="w-8 text-[10px] text-slate-400 text-center">Farbe</div>
             <div className="w-7" />
           </div>
@@ -544,9 +768,11 @@ export function SidebarNavConfig({ savedConfig }: { savedConfig: string }) {
                   <SortableNavItem
                     key={item.href}
                     item={item}
+                    categories={categories}
                     onLabelChange={handleLabelChange}
                     onColorChange={handleColorChange}
                     onIconChange={handleIconChange}
+                    onCategoryChange={handleCategoryChange}
                     onReset={handleReset}
                     onOpenIconPicker={setIconPickerFor}
                   />
@@ -557,12 +783,12 @@ export function SidebarNavConfig({ savedConfig }: { savedConfig: string }) {
 
           <p className="text-[11px] text-slate-400 mt-3 leading-relaxed">
             Die Reihenfolge und Anpassungen gelten für alle Benutzer.
-            Rollenbasierte Zugriffsrechte bleiben unverändert — Menüpunkte, auf die ein Benutzer keinen Zugriff hat, werden weiterhin ausgeblendet.
+            Rollenbasierte Zugriffsrechte bleiben unverändert — Menüpunkte ohne Zugriff werden ausgeblendet.
           </p>
         </CardContent>
       </Card>
 
-      {/* Icon picker dialog */}
+      {/* Nav icon picker */}
       {iconPickerItem && (
         <IconPickerDialog
           open={iconPickerFor !== null}
@@ -571,6 +797,19 @@ export function SidebarNavConfig({ savedConfig }: { savedConfig: string }) {
           defaultIconName={iconPickerItem.defaultIconName}
           onSelect={(name) => {
             if (iconPickerFor) handleIconChange(iconPickerFor, name);
+          }}
+        />
+      )}
+
+      {/* Category icon picker */}
+      {catIconPickerCat && (
+        <IconPickerDialog
+          open={catIconPickerFor !== null}
+          onClose={() => setCatIconPickerFor(null)}
+          currentIconName={catIconPickerCat.iconName}
+          defaultIconName="Folder"
+          onSelect={(name) => {
+            if (catIconPickerFor) handleCategoryIconChange(catIconPickerFor, name);
           }}
         />
       )}
