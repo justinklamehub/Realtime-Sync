@@ -85,8 +85,8 @@ function Router() {
         <AppLayout>
           <Switch>
             <Route path="/dashboard"><ProtectedRoute component={DashboardPage} /></Route>
-            <Route path="/shipments"><ProtectedRoute component={ShipmentsPage} /></Route>
             <Route path="/shipments/kanban"><ProtectedRoute component={KanbanPage} /></Route>
+            <Route path="/shipments"><ProtectedRoute component={ShipmentsPage} /></Route>
             <Route path="/speditionen"><ProtectedRoute component={SpeditionenPage} roles={["comet_admin", "comet_leitstand"]} /></Route>
             <Route path="/users"><ProtectedRoute component={UsersPage} /></Route>
             <Route path="/paletten"><ProtectedRoute component={PalettenPage} /></Route>
