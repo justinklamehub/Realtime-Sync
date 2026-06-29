@@ -6,13 +6,30 @@ import { eq, notLike, and } from "drizzle-orm";
 export type EmailEvent = "shipment" | "bulk" | "user";
 
 export interface ShipmentRow { label: string; value: string }
-export interface BulkShipmentRow { bezeichnung: string; kennzeichen: string; spedition: string; status: string }
+export interface BulkShipmentRow {
+  bezeichnung: string; kennzeichen: string; spedition: string; subSpedition: string;
+  relation: string; lkwArt: string; telefon: string; eta: string; ata: string;
+  tor: string; status: string; wareStatus: string; datum: string; bemerkungen: string;
+}
+
+// Keys shown by default when no setting is configured (original 4, backward-compat)
+const BULK_DEFAULT_KEYS = ["bezeichnung", "kennzeichen", "spedition", "status"];
 
 const ALL_BULK_COLS: { key: string; label: string; get: (s: BulkShipmentRow) => string }[] = [
-  { key: "bezeichnung", label: "Bezeichnung", get: (s) => s.bezeichnung },
-  { key: "kennzeichen", label: "Kennzeichen", get: (s) => s.kennzeichen },
-  { key: "spedition", label: "Spedition", get: (s) => s.spedition },
-  { key: "status", label: "Status", get: (s) => s.status },
+  { key: "bezeichnung",  label: "Bezeichnung",    get: (s) => s.bezeichnung },
+  { key: "kennzeichen",  label: "Kennzeichen",    get: (s) => s.kennzeichen },
+  { key: "spedition",    label: "Spedition",      get: (s) => s.spedition },
+  { key: "subSpedition", label: "Sub-Spedition",  get: (s) => s.subSpedition },
+  { key: "relation",     label: "Relation",        get: (s) => s.relation },
+  { key: "lkwArt",       label: "LKW-Art",         get: (s) => s.lkwArt },
+  { key: "telefon",      label: "Telefon Fahrer",  get: (s) => s.telefon },
+  { key: "eta",          label: "ETA",             get: (s) => s.eta },
+  { key: "ata",          label: "ATA",             get: (s) => s.ata },
+  { key: "tor",          label: "Tor",             get: (s) => s.tor },
+  { key: "status",       label: "Status",          get: (s) => s.status },
+  { key: "wareStatus",   label: "Ware-Status",     get: (s) => s.wareStatus },
+  { key: "datum",        label: "Datum (E-Mail)",  get: (s) => s.datum },
+  { key: "bemerkungen",  label: "Bemerkungen",     get: (s) => s.bemerkungen },
 ];
 
 async function getSettings(): Promise<Record<string, string>> {
@@ -67,9 +84,8 @@ export function buildShipmentTableText(rows: ShipmentRow[]): string {
 // ── HTML table: bulk shipments (multi-column) ────────────────────────────────
 
 export function buildBulkTableHtml(ships: BulkShipmentRow[], enabledKeys?: string[]): string {
-  const cols = enabledKeys && enabledKeys.length > 0
-    ? enabledKeys.map((k) => ALL_BULK_COLS.find((c) => c.key === k)).filter((c): c is (typeof ALL_BULK_COLS)[number] => c != null)
-    : ALL_BULK_COLS;
+  const activeKeys = enabledKeys && enabledKeys.length > 0 ? enabledKeys : BULK_DEFAULT_KEYS;
+  const cols = activeKeys.map((k) => ALL_BULK_COLS.find((c) => c.key === k)).filter((c): c is (typeof ALL_BULK_COLS)[number] => c != null);
   const th = (t: string) =>
     `<th style="border:1px solid #ddd;padding:7px 12px;background:#f0f4ff;text-align:left;font-size:13px">${t}</th>`;
   const td = (t: string) =>
@@ -82,9 +98,8 @@ export function buildBulkTableHtml(ships: BulkShipmentRow[], enabledKeys?: strin
 }
 
 export function buildBulkTableText(ships: BulkShipmentRow[], enabledKeys?: string[]): string {
-  const cols = enabledKeys && enabledKeys.length > 0
-    ? enabledKeys.map((k) => ALL_BULK_COLS.find((c) => c.key === k)).filter((c): c is (typeof ALL_BULK_COLS)[number] => c != null)
-    : ALL_BULK_COLS;
+  const activeKeys = enabledKeys && enabledKeys.length > 0 ? enabledKeys : BULK_DEFAULT_KEYS;
+  const cols = activeKeys.map((k) => ALL_BULK_COLS.find((c) => c.key === k)).filter((c): c is (typeof ALL_BULK_COLS)[number] => c != null);
   const headers = cols.map((c) => c.label);
   const widths = headers.map((h, ci) => Math.max(h.length, ...ships.map((s) => cols[ci].get(s).length)));
   const sep = widths.map((w) => "-".repeat(w + 2)).join("+");

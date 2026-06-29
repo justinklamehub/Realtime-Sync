@@ -71,11 +71,23 @@ const SHIPMENT_TABLE_FIELDS = [
   { key: "bemerkungen", label: "Bemerkungen" },
 ];
 
+const BULK_DEFAULT_ENABLED = ["bezeichnung", "kennzeichen", "spedition", "status"];
+
 const BULK_TABLE_FIELDS = [
-  { key: "bezeichnung", label: "Bezeichnung" },
-  { key: "kennzeichen", label: "Kennzeichen" },
-  { key: "spedition", label: "Spedition" },
-  { key: "status", label: "Status" },
+  { key: "bezeichnung",  label: "Bezeichnung" },
+  { key: "kennzeichen",  label: "Kennzeichen" },
+  { key: "spedition",    label: "Spedition" },
+  { key: "subSpedition", label: "Sub-Spedition" },
+  { key: "relation",     label: "Relation" },
+  { key: "lkwArt",       label: "LKW-Art" },
+  { key: "telefon",      label: "Telefon Fahrer" },
+  { key: "eta",          label: "ETA" },
+  { key: "ata",          label: "ATA" },
+  { key: "tor",          label: "Tor" },
+  { key: "status",       label: "Status" },
+  { key: "wareStatus",   label: "Ware-Status" },
+  { key: "datum",        label: "Datum (E-Mail)" },
+  { key: "bemerkungen",  label: "Bemerkungen" },
 ];
 
 const EMAIL_EVENTS = [
@@ -87,6 +99,7 @@ const EMAIL_EVENTS = [
     recipientNote: "Die E-Mail-Adresse des anlegenden Benutzers wird automatisch als Empfänger hinzugefügt.",
     tableFieldsKey: "email_tpl_shipment_tabelle_felder" as string,
     availableFields: SHIPMENT_TABLE_FIELDS,
+    defaultEnabledKeys: null as string[] | null,
   },
   {
     key: "bulk",
@@ -96,6 +109,7 @@ const EMAIL_EVENTS = [
     recipientNote: "Die E-Mail-Adresse des anlegenden Benutzers wird automatisch als Empfänger hinzugefügt.",
     tableFieldsKey: "email_tpl_bulk_tabelle_felder" as string,
     availableFields: BULK_TABLE_FIELDS,
+    defaultEnabledKeys: BULK_DEFAULT_ENABLED,
   },
   {
     key: "user",
@@ -105,6 +119,7 @@ const EMAIL_EVENTS = [
     recipientNote: "Die E-Mail-Adresse des neuen Benutzers wird automatisch als Empfänger hinzugefügt (sofern angegeben).",
     tableFieldsKey: null as string | null,
     availableFields: null as { key: string; label: string }[] | null,
+    defaultEnabledKeys: null as string[] | null,
   },
 ];
 
@@ -267,10 +282,12 @@ function TabelleFelder({
   availableFields,
   settingKey,
   settings,
+  defaultEnabledKeys,
 }: {
   availableFields: { key: string; label: string }[];
   settingKey: string;
   settings: SettingsMap;
+  defaultEnabledKeys?: string[] | null;
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -282,7 +299,9 @@ function TabelleFelder({
     if (raw) {
       try { enabledKeys = JSON.parse(raw); } catch { /* ignore */ }
     }
-    if (!enabledKeys) return availableFields.map((f) => ({ ...f, enabled: true }));
+    // Fall back to defaultEnabledKeys (for bulk) or all fields (for shipment)
+    const fallback = defaultEnabledKeys ?? availableFields.map((f) => f.key);
+    if (!enabledKeys) enabledKeys = fallback;
     const result: { key: string; label: string; enabled: boolean }[] = [];
     for (const k of enabledKeys) {
       const field = availableFields.find((f) => f.key === k);
@@ -393,10 +412,11 @@ function TabelleFelder({
 
 // ── EmailEventSection ─────────────────────────────────────────────────────────
 
-function EmailEventSection({ eventKey, label, description, placeholders, recipientNote, tableFieldsKey, availableFields, settings, onSave, isSaving }: {
+function EmailEventSection({ eventKey, label, description, placeholders, recipientNote, tableFieldsKey, availableFields, defaultEnabledKeys, settings, onSave, isSaving }: {
   eventKey: string; label: string; description: string;
   placeholders: string[]; recipientNote: string | null;
   tableFieldsKey: string | null; availableFields: { key: string; label: string }[] | null;
+  defaultEnabledKeys: string[] | null;
   settings: SettingsMap;
   onSave: (key: string, val: string) => void;
   isSaving: (key: string) => boolean;
@@ -488,6 +508,7 @@ function EmailEventSection({ eventKey, label, description, placeholders, recipie
               availableFields={availableFields}
               settingKey={tableFieldsKey}
               settings={settings}
+              defaultEnabledKeys={defaultEnabledKeys}
             />
           )}
         </div>
@@ -975,6 +996,7 @@ export default function SettingsPage() {
                     recipientNote={ev.recipientNote}
                     tableFieldsKey={ev.tableFieldsKey}
                     availableFields={ev.availableFields}
+                    defaultEnabledKeys={ev.defaultEnabledKeys}
                     settings={s}
                     onSave={handleSave}
                     isSaving={isSavingKey}
