@@ -58,12 +58,16 @@ const SHIPMENT_TABLE_FIELDS = [
   { key: "bezeichnung", label: "Bezeichnung" },
   { key: "kennzeichen", label: "Kennzeichen" },
   { key: "spedition", label: "Spedition" },
+  { key: "subSpedition", label: "Sub-Spedition" },
   { key: "relation", label: "Relation" },
   { key: "lkwArt", label: "LKW-Art" },
+  { key: "telefon", label: "Telefon Fahrer" },
   { key: "eta", label: "ETA" },
+  { key: "ata", label: "ATA" },
   { key: "tor", label: "Tor" },
   { key: "status", label: "Status" },
-  { key: "datum", label: "Datum" },
+  { key: "wareStatus", label: "Ware-Status" },
+  { key: "datum", label: "Datum (E-Mail)" },
   { key: "bemerkungen", label: "Bemerkungen" },
 ];
 

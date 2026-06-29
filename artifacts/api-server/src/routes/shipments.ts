@@ -167,22 +167,34 @@ router.post("/shipments", requireAuth, async (req, res) => {
     // E-Mail-Benachrichtigung (fire-and-forget)
     (async () => {
       try {
-        const spedName = shipment.speditionId
-          ? (await db.select({ name: speditionenTable.name }).from(speditionenTable).where(eq(speditionenTable.id, shipment.speditionId)).limit(1))[0]?.name ?? ""
-          : "";
-        const creatorEmail = req.session.userId
-          ? (await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, req.session.userId)).limit(1))[0]?.email ?? undefined
-          : undefined;
+        const [spedRow, subSpedRow, creatorRow] = await Promise.all([
+          shipment.speditionId
+            ? db.select({ name: speditionenTable.name }).from(speditionenTable).where(eq(speditionenTable.id, shipment.speditionId)).limit(1)
+            : Promise.resolve([]),
+          shipment.subSpeditionId
+            ? db.select({ name: speditionenTable.name }).from(speditionenTable).where(eq(speditionenTable.id, shipment.subSpeditionId)).limit(1)
+            : Promise.resolve([]),
+          req.session.userId
+            ? db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, req.session.userId)).limit(1)
+            : Promise.resolve([]),
+        ]);
+        const spedName = (spedRow as { name: string }[])[0]?.name ?? "";
+        const subSpedName = (subSpedRow as { name: string }[])[0]?.name ?? "";
+        const creatorEmail = (creatorRow as { email: string }[])[0]?.email ?? undefined;
         const ALL_SHIP_FIELDS = [
           { key: "bezeichnung", label: "Bezeichnung", value: shipment.bezeichnung ?? "" },
           { key: "kennzeichen", label: "Kennzeichen", value: shipment.kennzeichen ?? "" },
           { key: "spedition", label: "Spedition", value: spedName },
+          { key: "subSpedition", label: "Sub-Spedition", value: subSpedName },
           { key: "relation", label: "Relation", value: shipment.relation ?? "" },
           { key: "lkwArt", label: "LKW-Art", value: shipment.lkwArt ?? "" },
+          { key: "telefon", label: "Telefon Fahrer", value: shipment.telefon ?? "" },
           { key: "eta", label: "ETA", value: [shipment.etaDate, shipment.etaTime].filter(Boolean).join(" ") },
+          { key: "ata", label: "ATA", value: [shipment.ataDate, shipment.ataTime].filter(Boolean).join(" ") },
           { key: "tor", label: "Tor", value: shipment.tor ?? "" },
           { key: "status", label: "Status", value: shipment.status ?? "" },
-          { key: "datum", label: "Datum", value: new Date().toLocaleDateString("de-DE") },
+          { key: "wareStatus", label: "Ware-Status", value: shipment.wareStatus ?? "" },
+          { key: "datum", label: "Datum (E-Mail)", value: new Date().toLocaleDateString("de-DE") },
           { key: "bemerkungen", label: "Bemerkungen", value: shipment.bemerkungen ?? "" },
         ];
         const tabelleSettingRow = await db.select({ value: settingsTable.value })
