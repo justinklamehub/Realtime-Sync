@@ -5,6 +5,21 @@ import { can } from "../lib/permissions";
 
 const router = Router();
 
+export async function ensureAuftragAnalyseTable(): Promise<void> {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS auftrag_analyse_ergebnisse (
+      id SERIAL PRIMARY KEY,
+      uploaded_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+      filename TEXT,
+      uploaded_by_id INTEGER,
+      total_rows INTEGER NOT NULL DEFAULT 0,
+      total_paletten INTEGER NOT NULL DEFAULT 0,
+      total_auftraege INTEGER NOT NULL DEFAULT 0,
+      results JSONB NOT NULL DEFAULT '[]'
+    )
+  `);
+}
+
 function parseCsv(text: string) {
   const lines = text.split(/\r?\n/).filter((l) => l.trim());
   if (lines.length < 2) return [];
@@ -64,6 +79,92 @@ function parseCsv(text: string) {
   return rows;
 }
 
+function buildResults(
+  rows: ReturnType<typeof parseCsv>,
+  spedByNr: Map<string, { id: number; name: string }>
+) {
+  type Group = {
+    spediteurNr: string;
+    csvName: string;
+    speditionId: number | null;
+    speditionDbName: string | null;
+    auftraegeSet: Set<string>;
+    paletten: number;
+    leitgebieteMap: Map<string, number>;
+    liefertermineSet: Set<string>;
+    kartons: number;
+  };
+  const grouped = new Map<string, Group>();
+
+  for (const row of rows) {
+    if (!grouped.has(row.spediteurNr)) {
+      const cleanName = row.spedName.replace(/\s*\*\d+\*\s*$/, "").trim();
+      const dbMatch = spedByNr.get(row.spediteurNr);
+      grouped.set(row.spediteurNr, {
+        spediteurNr:      row.spediteurNr,
+        csvName:          cleanName,
+        speditionId:      dbMatch?.id ?? null,
+        speditionDbName:  dbMatch?.name ?? null,
+        auftraegeSet:     new Set(),
+        paletten:         0,
+        leitgebieteMap:   new Map(),
+        liefertermineSet: new Set(),
+        kartons:          0,
+      });
+    }
+    const g = grouped.get(row.spediteurNr)!;
+    if (row.auftrag) g.auftraegeSet.add(row.auftrag);
+    g.paletten++;
+    if (row.leitgebiet) g.leitgebieteMap.set(row.leitgebiet, (g.leitgebieteMap.get(row.leitgebiet) ?? 0) + 1);
+    if (row.lfdat) g.liefertermineSet.add(row.lfdat);
+    g.kartons += row.kartons;
+  }
+
+  return Array.from(grouped.values())
+    .map((g) => ({
+      spediteurNr:     g.spediteurNr,
+      csvName:         g.csvName,
+      speditionId:     g.speditionId,
+      speditionDbName: g.speditionDbName,
+      matched:         g.speditionId !== null,
+      auftraege:       g.auftraegeSet.size,
+      paletten:        g.paletten,
+      kartons:         g.kartons,
+      leitgebiete: Array.from(g.leitgebieteMap.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([leitgebiet, anzahl]) => ({ leitgebiet, anzahl })),
+      liefertermine: Array.from(g.liefertermineSet).sort(),
+    }))
+    .sort((a, b) => a.spediteurNr.localeCompare(b.spediteurNr));
+}
+
+// GET /api/auftragsauswertung/latest — load persisted analysis
+router.get("/auftragsauswertung/latest", requireAuth, async (req, res) => {
+  try {
+    const role = req.session.role!;
+    if (!(await can(role, "auftrag.analyse"))) {
+      return res.status(403).json({ error: "Keine Berechtigung" });
+    }
+    const r = await pool.query(
+      "SELECT * FROM auftrag_analyse_ergebnisse ORDER BY uploaded_at DESC LIMIT 1"
+    );
+    if (r.rows.length === 0) return res.json(null);
+    const row = r.rows[0];
+    return res.json({
+      uploadedAt:     row.uploaded_at,
+      filename:       row.filename,
+      totalRows:      row.total_rows,
+      totalPaletten:  row.total_paletten,
+      totalAuftraege: row.total_auftraege,
+      results:        row.results,
+    });
+  } catch (err) {
+    console.error("[auftragsauswertung] latest", err);
+    return res.status(500).json({ error: "Interner Fehler" });
+  }
+});
+
+// POST /api/auftragsauswertung/upload — parse CSV, persist, return result
 router.post("/auftragsauswertung/upload", requireAuth, async (req, res) => {
   try {
     const role = req.session.role!;
@@ -71,7 +172,7 @@ router.post("/auftragsauswertung/upload", requireAuth, async (req, res) => {
       return res.status(403).json({ error: "Keine Berechtigung für Auftragsauswertung" });
     }
 
-    const { csv } = req.body as { csv?: string };
+    const { csv, filename } = req.body as { csv?: string; filename?: string };
     if (!csv?.trim()) {
       return res.status(400).json({ error: "Keine CSV-Daten übermittelt" });
     }
@@ -92,65 +193,33 @@ router.post("/auftragsauswertung/upload", requireAuth, async (req, res) => {
       }
     }
 
-    // Group by Spediteur number
-    type Group = {
-      spediteurNr: string;
-      csvName: string;
-      speditionId: number | null;
-      speditionDbName: string | null;
-      auftraegeSet: Set<string>;
-      paletten: number;
-      leitgebieteMap: Map<string, number>;
-      liefertermineSet: Set<string>;
-      kartons: number;
-    };
-    const grouped = new Map<string, Group>();
+    const results = buildResults(rows, spedByNr);
+    const totalPaletten  = results.reduce((s, r) => s + r.paletten, 0);
+    const totalAuftraege = results.reduce((s, r) => s + r.auftraege, 0);
 
-    for (const row of rows) {
-      if (!grouped.has(row.spediteurNr)) {
-        const cleanName = row.spedName.replace(/\s*\*\d+\*\s*$/, "").trim();
-        const dbMatch = spedByNr.get(row.spediteurNr);
-        grouped.set(row.spediteurNr, {
-          spediteurNr:     row.spediteurNr,
-          csvName:         cleanName,
-          speditionId:     dbMatch?.id ?? null,
-          speditionDbName: dbMatch?.name ?? null,
-          auftraegeSet:    new Set(),
-          paletten:        0,
-          leitgebieteMap:  new Map(),
-          liefertermineSet: new Set(),
-          kartons:         0,
-        });
-      }
-      const g = grouped.get(row.spediteurNr)!;
-      if (row.auftrag) g.auftraegeSet.add(row.auftrag);
-      g.paletten++;
-      if (row.leitgebiet) g.leitgebieteMap.set(row.leitgebiet, (g.leitgebieteMap.get(row.leitgebiet) ?? 0) + 1);
-      if (row.lfdat) g.liefertermineSet.add(row.lfdat);
-      g.kartons += row.kartons;
-    }
-
-    const results = Array.from(grouped.values())
-      .map((g) => ({
-        spediteurNr:     g.spediteurNr,
-        csvName:         g.csvName,
-        speditionId:     g.speditionId,
-        speditionDbName: g.speditionDbName,
-        matched:         g.speditionId !== null,
-        auftraege:       g.auftraegeSet.size,
-        paletten:        g.paletten,
-        kartons:         g.kartons,
-        leitgebiete:     Array.from(g.leitgebieteMap.entries())
-          .sort((a, b) => a[0].localeCompare(b[0]))
-          .map(([leitgebiet, anzahl]) => ({ leitgebiet, anzahl })),
-        liefertermine: Array.from(g.liefertermineSet).sort(),
-      }))
-      .sort((a, b) => a.spediteurNr.localeCompare(b.spediteurNr));
+    // Persist: replace any previous result
+    await pool.query("DELETE FROM auftrag_analyse_ergebnisse");
+    const inserted = await pool.query(
+      `INSERT INTO auftrag_analyse_ergebnisse
+         (filename, uploaded_by_id, total_rows, total_paletten, total_auftraege, results)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING uploaded_at`,
+      [
+        filename ?? null,
+        req.session.userId ?? null,
+        rows.length,
+        totalPaletten,
+        totalAuftraege,
+        JSON.stringify(results),
+      ]
+    );
 
     return res.json({
+      uploadedAt:     inserted.rows[0].uploaded_at,
+      filename:       filename ?? null,
       totalRows:      rows.length,
-      totalPaletten:  results.reduce((s, r) => s + r.paletten, 0),
-      totalAuftraege: results.reduce((s, r) => s + r.auftraege, 0),
+      totalPaletten,
+      totalAuftraege,
       results,
     });
   } catch (err) {

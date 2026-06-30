@@ -1,9 +1,9 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Loader2, RefreshCw, Package, ClipboardList
+  Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Loader2, Package, ClipboardList
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +25,8 @@ interface SpedResult {
 }
 
 interface AnalyseResult {
+  uploadedAt?: string;
+  filename?: string | null;
   totalRows: number;
   totalPaletten: number;
   totalAuftraege: number;
@@ -37,34 +39,53 @@ function formatLfdat(s: string): string {
   return s;
 }
 
+function formatDate(iso?: string): string {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleString("de-DE", {
+      day: "2-digit", month: "2-digit", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    });
+  } catch { return iso; }
+}
+
 export default function AuftragsauswertungPage() {
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isLoadingLatest, setIsLoadingLatest] = useState(true);
   const [result, setResult] = useState<AnalyseResult | null>(null);
-  const [filename, setFilename] = useState("");
+
+  // Load persisted analysis on mount
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoadingLatest(true);
+    fetch(`${API_BASE}/auftragsauswertung/latest`, { credentials: "include" })
+      .then((r) => r.json())
+      .then((data) => { if (!cancelled) setResult(data ?? null); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setIsLoadingLatest(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   const processFile = useCallback(async (file: File) => {
     if (!file.name.toLowerCase().endsWith(".csv")) {
       toast({ title: "Bitte eine CSV-Datei auswählen", variant: "destructive" });
       return;
     }
-    setFilename(file.name);
-    setIsLoading(true);
-    setResult(null);
+    setIsUploading(true);
     try {
       const text = await file.text();
       const r = await fetch(`${API_BASE}/auftragsauswertung/upload`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ csv: text }),
+        body: JSON.stringify({ csv: text, filename: file.name }),
       });
       const data = await r.json();
       if (!r.ok) {
         toast({ title: data.error ?? "Fehler bei der Auswertung", variant: "destructive" });
-        setFilename("");
       } else {
         setResult(data);
         toast({
@@ -74,9 +95,9 @@ export default function AuftragsauswertungPage() {
       }
     } catch {
       toast({ title: "Netzwerkfehler", variant: "destructive" });
-      setFilename("");
     } finally {
-      setIsLoading(false);
+      setIsUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
     }
   }, [toast]);
 
@@ -87,11 +108,15 @@ export default function AuftragsauswertungPage() {
     if (file) processFile(file);
   }, [processFile]);
 
-  const reset = () => {
-    setResult(null);
-    setFilename("");
-    if (fileRef.current) fileRef.current.value = "";
-  };
+  const triggerUpload = () => fileRef.current?.click();
+
+  if (isLoadingLatest) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[300px]">
+        <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-full">
@@ -103,15 +128,29 @@ export default function AuftragsauswertungPage() {
             <p className="text-sm text-slate-500">SAP-Export (CSV) je Spedition auswerten</p>
           </div>
         </div>
-        {result && (
-          <Button variant="outline" size="sm" onClick={reset}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Neue Auswertung
+        <div className="flex items-center gap-2">
+          {isUploading && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={triggerUpload}
+            disabled={isUploading}
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            {result ? "Neue CSV hochladen" : "CSV hochladen"}
           </Button>
-        )}
+        </div>
       </div>
 
-      {!result && (
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".csv"
+        className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) processFile(f); }}
+      />
+
+      {!result && !isUploading && (
         <div
           className={cn(
             "border-2 border-dashed rounded-xl p-12 text-center transition-colors cursor-pointer",
@@ -120,38 +159,37 @@ export default function AuftragsauswertungPage() {
           onDrop={onDrop}
           onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
           onDragLeave={() => setIsDragging(false)}
-          onClick={() => fileRef.current?.click()}
+          onClick={triggerUpload}
         >
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".csv"
-            className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) processFile(f); }}
-          />
-          {isLoading ? (
-            <div className="flex flex-col items-center gap-3 text-slate-500">
-              <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
-              <p className="text-sm font-medium">Wird ausgewertet…</p>
-              {filename && <p className="text-xs text-slate-400">{filename}</p>}
+          <div className="flex flex-col items-center gap-3">
+            <div className="p-4 rounded-full bg-blue-50">
+              <Upload className="h-8 w-8 text-blue-500" />
             </div>
-          ) : (
-            <div className="flex flex-col items-center gap-3">
-              <div className="p-4 rounded-full bg-blue-50">
-                <Upload className="h-8 w-8 text-blue-500" />
-              </div>
-              <div>
-                <p className="text-base font-medium text-slate-700">CSV-Datei hier ablegen</p>
-                <p className="text-sm text-slate-400 mt-1">oder klicken zum Auswählen</p>
-              </div>
-              <p className="text-xs text-slate-400">SAP-Export, semikolongetrennt</p>
+            <div>
+              <p className="text-base font-medium text-slate-700">CSV-Datei hier ablegen</p>
+              <p className="text-sm text-slate-400 mt-1">oder klicken zum Auswählen</p>
             </div>
-          )}
+            <p className="text-xs text-slate-400">SAP-Export, semikolongetrennt</p>
+          </div>
+        </div>
+      )}
+
+      {!result && isUploading && (
+        <div className="border-2 border-dashed border-blue-200 bg-blue-50 rounded-xl p-12 text-center">
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
+            <p className="text-sm font-medium text-slate-600">Wird ausgewertet…</p>
+          </div>
         </div>
       )}
 
       {result && (
-        <div className="space-y-4">
+        <div
+          className={cn("space-y-4", isUploading && "opacity-50 pointer-events-none")}
+          onDrop={onDrop}
+          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+          onDragLeave={() => setIsDragging(false)}
+        >
           <div className="grid grid-cols-3 gap-4">
             <div className="bg-white border border-slate-200 rounded-lg p-4">
               <p className="text-xs text-slate-500 mb-1">Speditionen</p>
@@ -169,9 +207,16 @@ export default function AuftragsauswertungPage() {
 
           <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
             <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2 text-sm text-slate-500">
-              <FileSpreadsheet className="h-4 w-4" />
-              <span className="font-medium text-slate-700">{filename}</span>
-              <span>— {result.totalRows} Zeilen</span>
+              <FileSpreadsheet className="h-4 w-4 shrink-0" />
+              {result.filename && (
+                <span className="font-medium text-slate-700 truncate max-w-xs">{result.filename}</span>
+              )}
+              <span className="shrink-0">{result.totalRows} Zeilen</span>
+              {result.uploadedAt && (
+                <span className="shrink-0 ml-auto text-xs text-slate-400">
+                  Hochgeladen: {formatDate(result.uploadedAt)}
+                </span>
+              )}
             </div>
 
             <div className="overflow-x-auto">
@@ -190,9 +235,7 @@ export default function AuftragsauswertungPage() {
                 <tbody className="divide-y divide-slate-100">
                   {result.results.map((s) => (
                     <tr key={s.spediteurNr} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3 font-mono text-slate-700 whitespace-nowrap">
-                        {s.spediteurNr}
-                      </td>
+                      <td className="px-4 py-3 font-mono text-slate-700 whitespace-nowrap">{s.spediteurNr}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-slate-800">
@@ -228,15 +271,9 @@ export default function AuftragsauswertungPage() {
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1 max-w-xs">
                           {s.leitgebiete.map((lg) => (
-                            <Badge
-                              key={lg.leitgebiet}
-                              variant="secondary"
-                              className="text-xs font-mono px-1.5 py-0"
-                            >
+                            <Badge key={lg.leitgebiet} variant="secondary" className="text-xs font-mono px-1.5 py-0">
                               {lg.leitgebiet}
-                              {lg.anzahl > 1 && (
-                                <span className="ml-1 text-slate-400">×{lg.anzahl}</span>
-                              )}
+                              {lg.anzahl > 1 && <span className="ml-1 text-slate-400">×{lg.anzahl}</span>}
                             </Badge>
                           ))}
                           {s.leitgebiete.length === 0 && <span className="text-slate-300">—</span>}
@@ -262,6 +299,15 @@ export default function AuftragsauswertungPage() {
                 Einige Speditionen konnten nicht zugeordnet werden. Bitte{" "}
                 <strong>Speditionsnummer (SAP)</strong> in den Speditionsstammdaten hinterlegen.
               </span>
+            </div>
+          )}
+
+          {isDragging && (
+            <div className="fixed inset-0 bg-blue-500/10 border-4 border-blue-400 border-dashed rounded-xl z-50 flex items-center justify-center pointer-events-none">
+              <div className="bg-white rounded-xl px-8 py-6 shadow-xl flex flex-col items-center gap-3">
+                <Upload className="h-10 w-10 text-blue-500" />
+                <p className="text-lg font-semibold text-slate-700">CSV ablegen zum Ersetzen</p>
+              </div>
             </div>
           )}
         </div>
