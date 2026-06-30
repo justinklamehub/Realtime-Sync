@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Plus, Trash2, AlertCircle, Upload, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -25,6 +26,7 @@ export interface RowData {
   speditionId: string;
   relation: string;
   telefon: string;
+  bemerkungen: string;
   status: string;
 }
 
@@ -40,6 +42,7 @@ export function emptyRow(id: number, partial?: Partial<RowData>): RowData {
     speditionId: "",
     relation: "",
     telefon: "",
+    bemerkungen: "",
     status: "Angemeldet",
     ...partial,
   };
@@ -54,20 +57,6 @@ interface Props {
 }
 
 // ── CSV helpers ───────────────────────────────────────────────────────────────
-
-const CSV_COLUMNS = ["Kennzeichen", "Bezeichnung", "LKW-Art", "ETA Datum (JJJJ-MM-TT)", "ETA Zeit (HH:MM)", "Tor", "Relation", "Telefon"];
-
-function downloadCsvTemplate() {
-  const header = CSV_COLUMNS.join(";");
-  const example = ["M-AB 1234", "Wöchentliche Lieferung", "Container", "2025-07-01", "08:00", "Tor 3", "München → Hamburg", "+49 89 12345"].join(";");
-  const blob = new Blob(["\uFEFF" + header + "\r\n" + example + "\r\n"], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "verladungen_vorlage.csv";
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 function normalizeLkwArt(raw: string): string {
   const lower = raw.toLowerCase().trim();
@@ -95,7 +84,7 @@ function parseDate(raw: string): string {
   return "";
 }
 
-function parseCsv(text: string): Partial<RowData>[] {
+function parseCsv(text: string, isCometUser: boolean): Partial<RowData>[] {
   const lines = text.split(/\r?\n/).filter((l) => l.trim());
   if (lines.length < 2) return [];
 
@@ -110,14 +99,15 @@ function parseCsv(text: string): Partial<RowData>[] {
     return -1;
   };
 
-  const colKennzeichen = idx(["kennzeichen", "license", "kfz"]);
-  const colBezeichnung = idx(["bezeichnung", "title", "name", "description"]);
-  const colLkwArt = idx(["lkw-art", "lkwart", "art", "type", "fahrzeug"]);
-  const colEtaDate = idx(["datum", "date", "eta dat"]);
-  const colEtaTime = idx(["zeit", "time", "eta z"]);
-  const colTor = idx(["tor", "gate", "dock"]);
-  const colRelation = idx(["relation", "route", "strecke"]);
-  const colTelefon = idx(["telefon", "phone", "tel"]);
+  const colKennzeichen  = idx(["kennzeichen", "license", "kfz"]);
+  const colBezeichnung  = idx(["bezeichnung", "title", "name", "description"]);
+  const colLkwArt       = idx(["lkw-art", "lkwart", "art", "type", "fahrzeug"]);
+  const colEtaDate      = idx(["datum", "date", "eta dat"]);
+  const colEtaTime      = idx(["zeit", "time", "eta z"]);
+  const colTor          = isCometUser ? idx(["tor", "gate", "dock"]) : -1;
+  const colRelation     = idx(["relation", "route", "strecke"]);
+  const colTelefon      = idx(["telefon", "phone", "tel"]);
+  const colBemerkungen  = idx(["bemerkung", "remark", "notiz", "note", "comment"]);
 
   const rows: Partial<RowData>[] = [];
   for (let i = 1; i < lines.length; i++) {
@@ -130,13 +120,14 @@ function parseCsv(text: string): Partial<RowData>[] {
     rows.push({
       kennzeichen: kz,
       bezeichnung: get(colBezeichnung),
-      lkwArt: normalizeLkwArt(get(colLkwArt)),
-      etaDate: parseDate(get(colEtaDate)),
-      etaTime: get(colEtaTime),
-      tor: normalizeTor(get(colTor)),
-      relation: get(colRelation),
-      telefon: get(colTelefon),
-      status: "Angemeldet",
+      lkwArt:      normalizeLkwArt(get(colLkwArt)),
+      etaDate:     parseDate(get(colEtaDate)),
+      etaTime:     get(colEtaTime),
+      tor:         isCometUser ? normalizeTor(get(colTor)) : "",
+      relation:    get(colRelation),
+      telefon:     get(colTelefon),
+      bemerkungen: get(colBemerkungen),
+      status:      "Angemeldet",
     });
   }
   return rows;
@@ -152,10 +143,45 @@ export function BulkCreateDialog({ open, onOpenChange, initialRows }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const isCometUser = ["comet_admin", "comet_leitstand", "comet_lager"].includes(user?.role ?? "");
-  const isSpedUser = ["speditions_admin", "speditions_bearbeiter"].includes(user?.role ?? "");
+  const isSpedUser  = ["speditions_admin", "speditions_bearbeiter"].includes(user?.role ?? "");
 
   const [rows, setRows] = useState<RowData[]>([emptyRow(rowCounter++)]);
   const [errors, setErrors] = useState<Set<number>>(new Set());
+
+  // Muster-CSV: role-aware columns
+  function downloadCsvTemplate() {
+    const columns = [
+      "Kennzeichen",
+      "Bezeichnung",
+      "LKW-Art",
+      "ETA Datum (JJJJ-MM-TT)",
+      "ETA Zeit (HH:MM)",
+      ...(isCometUser ? ["Tor"] : []),
+      "Relation",
+      "Telefon",
+      "Bemerkungen",
+    ];
+    const example = [
+      "M-AB 1234",
+      "Wöchentliche Lieferung",
+      "Container",
+      "2025-07-01",
+      "08:00",
+      ...(isCometUser ? ["Tor 3"] : []),
+      "München → Hamburg",
+      "+49 89 12345",
+      "Bitte Kühlung beachten",
+    ];
+    const blob = new Blob(["\uFEFF" + columns.join(";") + "\r\n" + example.join(";") + "\r\n"], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "verladungen_vorlage.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   useEffect(() => {
     if (open && initialRows && initialRows.length > 0) {
@@ -201,7 +227,7 @@ export function BulkCreateDialog({ open, onOpenChange, initialRows }: Props) {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = ev.target?.result as string;
-      const parsed = parseCsv(text);
+      const parsed = parseCsv(text, isCometUser);
       if (parsed.length === 0) {
         toast({ title: "Keine Daten gefunden", description: "Bitte prüfen Sie das CSV-Format.", variant: "destructive" });
         return;
@@ -225,16 +251,17 @@ export function BulkCreateDialog({ open, onOpenChange, initialRows }: Props) {
     }
 
     const shipments = rows.map((r) => ({
-      kennzeichen: r.kennzeichen.trim(),
-      bezeichnung: r.bezeichnung.trim() || undefined,
-      lkwArt: (r.lkwArt as ShipmentInputLkwArt) || undefined,
-      etaDate: r.etaDate || undefined,
-      etaTime: r.etaTime || undefined,
-      tor: r.tor || undefined,
-      speditionId: r.speditionId ? parseInt(r.speditionId) : (isSpedUser ? user?.speditionId : undefined),
-      relation: r.relation.trim() || undefined,
-      telefon: r.telefon.trim() || undefined,
-      status: (r.status as ShipmentInputStatus) || "Angemeldet",
+      kennzeichen:  r.kennzeichen.trim(),
+      bezeichnung:  r.bezeichnung.trim() || undefined,
+      lkwArt:       (r.lkwArt as ShipmentInputLkwArt) || undefined,
+      etaDate:      r.etaDate || undefined,
+      etaTime:      r.etaTime || undefined,
+      tor:          isCometUser ? (r.tor || undefined) : undefined,
+      speditionId:  r.speditionId ? parseInt(r.speditionId) : (isSpedUser ? user?.speditionId : undefined),
+      relation:     r.relation.trim() || undefined,
+      telefon:      r.telefon.trim() || undefined,
+      bemerkungen:  r.bemerkungen.trim() || undefined,
+      status:       (r.status as ShipmentInputStatus) || "Angemeldet",
     }));
 
     bulkMutation.mutate({ data: { shipments } });
@@ -299,6 +326,7 @@ export function BulkCreateDialog({ open, onOpenChange, initialRows }: Props) {
                   )}
                   <th className="sticky top-0 bg-slate-50 text-left px-2 py-2 text-xs font-semibold text-slate-600 border-b border-slate-200 min-w-[130px]">Relation</th>
                   <th className="sticky top-0 bg-slate-50 text-left px-2 py-2 text-xs font-semibold text-slate-600 border-b border-slate-200 min-w-[120px]">Telefon</th>
+                  <th className="sticky top-0 bg-slate-50 text-left px-2 py-2 text-xs font-semibold text-slate-600 border-b border-slate-200 min-w-[180px]">Bemerkungen</th>
                   <th className="sticky top-0 bg-slate-50 text-left px-2 py-2 text-xs font-semibold text-slate-600 border-b border-slate-200 w-8"></th>
                 </tr>
               </thead>
@@ -395,6 +423,15 @@ export function BulkCreateDialog({ open, onOpenChange, initialRows }: Props) {
                           onChange={(e) => updateRow(row.id, "telefon", e.target.value)}
                           placeholder="+49 …"
                           className="h-8 text-sm"
+                        />
+                      </td>
+                      <td className="px-1 py-1.5 border-b border-slate-100">
+                        <Textarea
+                          value={row.bemerkungen}
+                          onChange={(e) => updateRow(row.id, "bemerkungen", e.target.value)}
+                          placeholder="Bemerkungen…"
+                          className="text-sm min-h-[32px] h-8 resize-none py-1.5 leading-tight"
+                          rows={1}
                         />
                       </td>
                       <td className="px-1 py-1.5 border-b border-slate-100">
