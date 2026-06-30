@@ -3,7 +3,7 @@ import { Server as SocketIOServer } from "socket.io";
 import app, { sessionMiddleware } from "./app";
 import { logger } from "./lib/logger";
 import { seedMissingPermissions } from "./lib/permissions";
-import { seedEmailTemplates, ensureEmailLogTable } from "./lib/email";
+import { seedEmailTemplates, ensureEmailLogTable, ensurePasswordResetTable } from "./lib/email";
 import { ensureTicketsTables } from "./routes/tickets";
 import { ensureUserPreferencesTable } from "./routes/user-preferences";
 import { startScheduler } from "./lib/scheduler";
@@ -231,6 +231,12 @@ httpServer.listen(port, async (err?: Error) => {
     logger.info("email_log table ensured");
   } catch (e) {
     logger.warn({ err: e }, "ensureEmailLogTable failed — non-fatal");
+  }
+  try {
+    await ensurePasswordResetTable();
+    logger.info("password_reset_tokens table ensured");
+  } catch (e) {
+    logger.warn({ err: e }, "ensurePasswordResetTable failed — non-fatal");
   }
   try {
     await ensureTicketsTables();

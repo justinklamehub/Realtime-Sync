@@ -24,7 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
-    const isPublicRoute = location === "/login" || location.startsWith("/scanner");
+    const isPublicRoute = location === "/login" || location === "/forgot-password" || location.startsWith("/reset-password") || location.startsWith("/scanner");
     if (!isLoading && (isError || !user) && !isPublicRoute) {
       setLocation("/login");
     }

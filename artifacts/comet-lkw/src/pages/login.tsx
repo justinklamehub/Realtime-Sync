@@ -104,6 +104,11 @@ export default function LoginPage() {
             </Button>
           </form>
         </CardContent>
+        <div className="px-6 pb-5 text-center">
+          <Link href="/forgot-password" className="text-sm text-slate-400 hover:text-slate-600 transition-colors">
+            Passwort vergessen?
+          </Link>
+        </div>
       </Card>
     </div>
   );

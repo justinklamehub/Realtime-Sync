@@ -191,6 +191,21 @@ export async function sendEventEmail(
   }
 }
 
+// ── Startup migration: ensure password_reset_tokens table exists ─────────────
+
+export async function ensurePasswordResetTable(): Promise<void> {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      id          SERIAL PRIMARY KEY,
+      user_id     INTEGER NOT NULL,
+      token       TEXT NOT NULL UNIQUE,
+      expires_at  TIMESTAMPTZ NOT NULL,
+      used_at     TIMESTAMPTZ,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+}
+
 // ── Startup migration: ensure email_log table exists ─────────────────────────
 
 export async function ensureEmailLogTable(): Promise<void> {

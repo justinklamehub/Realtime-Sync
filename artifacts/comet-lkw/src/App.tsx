@@ -25,6 +25,8 @@ function TitleSetter() {
 }
 
 import LoginPage from "@/pages/login";
+import ForgotPasswordPage from "@/pages/forgot-password";
+import ResetPasswordPage from "@/pages/reset-password";
 import DashboardPage from "@/pages/dashboard";
 import ShipmentsPage from "@/pages/shipments";
 import KanbanPage from "@/pages/shipments/kanban";
@@ -75,6 +77,8 @@ function Router() {
   return (
     <Switch>
       <Route path="/login" component={LoginPage} />
+      <Route path="/forgot-password" component={ForgotPasswordPage} />
+      <Route path="/reset-password" component={ResetPasswordPage} />
       <Route path="/scanner" component={ScannerLandingPage} />
       <Route path="/scanner/gefahrgut" component={ScannerGefahrgutPage} />
 
