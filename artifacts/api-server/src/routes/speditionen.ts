@@ -18,10 +18,34 @@ function emit(req: any, event: string, data: any, speditionId?: number | null, a
 
 const router = Router();
 
+function mapSpedition(r: any) {
+  return {
+    id: r.id,
+    name: r.name,
+    kuerzel: r.kuerzel,
+    ansprechpartner: r.ansprechpartner,
+    email: r.email,
+    telefon: r.telefon,
+    status: r.status,
+    bemerkungen: r.bemerkungen,
+    speditionsnummer: r.speditionsnummer ?? null,
+    palletFaktor: r.pallet_faktor ?? r.palletFaktor ?? 1,
+    preisProKm: r.preis_pro_km ?? r.preisProKm ?? null,
+    mindestpreisProFahrt: r.mindestpreis_pro_fahrt ?? r.mindestpreisProFahrt ?? null,
+    palettenAufschlag: r.paletten_aufschlag ?? r.palettenAufschlag ?? null,
+    kraftstoffzuschlagProzent: r.kraftstoffzuschlag_prozent ?? r.kraftstoffzuschlagProzent ?? null,
+    fixkostenProFahrt: r.fixkosten_pro_fahrt ?? r.fixkostenProFahrt ?? null,
+    mautProKm: r.maut_pro_km ?? r.mautProKm ?? null,
+    dailyShipmentLimit: r.daily_shipment_limit ?? r.dailyShipmentLimit ?? null,
+    createdAt: r.created_at ?? r.createdAt,
+    updatedAt: r.updated_at ?? r.updatedAt,
+  };
+}
+
 router.get("/speditionen", requireAuth, async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM speditionen ORDER BY name");
-    return res.json(result.rows);
+    return res.json(result.rows.map(mapSpedition));
   } catch (err) {
     return res.status(500).json({ error: "Internal server error" });
   }
