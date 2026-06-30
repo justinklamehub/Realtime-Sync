@@ -332,7 +332,7 @@ export function AppSidebar({ collapsed, onToggle, isDark, onToggleTheme }: AppSi
     { name: "Kalkulation", href: "/kalkulation", icon: Calculator, show: isCometUser },
     { name: "Gefahrgut", href: "/gefahrgut", icon: ShieldAlert, show: isCometUser },
     { name: "Auswertung", href: "/auswertung", icon: BarChart2, show: isCometUser },
-    { name: "Auftragsauswertung", href: "/auftragsauswertung", icon: FileSpreadsheet, show: isCometUser },
+    { name: "Auftragsauswertung", href: "/auftragsauswertung", icon: FileSpreadsheet, show: isCometUser || !!user.speditionId },
     { name: "Änderungslog", href: "/auditlog", icon: History, show: isCometUser },
     { name: "Speditionsfreigabe", href: "/speditionsfreigabe", icon: Share2, show: user.role === "speditions_admin" },
     { name: "Einstellungen", href: "/settings", icon: Settings, show: user.role === "comet_admin" },

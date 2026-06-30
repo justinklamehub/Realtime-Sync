@@ -19,7 +19,8 @@ export type Permission =
   | "gefahrgut.reset"
   | "gefahrgut.assign_shipment"
   | "kanban.use"
-  | "auftrag.analyse";
+  | "auftrag.analyse"
+  | "auftrag.analyse.spedition";
 
 export type ConfigurableRole =
   | "comet_leitstand"
@@ -57,6 +58,7 @@ export const ALL_PERMISSIONS: Permission[] = [
   "gefahrgut.assign_shipment",
   "kanban.use",
   "auftrag.analyse",
+  "auftrag.analyse.spedition",
 ];
 
 export const PERMISSION_LABELS: Record<Permission, { label: string; category: string }> = {
@@ -78,6 +80,7 @@ export const PERMISSION_LABELS: Record<Permission, { label: string; category: st
   "gefahrgut.assign_shipment":  { label: "Checkliste LKW zuordnen",      category: "Gefahrgut" },
   "kanban.use":                 { label: "Kanban-Board nutzen (Drag & Drop)", category: "Kanban" },
   "auftrag.analyse":            { label: "Auftragsauswertung (CSV-Upload)",    category: "Auftragsauswertung" },
+  "auftrag.analyse.spedition":  { label: "Auftragsauswertung (eigene Zeile sehen)", category: "Auftragsauswertung" },
 };
 
 export const ROLE_LABELS: Record<string, string> = {
@@ -128,6 +131,13 @@ export async function seedMissingPermissions(): Promise<void> {
     sql`INSERT INTO role_permissions (role, permission, allowed)
         SELECT role_key, 'kanban.use', true FROM roles
         WHERE role_key IN ('comet_lager', 'comet_leitstand')
+        ON CONFLICT (role, permission) DO NOTHING`
+  );
+  // Smart defaults: auftrag.analyse.spedition enabled by default for all spedition roles
+  await db.execute(
+    sql`INSERT INTO role_permissions (role, permission, allowed)
+        SELECT role_key, 'auftrag.analyse.spedition', true FROM roles
+        WHERE role_key IN ('speditions_admin', 'speditions_bearbeiter', 'speditions_viewer')
         ON CONFLICT (role, permission) DO NOTHING`
   );
 }

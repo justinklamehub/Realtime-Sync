@@ -141,6 +141,7 @@ function buildResults(
       matched:         g.speditionId !== null,
       auftraege:       g.auftraegeSet.size,
       paletten:        g.paletten,
+      freigegeben: false,
       leitgebiete: Array.from(g.leitgebieteMap.entries())
         .sort((a, b) => a[0].localeCompare(b[0]))
         .map(([leitgebiet, sub]) => ({
@@ -163,7 +164,10 @@ function buildResults(
 router.get("/auftragsauswertung/latest", requireAuth, async (req, res) => {
   try {
     const role = req.session.role!;
-    if (!(await can(role, "auftrag.analyse"))) {
+    const speditionId = req.session.speditionId ?? null;
+    const canFull  = await can(role, "auftrag.analyse");
+    const canSped  = await can(role, "auftrag.analyse.spedition");
+    if (!canFull && !canSped) {
       return res.status(403).json({ error: "Keine Berechtigung" });
     }
     const r = await pool.query(
@@ -171,16 +175,57 @@ router.get("/auftragsauswertung/latest", requireAuth, async (req, res) => {
     );
     if (r.rows.length === 0) return res.json(null);
     const row = r.rows[0];
+    let results: any[] = row.results ?? [];
+
+    // Spedition users only see their own row + freigegeben rows
+    if (!canFull && canSped && speditionId) {
+      results = results.filter(
+        (e: any) => e.speditionId === speditionId || e.freigegeben === true
+      );
+    }
+
     return res.json({
       uploadedAt:     row.uploaded_at,
       filename:       row.filename,
       totalRows:      row.total_rows,
       totalPaletten:  row.total_paletten,
       totalAuftraege: row.total_auftraege,
-      results:        row.results,
+      results,
     });
   } catch (err) {
     console.error("[auftragsauswertung] latest", err);
+    return res.status(500).json({ error: "Interner Fehler" });
+  }
+});
+
+// PATCH /api/auftragsauswertung/freigaben — toggle freigabe for one row (admin only)
+router.patch("/auftragsauswertung/freigaben", requireAuth, async (req, res) => {
+  try {
+    const role = req.session.role!;
+    if (!(await can(role, "auftrag.analyse"))) {
+      return res.status(403).json({ error: "Keine Berechtigung" });
+    }
+    const { spediteurNr, freigegeben } = req.body as { spediteurNr: string; freigegeben: boolean };
+    if (!spediteurNr || typeof freigegeben !== "boolean") {
+      return res.status(400).json({ error: "spediteurNr und freigegeben (boolean) erforderlich" });
+    }
+
+    const r = await pool.query(
+      "SELECT id, results FROM auftrag_analyse_ergebnisse ORDER BY uploaded_at DESC LIMIT 1"
+    );
+    if (r.rows.length === 0) return res.status(404).json({ error: "Keine Auswertung vorhanden" });
+
+    const { id, results } = r.rows[0];
+    const updated = (results as any[]).map((e: any) =>
+      e.spediteurNr === spediteurNr ? { ...e, freigegeben } : e
+    );
+    await pool.query(
+      "UPDATE auftrag_analyse_ergebnisse SET results = $1 WHERE id = $2",
+      [JSON.stringify(updated), id]
+    );
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("[auftragsauswertung] freigaben", err);
     return res.status(500).json({ error: "Interner Fehler" });
   }
 });
