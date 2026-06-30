@@ -79,6 +79,10 @@ router.put("/settings/:key", requireAuth, async (req, res) => {
       "email_tpl_shipment_tabelle_felder",
       "email_tpl_bulk_tabelle_felder",
       "kalkulation_startort",
+      "report_weekly_enabled",
+      "report_weekly_email",
+      "report_weekly_day",
+      "report_weekly_time",
     ];
     if (!ALLOWED_KEYS.includes(key)) {
       return res.status(400).json({ error: "Unbekannter Einstellungsschlüssel" });

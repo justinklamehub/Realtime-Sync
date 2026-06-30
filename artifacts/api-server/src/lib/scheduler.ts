@@ -1,5 +1,6 @@
-import { db, notifications, shipmentsTable } from "@workspace/db";
+import { db, pool, notifications, shipmentsTable, settingsTable } from "@workspace/db";
 import { and, gte, eq, lt, notInArray, isNotNull, count } from "drizzle-orm";
+import { sendWeeklyReport } from "./weekly-report";
 import type { Server as SocketIOServer } from "socket.io";
 import { notify } from "./notify";
 import { logger } from "./logger";
@@ -80,6 +81,52 @@ async function runOffeneVerladungenCheck(io: SocketIOServer) {
   });
 }
 
+// ── Wöchentlicher Bericht ─────────────────────────────────────────────────────
+
+async function hasWeeklyReportBeenSentThisWeek(): Promise<boolean> {
+  const now = new Date();
+  const daysSinceMonday = (now.getDay() + 6) % 7;
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - daysSinceMonday);
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  const result = await pool.query<{ sent_at: Date }>(
+    "SELECT sent_at FROM report_weekly_log WHERE sent_at >= $1 LIMIT 1",
+    [startOfWeek.toISOString()],
+  );
+  return result.rows.length > 0;
+}
+
+async function ensureReportWeeklyLogTable(): Promise<void> {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS report_weekly_log (
+      id SERIAL PRIMARY KEY,
+      sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+}
+
+async function runWeeklyReportCheck() {
+  const rows = await db.select().from(settingsTable);
+  const s = Object.fromEntries(rows.map((r) => [r.key, r.value ?? ""]));
+
+  if (s.report_weekly_enabled !== "1") return;
+
+  const configuredDay = parseInt(s.report_weekly_day || "1", 10);
+  const configuredHour = parseInt((s.report_weekly_time || "07:00").split(":")[0], 10);
+
+  const now = new Date();
+  const currentDay = now.getDay() === 0 ? 7 : now.getDay();
+
+  if (currentDay !== configuredDay) return;
+  if (now.getHours() !== configuredHour) return;
+  if (await hasWeeklyReportBeenSentThisWeek()) return;
+
+  await sendWeeklyReport();
+  await pool.query("INSERT INTO report_weekly_log (sent_at) VALUES (NOW())");
+  logger.info("Wöchentlicher Bericht erfolgreich versendet und protokolliert");
+}
+
 // ── Scheduler starten ─────────────────────────────────────────────────────────
 
 async function runAllChecks(io: SocketIOServer) {
@@ -89,7 +136,12 @@ async function runAllChecks(io: SocketIOServer) {
   await runOffeneVerladungenCheck(io).catch((e) =>
     logger.warn({ err: e }, "Offene Verladungen check failed — non-fatal")
   );
+  await runWeeklyReportCheck().catch((e) =>
+    logger.warn({ err: e }, "Weekly report check failed — non-fatal")
+  );
 }
+
+export { ensureReportWeeklyLogTable };
 
 export function startScheduler(io: SocketIOServer) {
   runAllChecks(io);

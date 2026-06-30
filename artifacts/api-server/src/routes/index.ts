@@ -17,6 +17,7 @@ import gefahrgutRouter from "./gefahrgut";
 import emailLogRouter from "./email-log";
 import ticketsRouter from "./tickets";
 import userPreferencesRouter from "./user-preferences";
+import reportRouter from "./report";
 
 const router: IRouter = Router();
 
@@ -38,5 +39,6 @@ router.use(gefahrgutRouter);
 router.use(emailLogRouter);
 router.use(ticketsRouter);
 router.use(userPreferencesRouter);
+router.use(reportRouter);
 
 export default router;

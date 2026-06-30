@@ -9,9 +9,10 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, Settings, Type, Mail, Inbox, CheckCircle2, XCircle, Eye, EyeOff, Image, Upload, Trash2 as TrashIcon, PanelLeft, Send, Server, ChevronUp, ChevronDown, Table2, Calculator } from "lucide-react";
+import { Loader2, Save, Settings, Type, Mail, Inbox, CheckCircle2, XCircle, Eye, EyeOff, Image, Upload, Trash2 as TrashIcon, PanelLeft, Send, Server, ChevronUp, ChevronDown, Table2, Calculator, BarChart2 } from "lucide-react";
 import { SidebarNavConfig } from "./sidebar-nav-config";
 import { useAuth } from "@/contexts/auth-context";
 
@@ -868,6 +869,169 @@ function SmtpSettingsCard({ settings }: { settings: SettingsMap }) {
   );
 }
 
+// ── Wöchentlicher Bericht ─────────────────────────────────────────────────────
+
+const WOCHENTAGE = [
+  { value: "1", label: "Montag" },
+  { value: "2", label: "Dienstag" },
+  { value: "3", label: "Mittwoch" },
+  { value: "4", label: "Donnerstag" },
+  { value: "5", label: "Freitag" },
+  { value: "6", label: "Samstag" },
+  { value: "7", label: "Sonntag" },
+];
+
+const UHRZEITEN = Array.from({ length: 24 }, (_, h) => ({
+  value: String(h).padStart(2, "0") + ":00",
+  label: String(h).padStart(2, "0") + ":00 Uhr",
+}));
+
+function WeeklyReportCard({
+  settings,
+  onSave,
+  isSaving,
+}: {
+  settings: SettingsMap;
+  onSave: (k: string, v: string) => void;
+  isSaving: (k: string) => boolean;
+}) {
+  const { toast } = useToast();
+  const [sending, setSending] = useState(false);
+
+  const enabled = settings["report_weekly_enabled"] === "1";
+  const email = settings["report_weekly_email"] ?? "";
+  const day = settings["report_weekly_day"] ?? "1";
+  const time = settings["report_weekly_time"] ?? "07:00";
+
+  const [localEmail, setLocalEmail] = useState(email);
+  useEffect(() => setLocalEmail(settings["report_weekly_email"] ?? ""), [settings]);
+
+  async function handleSendNow() {
+    setSending(true);
+    try {
+      const res = await fetch(`${API}/report/weekly/send`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || "Unbekannter Fehler");
+      }
+      toast({ title: "Bericht gesendet", description: "Der wöchentliche Bericht wurde erfolgreich versendet." });
+    } catch (e) {
+      toast({ title: "Fehler beim Senden", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <Card className="shadow-sm">
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-2">
+          <BarChart2 className="w-4 h-4 text-primary" />
+          <CardTitle className="text-base">Wöchentlicher Bericht</CardTitle>
+        </div>
+        <CardDescription className="text-xs">
+          Automatischer E-Mail-Bericht mit einer Zusammenfassung der letzten 7 Tage (Verladungen nach Status, LKW-Art und Spedition).
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
+
+        {/* Aktiviert */}
+        <div className="flex items-center justify-between">
+          <div>
+            <label className="text-sm font-medium">Aktiviert</label>
+            <p className="text-xs text-slate-500 mt-0.5">Automatischen Bericht per E-Mail versenden</p>
+          </div>
+          <Switch
+            checked={enabled}
+            onCheckedChange={(v) => onSave("report_weekly_enabled", v ? "1" : "")}
+            disabled={isSaving("report_weekly_enabled")}
+          />
+        </div>
+
+        <Separator />
+
+        {/* Empfänger */}
+        <div className="space-y-1.5">
+          <Label className="text-sm font-medium">Empfänger-E-Mail(s)</Label>
+          <p className="text-xs text-slate-500">Mehrere Adressen mit Komma trennen</p>
+          <div className="flex gap-2">
+            <Input
+              value={localEmail}
+              onChange={(e) => setLocalEmail(e.target.value)}
+              placeholder="admin@firma.de, leitung@firma.de"
+              className="text-sm"
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onSave("report_weekly_email", localEmail)}
+              disabled={isSaving("report_weekly_email") || localEmail === email}
+            >
+              {isSaving("report_weekly_email") ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+            </Button>
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Wochentag + Uhrzeit */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">Wochentag</Label>
+            <Select value={day} onValueChange={(v) => onSave("report_weekly_day", v)}>
+              <SelectTrigger className="text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {WOCHENTAGE.map((w) => (
+                  <SelectItem key={w.value} value={w.value}>{w.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">Uhrzeit</Label>
+            <Select value={time} onValueChange={(v) => onSave("report_weekly_time", v)}>
+              <SelectTrigger className="text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {UHRZEITEN.map((u) => (
+                  <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Jetzt senden */}
+        <div className="flex items-center justify-between">
+          <div>
+            <label className="text-sm font-medium">Bericht jetzt senden</label>
+            <p className="text-xs text-slate-500 mt-0.5">Sendet den Bericht sofort — unabhängig vom Zeitplan</p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSendNow}
+            disabled={sending || !email.trim()}
+            className="gap-2"
+          >
+            {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+            Jetzt senden
+          </Button>
+        </div>
+
+      </CardContent>
+    </Card>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
@@ -926,7 +1090,7 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="allgemein" className="space-y-5">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="allgemein" className="flex items-center gap-1.5 text-xs">
             <Settings className="w-3.5 h-3.5" /> Allgemein
           </TabsTrigger>
@@ -935,6 +1099,9 @@ export default function SettingsPage() {
           </TabsTrigger>
           <TabsTrigger value="email" className="flex items-center gap-1.5 text-xs">
             <Mail className="w-3.5 h-3.5" /> E-Mail-Vorlagen
+          </TabsTrigger>
+          <TabsTrigger value="berichte" className="flex items-center gap-1.5 text-xs">
+            <BarChart2 className="w-3.5 h-3.5" /> Berichte
           </TabsTrigger>
           <TabsTrigger value="postausgang" className="flex items-center gap-1.5 text-xs">
             <Inbox className="w-3.5 h-3.5" /> Postausgang
@@ -1043,6 +1210,11 @@ export default function SettingsPage() {
               ))}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ── Tab: Berichte ── */}
+        <TabsContent value="berichte" className="space-y-5 mt-0">
+          <WeeklyReportCard settings={s} onSave={handleSave} isSaving={isSavingKey} />
         </TabsContent>
 
         {/* ── Tab: Postausgang ── */}
