@@ -29,4 +29,16 @@ title = "Deployment-Anleitung (Debian 12 + Apache2)"
 id = "MzONsIgMjarGrnB8X-Auc"
 uri = "file://.local/outputs/COMET-LKW-Praesentation.pptx"
 type = "slides"
-title = "COMET LKW – Verladungsverwaltung (PPTX)"
+title = "COMET LKW – Verladungsverwaltung (korrigiert + Bilder)"
+
+[[outputs]]
+id = "i0VSTjIVv5ZmHhLbOem9k"
+uri = "file://attached_assets/stock_images/truck-loading-dock.jpg"
+type = "image"
+title = "truck logistics loading dock freight warehouse industrial Germany"
+
+[[outputs]]
+id = "XB924d3Vzsp8PY80gwp_d"
+uri = "file://attached_assets/stock_images/warehouse-mobile.jpg"
+type = "image"
+title = "warehouse worker using tablet mobile device scanning logistics operations"
