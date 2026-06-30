@@ -9,6 +9,7 @@ export async function ensureShipmentTemplatesTable(): Promise<void> {
     CREATE TABLE IF NOT EXISTS shipment_templates (
       id           SERIAL PRIMARY KEY,
       name         TEXT NOT NULL,
+      kennzeichen  TEXT,
       bezeichnung  TEXT,
       lkw_art      TEXT,
       eta_time     TEXT,
@@ -21,6 +22,9 @@ export async function ensureShipmentTemplatesTable(): Promise<void> {
       created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
+  `);
+  await pool.query(`
+    ALTER TABLE shipment_templates ADD COLUMN IF NOT EXISTS kennzeichen TEXT
   `);
 }
 
@@ -41,8 +45,9 @@ router.get("/shipments/templates", requireAuth, async (req, res) => {
 
 router.post("/shipments/templates", requireAuth, async (req, res) => {
   try {
-    const { name, bezeichnung, lkwArt, etaTime, tor, speditionId, relation, telefon, status } = req.body as {
+    const { name, kennzeichen, bezeichnung, lkwArt, etaTime, tor, speditionId, relation, telefon, status } = req.body as {
       name?: string;
+      kennzeichen?: string;
       bezeichnung?: string;
       lkwArt?: string;
       etaTime?: string;
@@ -59,11 +64,12 @@ router.post("/shipments/templates", requireAuth, async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO shipment_templates
-         (name, bezeichnung, lkw_art, eta_time, tor, spedition_id, relation, telefon, status, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+         (name, kennzeichen, bezeichnung, lkw_art, eta_time, tor, spedition_id, relation, telefon, status, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
        RETURNING *`,
       [
         name.trim(),
+        kennzeichen?.trim() || null,
         bezeichnung?.trim() || null,
         lkwArt || null,
         etaTime || null,
@@ -87,8 +93,9 @@ router.patch("/shipments/templates/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return res.status(400).json({ error: "Ungültige ID" });
 
-    const { name, bezeichnung, lkwArt, etaTime, tor, speditionId, relation, telefon, status } = req.body as {
+    const { name, kennzeichen, bezeichnung, lkwArt, etaTime, tor, speditionId, relation, telefon, status } = req.body as {
       name?: string;
+      kennzeichen?: string;
       bezeichnung?: string;
       lkwArt?: string;
       etaTime?: string;
@@ -105,12 +112,13 @@ router.patch("/shipments/templates/:id", requireAuth, async (req, res) => {
 
     const result = await pool.query(
       `UPDATE shipment_templates SET
-         name=$1, bezeichnung=$2, lkw_art=$3, eta_time=$4, tor=$5,
-         spedition_id=$6, relation=$7, telefon=$8, status=$9, updated_at=NOW()
-       WHERE id=$10
+         name=$1, kennzeichen=$2, bezeichnung=$3, lkw_art=$4, eta_time=$5, tor=$6,
+         spedition_id=$7, relation=$8, telefon=$9, status=$10, updated_at=NOW()
+       WHERE id=$11
        RETURNING *`,
       [
         name.trim(),
+        kennzeichen?.trim() || null,
         bezeichnung?.trim() || null,
         lkwArt || null,
         etaTime || null,

@@ -19,6 +19,7 @@ const STATUS_OPTIONS = ["Angemeldet", "Erwartet", "Angekommen", "in Verladung", 
 export interface TemplateRow {
   id: number;
   name: string;
+  kennzeichen: string | null;
   bezeichnung: string | null;
   lkw_art: string | null;
   eta_time: string | null;
@@ -32,6 +33,7 @@ export interface TemplateRow {
 
 interface FormState {
   name: string;
+  kennzeichen: string;
   bezeichnung: string;
   lkwArt: string;
   etaTime: string;
@@ -44,6 +46,7 @@ interface FormState {
 
 const emptyForm = (defaultSpedId?: string): FormState => ({
   name: "",
+  kennzeichen: "",
   bezeichnung: "",
   lkwArt: "",
   etaTime: "",
@@ -118,7 +121,8 @@ export function TemplatesDialog({ open, onOpenChange, onLoadToMassenanlage }: Pr
 
   const buildBody = (data: FormState) => ({
     name:        data.name,
-    bezeichnung: data.bezeichnung,
+    kennzeichen: data.kennzeichen || null,
+    bezeichnung: data.bezeichnung || null,
     lkwArt:      data.lkwArt || null,
     etaTime:     data.etaTime || null,
     tor:         (isCometUser && data.tor) ? data.tor : null,
@@ -186,6 +190,7 @@ export function TemplatesDialog({ open, onOpenChange, onLoadToMassenanlage }: Pr
     setEditingId(t.id);
     setForm({
       name:        t.name,
+      kennzeichen: t.kennzeichen ?? "",
       bezeichnung: t.bezeichnung ?? "",
       lkwArt:      t.lkw_art ?? "",
       etaTime:     t.eta_time ?? "",
@@ -243,7 +248,10 @@ export function TemplatesDialog({ open, onOpenChange, onLoadToMassenanlage }: Pr
                   )}
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm">{t.name}</div>
+                    <div className="font-medium text-sm">
+                      {t.name}
+                      {t.kennzeichen && <span className="ml-2 font-mono text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{t.kennzeichen}</span>}
+                    </div>
                     <div className="text-xs text-slate-500 mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
                       {t.lkw_art && <span>{t.lkw_art}</span>}
                       {t.relation && <span className="flex items-center gap-1"><ArrowRight className="w-3 h-3" />{t.relation}</span>}
@@ -318,6 +326,15 @@ export function TemplatesDialog({ open, onOpenChange, onLoadToMassenanlage }: Pr
               </div>
 
               <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-600">Kennzeichen</label>
+                  <Input
+                    value={form.kennzeichen}
+                    onChange={(e) => setForm((f) => ({ ...f, kennzeichen: e.target.value }))}
+                    placeholder="M-AB 1234 (optional)"
+                    className="h-8 text-sm font-mono"
+                  />
+                </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-slate-600">Bezeichnung</label>
                   <Input
