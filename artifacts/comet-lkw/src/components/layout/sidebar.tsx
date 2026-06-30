@@ -347,8 +347,18 @@ export function AppSidebar({ collapsed, onToggle, isDark, onToggleTheme }: AppSi
   })();
   const overrideMap = new Map(navOverrides.map((o, idx) => [o.href, { ...o, order: idx }]));
 
+  const roleVisibility: Record<string, string[]> = (() => {
+    try { return pubSettings?.sidebar_role_visibility ? JSON.parse(pubSettings.sidebar_role_visibility) : {}; }
+    catch { return {}; }
+  })();
+
   const customizedNavigation = navigation
-    .filter((item) => item.show)
+    .filter((item) => {
+      if (!item.show) return false;
+      const allowed = roleVisibility[item.href];
+      if (!allowed || allowed.length === 0) return true;
+      return allowed.includes(user!.role);
+    })
     .map((item, defaultIdx) => {
       const cfg = overrideMap.get(item.href);
       const NavIcon: React.ComponentType<LucideProps> =

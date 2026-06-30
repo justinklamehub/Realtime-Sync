@@ -32,9 +32,47 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, RotateCcw, GripVertical, Plus, Trash2, Folder, Layers } from "lucide-react";
+import { Loader2, Save, RotateCcw, GripVertical, Plus, Trash2, Folder, Layers, Eye } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
+
+// ── Roles ──────────────────────────────────────────────────────────────────────
+
+const ALL_ROLES = [
+  "comet_admin", "comet_leitstand", "comet_lager", "comet_viewer",
+  "speditions_admin", "speditions_bearbeiter", "speditions_viewer",
+] as const;
+
+const ROLE_LABELS: Record<string, { short: string; long: string }> = {
+  comet_admin:            { short: "CA",  long: "COMET Admin" },
+  comet_leitstand:        { short: "LS",  long: "Leitstand" },
+  comet_lager:            { short: "LA",  long: "Lager" },
+  comet_viewer:           { short: "CV",  long: "COMET Viewer" },
+  speditions_admin:       { short: "SA",  long: "Sped. Admin" },
+  speditions_bearbeiter:  { short: "BE",  long: "Bearbeiter" },
+  speditions_viewer:      { short: "SV",  long: "Sped. Viewer" },
+};
+
+const ITEM_ALLOWED_ROLES: Record<string, readonly string[]> = {
+  "/dashboard":         ALL_ROLES,
+  "/shipments":         ALL_ROLES,
+  "/shipments/kanban":  ["comet_admin","comet_leitstand","comet_lager"],
+  "/wochenansicht":     ALL_ROLES,
+  "/speditionen":       ["comet_admin","comet_leitstand"],
+  "/users":             ["comet_admin","comet_leitstand","speditions_admin"],
+  "/paletten":          ALL_ROLES,
+  "/abstimmungen":      ALL_ROLES,
+  "/kalkulation":       ["comet_admin","comet_leitstand","comet_lager","comet_viewer"],
+  "/gefahrgut":         ["comet_admin","comet_leitstand","comet_lager","comet_viewer"],
+  "/auswertung":        ["comet_admin","comet_leitstand","comet_lager","comet_viewer"],
+  "/auditlog":          ["comet_admin","comet_leitstand","comet_lager","comet_viewer"],
+  "/speditionsfreigabe":["speditions_admin"],
+  "/settings":          ["comet_admin"],
+  "/berechtigungen":    ["comet_admin"],
+  "/tickets":           ALL_ROLES,
+  "/hilfe":             ALL_ROLES,
+};
 
 // ── Default nav items ──────────────────────────────────────────────────────────
 
@@ -440,9 +478,9 @@ function SortableNavItem({
 // ── SidebarNavConfig (main component) ─────────────────────────────────────────
 
 export function SidebarNavConfig({
-  savedConfig, savedCategories, savedOrder,
+  savedConfig, savedCategories, savedOrder, savedRoleVisibility,
 }: {
-  savedConfig: string; savedCategories: string; savedOrder: string;
+  savedConfig: string; savedCategories: string; savedOrder: string; savedRoleVisibility: string;
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -452,6 +490,9 @@ export function SidebarNavConfig({
   const [sidebarOrder, setSidebarOrder] = useState<OrderEntry[]>(() =>
     buildInitialOrder(savedOrder, buildInitialState(savedConfig), buildInitialCategories(savedCategories))
   );
+  const [roleVisibility, setRoleVisibility] = useState<Record<string, string[]>>(() => {
+    try { return savedRoleVisibility ? JSON.parse(savedRoleVisibility) : {}; } catch { return {}; }
+  });
   const [saving, setSaving] = useState(false);
   const [iconPickerFor, setIconPickerFor] = useState<string | null>(null);
   const [catIconPickerFor, setCatIconPickerFor] = useState<string | null>(null);
@@ -463,6 +504,29 @@ export function SidebarNavConfig({
     setCategories(newCats);
     setSidebarOrder(buildInitialOrder(savedOrder, newItems, newCats));
   }, [savedConfig, savedCategories, savedOrder]);
+
+  useEffect(() => {
+    try { setRoleVisibility(savedRoleVisibility ? JSON.parse(savedRoleVisibility) : {}); } catch { /* ignore */ }
+  }, [savedRoleVisibility]);
+
+  function handleRoleToggle(href: string, role: string, checked: boolean) {
+    setRoleVisibility((prev) => {
+      const allowedForItem = ITEM_ALLOWED_ROLES[href] ?? ALL_ROLES;
+      const current = prev[href] ?? [...allowedForItem];
+      const next = checked ? [...new Set([...current, role])] : current.filter((r) => r !== role);
+      const allAllowed = allowedForItem.every((r) => next.includes(r));
+      if (allAllowed) {
+        const { [href]: _, ...rest } = prev;
+        void _;
+        return rest;
+      }
+      return { ...prev, [href]: next };
+    });
+  }
+
+  function handleRoleVisibilityReset() {
+    setRoleVisibility({});
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -617,6 +681,11 @@ export function SidebarNavConfig({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ value: JSON.stringify(sidebarOrder) }),
         }),
+        fetch(`${API}/settings/sidebar_role_visibility`, {
+          method: "PUT", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ value: JSON.stringify(roleVisibility) }),
+        }),
       ]);
 
       if (results.some((r) => !r.ok)) throw new Error("Fehler");
@@ -765,6 +834,82 @@ export function SidebarNavConfig({
           </DndContext>
           <p className="text-[11px] text-slate-400 mt-3 leading-relaxed">
             Rollenbasierte Zugriffsrechte bleiben unverändert — Menüpunkte ohne Zugriff werden ausgeblendet.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* ── Rollensichtbarkeit ──────────────────────────────────────────────── */}
+      <Card className="shadow-sm">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Eye className="w-4 h-4 text-primary" />
+                Rollensichtbarkeit
+              </CardTitle>
+              <CardDescription className="text-xs mt-0.5">
+                Steuern Sie, welche Rolle welchen Menüpunkt sehen darf — ausgegraut bedeutet systemseitig nicht verfügbar
+              </CardDescription>
+            </div>
+            {Object.keys(roleVisibility).length > 0 && (
+              <Button variant="ghost" size="sm" className="h-8 px-3 text-xs text-slate-500 hover:text-red-600 shrink-0"
+                onClick={handleRoleVisibilityReset} disabled={saving}>
+                <RotateCcw className="w-3 h-3 mr-1" /> Zurücksetzen
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b bg-slate-50">
+                  <th className="text-left font-medium text-slate-500 px-4 py-2 min-w-[140px]">Menüpunkt</th>
+                  {ALL_ROLES.map((role) => (
+                    <th key={role} className="text-center font-medium text-slate-500 px-1 py-2 min-w-[44px]">
+                      <span title={ROLE_LABELS[role]?.long ?? role}>{ROLE_LABELS[role]?.short ?? role}</span>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {DEFAULT_NAV_ITEMS.map((navItem) => {
+                  const allowed = ITEM_ALLOWED_ROLES[navItem.href] ?? ALL_ROLES;
+                  const configured = roleVisibility[navItem.href];
+                  const activeSet = new Set(configured ?? allowed);
+                  const hasRestriction = !!configured;
+                  const customLabel = items.find((i) => i.href === navItem.href)?.label ?? navItem.defaultLabel;
+                  return (
+                    <tr key={navItem.href} className={cn("hover:bg-slate-50/60 transition-colors", hasRestriction && "bg-amber-50/40")}>
+                      <td className="px-4 py-2 font-medium text-slate-700 whitespace-nowrap">
+                        {customLabel}
+                        {hasRestriction && <span className="ml-1.5 text-[9px] text-amber-600 font-semibold bg-amber-100 rounded px-1">eingeschränkt</span>}
+                      </td>
+                      {ALL_ROLES.map((role) => {
+                        const roleAllowed = allowed.includes(role);
+                        const isChecked = roleAllowed && activeSet.has(role);
+                        return (
+                          <td key={role} className="px-1 py-2 text-center">
+                            {roleAllowed ? (
+                              <Checkbox
+                                checked={isChecked}
+                                onCheckedChange={(v) => handleRoleToggle(navItem.href, role, !!v)}
+                                className="mx-auto"
+                              />
+                            ) : (
+                              <span className="inline-flex items-center justify-center w-4 h-4 mx-auto text-slate-200" title="Systemseitig nicht verfügbar">—</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-[11px] text-slate-400 px-4 py-3 leading-relaxed border-t">
+            <strong>CA</strong> COMET Admin · <strong>LS</strong> Leitstand · <strong>LA</strong> Lager · <strong>CV</strong> COMET Viewer · <strong>SA</strong> Sped. Admin · <strong>BE</strong> Bearbeiter · <strong>SV</strong> Sped. Viewer
           </p>
         </CardContent>
       </Card>

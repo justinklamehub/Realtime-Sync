@@ -1001,7 +1001,7 @@ export default function SettingsPage() {
 
         {/* ── Tab: Sidebar ── */}
         <TabsContent value="sidebar" className="mt-0">
-          <SidebarNavConfig savedConfig={s["sidebar_nav_config"] ?? ""} savedCategories={s["sidebar_categories"] ?? ""} savedOrder={s["sidebar_order"] ?? ""} />
+          <SidebarNavConfig savedConfig={s["sidebar_nav_config"] ?? ""} savedCategories={s["sidebar_categories"] ?? ""} savedOrder={s["sidebar_order"] ?? ""} savedRoleVisibility={s["sidebar_role_visibility"] ?? ""} />
         </TabsContent>
 
         {/* ── Tab: E-Mail-Vorlagen ── */}
