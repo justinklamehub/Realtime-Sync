@@ -24,3 +24,9 @@ id = "fY9BoCCf6DWPJFvltRuwa"
 uri = "file://DEPLOYMENT_DEBIAN_APACHE.md"
 type = "text"
 title = "Deployment-Anleitung (Debian 12 + Apache2)"
+
+[[outputs]]
+id = "MzONsIgMjarGrnB8X-Auc"
+uri = "file://.local/outputs/COMET-LKW-Praesentation.pptx"
+type = "slides"
+title = "COMET LKW – Verladungsverwaltung (PPTX)"
