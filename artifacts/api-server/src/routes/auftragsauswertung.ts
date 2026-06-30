@@ -170,9 +170,12 @@ router.get("/auftragsauswertung/latest", requireAuth, async (req, res) => {
     if (!canFull && !canSped) {
       return res.status(403).json({ error: "Keine Berechtigung" });
     }
-    const r = await pool.query(
-      "SELECT * FROM auftrag_analyse_ergebnisse ORDER BY uploaded_at DESC LIMIT 1"
-    );
+    const r = await pool.query(`
+      SELECT a.*, u.username AS uploaded_by_username
+      FROM auftrag_analyse_ergebnisse a
+      LEFT JOIN users u ON u.id = a.uploaded_by_id
+      ORDER BY a.uploaded_at DESC LIMIT 1
+    `);
     if (r.rows.length === 0) return res.json(null);
     const row = r.rows[0];
     let results: any[] = row.results ?? [];
@@ -185,11 +188,12 @@ router.get("/auftragsauswertung/latest", requireAuth, async (req, res) => {
     }
 
     return res.json({
-      uploadedAt:     row.uploaded_at,
-      filename:       row.filename,
-      totalRows:      row.total_rows,
-      totalPaletten:  row.total_paletten,
-      totalAuftraege: row.total_auftraege,
+      uploadedAt:          row.uploaded_at,
+      filename:            row.filename,
+      uploadedByUsername:  row.uploaded_by_username ?? null,
+      totalRows:           row.total_rows,
+      totalPaletten:       row.total_paletten,
+      totalAuftraege:      row.total_auftraege,
       results,
     });
   } catch (err) {
