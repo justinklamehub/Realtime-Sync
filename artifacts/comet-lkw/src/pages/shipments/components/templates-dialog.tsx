@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useListSpeditionen } from "@workspace/api-client-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,17 +36,19 @@ interface FormState {
   lkwArt: string;
   etaTime: string;
   tor: string;
+  speditionId: string;
   relation: string;
   telefon: string;
   status: string;
 }
 
-const emptyForm = (): FormState => ({
+const emptyForm = (defaultSpedId?: string): FormState => ({
   name: "",
   bezeichnung: "",
   lkwArt: "",
   etaTime: "",
   tor: "",
+  speditionId: defaultSpedId ?? "",
   relation: "",
   telefon: "",
   status: "Angemeldet",
@@ -63,11 +66,37 @@ export function TemplatesDialog({ open, onOpenChange, onLoadToMassenanlage }: Pr
   const queryClient = useQueryClient();
 
   const isCometAdmin = user?.role === "comet_admin";
-  const isCometUser = ["comet_admin", "comet_leitstand", "comet_lager"].includes(user?.role ?? "");
+  const isCometUser  = ["comet_admin", "comet_leitstand", "comet_lager"].includes(user?.role ?? "");
+  const isSpedUser   = ["speditions_admin", "speditions_bearbeiter"].includes(user?.role ?? "");
+  // Both comet users and spedition admins may create templates
+  const canManage = isCometUser || user?.role === "speditions_admin";
+
+  const ownSpedId = user?.speditionId ? String(user.speditionId) : "";
 
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState<FormState>(emptyForm());
+  const [showForm, setShowForm]   = useState(false);
+  const [form, setForm]           = useState<FormState>(emptyForm(isSpedUser ? ownSpedId : ""));
+
+  // All active speditionen (used by comet users)
+  const { data: allSpeditionen = [] } = useListSpeditionen();
+
+  // Speditionen available to spedition users (own + granted via permissions)
+  const { data: grantedSpeditionen = [] } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ["sped-granted", user?.speditionId],
+    queryFn: async () => {
+      const r = await fetch(`${API}/speditionen/granted`, { credentials: "include" });
+      if (!r.ok) return [];
+      return r.json();
+    },
+    enabled: isSpedUser && open,
+  });
+
+  // Which list to show in the dropdown
+  const spedOptions: { id: number; name: string }[] = isCometUser
+    ? allSpeditionen
+    : isSpedUser
+      ? (grantedSpeditionen.length > 0 ? grantedSpeditionen : (ownSpedId ? [{ id: Number(ownSpedId), name: user?.username ?? "Eigene" }] : []))
+      : [];
 
   const { data: templates = [], isLoading } = useQuery<TemplateRow[]>({
     queryKey: ["shipment-templates"],
@@ -83,9 +112,21 @@ export function TemplatesDialog({ open, onOpenChange, onLoadToMassenanlage }: Pr
     if (!open) {
       setShowForm(false);
       setEditingId(null);
-      setForm(emptyForm());
+      setForm(emptyForm(isSpedUser ? ownSpedId : ""));
     }
   }, [open]);
+
+  const buildBody = (data: FormState) => ({
+    name:        data.name,
+    bezeichnung: data.bezeichnung,
+    lkwArt:      data.lkwArt || null,
+    etaTime:     data.etaTime || null,
+    tor:         (isCometUser && data.tor) ? data.tor : null,
+    speditionId: data.speditionId ? parseInt(data.speditionId) : null,
+    relation:    data.relation || null,
+    telefon:     data.telefon || null,
+    status:      data.status,
+  });
 
   const createMutation = useMutation({
     mutationFn: async (data: FormState) => {
@@ -93,16 +134,7 @@ export function TemplatesDialog({ open, onOpenChange, onLoadToMassenanlage }: Pr
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: data.name,
-          bezeichnung: data.bezeichnung,
-          lkwArt: data.lkwArt,
-          etaTime: data.etaTime,
-          tor: data.tor,
-          relation: data.relation,
-          telefon: data.telefon,
-          status: data.status,
-        }),
+        body: JSON.stringify(buildBody(data)),
       });
       if (!r.ok) { const j = await r.json(); throw new Error(j.error || "Fehler"); }
       return r.json();
@@ -112,7 +144,7 @@ export function TemplatesDialog({ open, onOpenChange, onLoadToMassenanlage }: Pr
       toast({ title: "Vorlage gespeichert" });
       setShowForm(false);
       setEditingId(null);
-      setForm(emptyForm());
+      setForm(emptyForm(isSpedUser ? ownSpedId : ""));
     },
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
@@ -123,16 +155,7 @@ export function TemplatesDialog({ open, onOpenChange, onLoadToMassenanlage }: Pr
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: data.name,
-          bezeichnung: data.bezeichnung,
-          lkwArt: data.lkwArt,
-          etaTime: data.etaTime,
-          tor: data.tor,
-          relation: data.relation,
-          telefon: data.telefon,
-          status: data.status,
-        }),
+        body: JSON.stringify(buildBody(data)),
       });
       if (!r.ok) { const j = await r.json(); throw new Error(j.error || "Fehler"); }
       return r.json();
@@ -142,7 +165,7 @@ export function TemplatesDialog({ open, onOpenChange, onLoadToMassenanlage }: Pr
       toast({ title: "Vorlage aktualisiert" });
       setShowForm(false);
       setEditingId(null);
-      setForm(emptyForm());
+      setForm(emptyForm(isSpedUser ? ownSpedId : ""));
     },
     onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
@@ -162,14 +185,15 @@ export function TemplatesDialog({ open, onOpenChange, onLoadToMassenanlage }: Pr
   function startEdit(t: TemplateRow) {
     setEditingId(t.id);
     setForm({
-      name: t.name,
+      name:        t.name,
       bezeichnung: t.bezeichnung ?? "",
-      lkwArt: t.lkw_art ?? "",
-      etaTime: t.eta_time ?? "",
-      tor: t.tor ?? "",
-      relation: t.relation ?? "",
-      telefon: t.telefon ?? "",
-      status: t.status,
+      lkwArt:      t.lkw_art ?? "",
+      etaTime:     t.eta_time ?? "",
+      tor:         t.tor ?? "",
+      speditionId: t.spedition_id ? String(t.spedition_id) : "",
+      relation:    t.relation ?? "",
+      telefon:     t.telefon ?? "",
+      status:      t.status,
     });
     setShowForm(true);
   }
@@ -225,7 +249,7 @@ export function TemplatesDialog({ open, onOpenChange, onLoadToMassenanlage }: Pr
                       {t.relation && <span className="flex items-center gap-1"><ArrowRight className="w-3 h-3" />{t.relation}</span>}
                       {t.tor && <span>{t.tor}</span>}
                       {t.eta_time && <span>ETA {t.eta_time}</span>}
-                      {t.spedition_name && <span>{t.spedition_name}</span>}
+                      {t.spedition_name && <span className="text-blue-600">{t.spedition_name}</span>}
                       {t.bezeichnung && <span className="text-slate-400 italic">{t.bezeichnung}</span>}
                     </div>
                   </div>
@@ -239,7 +263,7 @@ export function TemplatesDialog({ open, onOpenChange, onLoadToMassenanlage }: Pr
                       <Plus className="w-3.5 h-3.5" />
                       Verwenden
                     </Button>
-                    {isCometUser && (
+                    {canManage && (
                       <Button
                         variant="ghost"
                         size="icon"
@@ -277,7 +301,7 @@ export function TemplatesDialog({ open, onOpenChange, onLoadToMassenanlage }: Pr
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6"
-                  onClick={() => { setShowForm(false); setEditingId(null); setForm(emptyForm()); }}
+                  onClick={() => { setShowForm(false); setEditingId(null); setForm(emptyForm(isSpedUser ? ownSpedId : "")); }}
                 >
                   <X className="w-3.5 h-3.5" />
                 </Button>
@@ -322,16 +346,18 @@ export function TemplatesDialog({ open, onOpenChange, onLoadToMassenanlage }: Pr
                     className="h-8 text-sm"
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-slate-600">Tor</label>
-                  <Select value={form.tor || "__none__"} onValueChange={(v) => setForm((f) => ({ ...f, tor: v === "__none__" ? "" : v }))}>
-                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Wählen…" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">— kein —</SelectItem>
-                      {TOR_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {isCometUser && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600">Tor</label>
+                    <Select value={form.tor || "__none__"} onValueChange={(v) => setForm((f) => ({ ...f, tor: v === "__none__" ? "" : v }))}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Wählen…" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">— kein —</SelectItem>
+                        {TOR_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-slate-600">Relation</label>
                   <Input
@@ -350,6 +376,24 @@ export function TemplatesDialog({ open, onOpenChange, onLoadToMassenanlage }: Pr
                     className="h-8 text-sm"
                   />
                 </div>
+                {/* Spedition — comet: alle, speditions_admin: eigene + freigegebene */}
+                {spedOptions.length > 0 && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600">Spedition</label>
+                    <Select
+                      value={form.speditionId || "__none__"}
+                      onValueChange={(v) => setForm((f) => ({ ...f, speditionId: v === "__none__" ? "" : v }))}
+                    >
+                      <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Wählen…" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">— keine —</SelectItem>
+                        {spedOptions.map((s) => (
+                          <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-slate-600">Standard-Status</label>
                   <Select value={form.status} onValueChange={(v) => setForm((f) => ({ ...f, status: v }))}>
@@ -365,7 +409,7 @@ export function TemplatesDialog({ open, onOpenChange, onLoadToMassenanlage }: Pr
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => { setShowForm(false); setEditingId(null); setForm(emptyForm()); }}
+                  onClick={() => { setShowForm(false); setEditingId(null); setForm(emptyForm(isSpedUser ? ownSpedId : "")); }}
                   disabled={isMutating}
                 >
                   Abbrechen
@@ -380,12 +424,12 @@ export function TemplatesDialog({ open, onOpenChange, onLoadToMassenanlage }: Pr
         </div>
 
         <DialogFooter className="pt-2 border-t border-slate-100">
-          {isCometUser && !showForm && (
+          {canManage && !showForm && (
             <Button
               variant="outline"
               size="sm"
               className="mr-auto border-dashed text-slate-500 hover:text-slate-700"
-              onClick={() => { setEditingId(null); setForm(emptyForm()); setShowForm(true); }}
+              onClick={() => { setEditingId(null); setForm(emptyForm(isSpedUser ? ownSpedId : "")); setShowForm(true); }}
             >
               <Plus className="w-3.5 h-3.5 mr-1.5" />
               Neue Vorlage

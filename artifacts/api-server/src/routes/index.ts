@@ -27,6 +27,7 @@ router.use(healthRouter);
 router.use(authRouter);
 router.use(usersRouter);
 router.use(speditionenRouter);
+router.use(shipmentTemplatesRouter);
 router.use(shipmentsRouter);
 router.use(palletsRouter);
 router.use(reconciliationsRouter);
@@ -41,6 +42,5 @@ router.use(emailLogRouter);
 router.use(ticketsRouter);
 router.use(userPreferencesRouter);
 router.use(reportRouter);
-router.use(shipmentTemplatesRouter);
 
 export default router;
