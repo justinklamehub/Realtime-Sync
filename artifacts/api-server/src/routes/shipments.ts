@@ -262,6 +262,19 @@ router.post("/shipments", requireAuth, async (req, res) => {
           linkTo: "/shipments",
           pushEventKey: "shipment.created",
           suppressPush: !isToday,
+          pushVars: {
+            bezeichnung: shipment.bezeichnung ?? "",
+            kennzeichen: shipment.kennzeichen ?? "",
+            spedition: spedName ?? "",
+            relation: shipment.relation ?? "",
+            etaDate: shipment.etaDate ?? "",
+            etaTime: shipment.etaTime ?? "",
+            lkwArt: shipment.lkwArt ?? "",
+            telefon: shipment.telefon ?? "",
+            tor: shipment.tor ?? "",
+            status: shipment.status ?? "",
+            wareStatus: shipment.wareStatus ?? "",
+          },
         });
       }
     }
@@ -506,6 +519,17 @@ router.patch("/shipments/:id", requireAuth, async (req, res) => {
       const io = getIO(req);
       if (io) {
         const label = shipment.bezeichnung || shipment.kennzeichen || `#${id}`;
+        const spedNameStatus = shipment.speditionId
+          ? (await db.select({ name: speditionenTable.name }).from(speditionenTable).where(eq(speditionenTable.id, shipment.speditionId)).limit(1))[0]?.name ?? ""
+          : "";
+        const basePushVars = {
+          bezeichnung: shipment.bezeichnung ?? "",
+          kennzeichen: shipment.kennzeichen ?? "",
+          spedition: spedNameStatus,
+          relation: shipment.relation ?? "",
+          tor: shipment.tor ?? "",
+          status: shipment.status ?? "",
+        };
         if (updates.status === "Angekommen") {
           await notify(io, {
             targetRoles: ["comet_lager", "comet_leitstand"],
@@ -514,6 +538,7 @@ router.patch("/shipments/:id", requireAuth, async (req, res) => {
             type: "info",
             linkTo: "/shipments",
             pushEventKey: "shipment.arrived",
+            pushVars: { ...basePushVars, ataDate: shipment.ataDate ?? "", ataTime: shipment.ataTime ?? "" },
           });
         } else if (updates.status === "Abgefertigt") {
           await notify(io, {
@@ -523,6 +548,7 @@ router.patch("/shipments/:id", requireAuth, async (req, res) => {
             type: "success",
             linkTo: "/shipments",
             pushEventKey: "shipment.dispatched",
+            pushVars: basePushVars,
           });
         }
       }

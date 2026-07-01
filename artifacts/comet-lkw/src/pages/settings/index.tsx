@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, Settings, Type, Mail, Inbox, CheckCircle2, XCircle, Eye, EyeOff, Image, Upload, Trash2 as TrashIcon, PanelLeft, Send, Server, ChevronUp, ChevronDown, Table2, Calculator, BarChart2 } from "lucide-react";
+import { Loader2, Save, Settings, Type, Mail, Inbox, CheckCircle2, XCircle, Eye, EyeOff, Image, Upload, Trash2 as TrashIcon, PanelLeft, Send, Server, ChevronUp, ChevronDown, Table2, Calculator, BarChart2, BellRing } from "lucide-react";
 import { SidebarNavConfig } from "./sidebar-nav-config";
 import { useAuth } from "@/contexts/auth-context";
 
@@ -1032,6 +1032,154 @@ function WeeklyReportCard({
   );
 }
 
+// ── Push Template Settings ────────────────────────────────────────────────────
+
+interface PushTemplateEntry {
+  event_key: string;
+  label: string;
+  description: string;
+  title_template: string;
+  message_template: string;
+  placeholders: string[];
+}
+
+function PushTemplateCard({ tpl, onSaved }: { tpl: PushTemplateEntry; onSaved: () => void }) {
+  const { toast } = useToast();
+  const [title, setTitle] = useState(tpl.title_template);
+  const [message, setMessage] = useState(tpl.message_template);
+  const [saving, setSaving] = useState(false);
+  const messageRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => { setTitle(tpl.title_template); }, [tpl.title_template]);
+  useEffect(() => { setMessage(tpl.message_template); }, [tpl.message_template]);
+
+  const dirty = title !== tpl.title_template || message !== tpl.message_template;
+
+  function insertPlaceholder(ph: string) {
+    const el = messageRef.current;
+    const token = `{${ph}}`;
+    if (!el) { setMessage(m => m + token); return; }
+    const start = el.selectionStart ?? message.length;
+    const end = el.selectionEnd ?? message.length;
+    const next = message.slice(0, start) + token + message.slice(end);
+    setMessage(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(start + token.length, start + token.length);
+    });
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      const res = await fetch(`${API}/push/message-templates/${tpl.event_key}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title_template: title, message_template: message }),
+      });
+      if (!res.ok) throw new Error();
+      toast({ title: "Push-Vorlage gespeichert" });
+      onSaved();
+    } catch {
+      toast({ title: "Fehler beim Speichern", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card className="shadow-sm">
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle className="text-base">{tpl.label}</CardTitle>
+            <CardDescription className="text-xs mt-0.5">{tpl.description}</CardDescription>
+          </div>
+          <Button size="sm" className="h-7 px-3 text-xs shrink-0" onClick={save} disabled={saving || !dirty}>
+            {saving ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Save className="w-3 h-3 mr-1" />}
+            Speichern
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium text-slate-600">Titel</Label>
+          <Input value={title} onChange={e => setTitle(e.target.value)} className="text-sm" placeholder="Push-Titel…" />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium text-slate-600">Nachricht</Label>
+          <Textarea
+            ref={messageRef}
+            value={message}
+            onChange={e => setMessage(e.target.value)}
+            className="text-sm resize-none"
+            rows={2}
+            placeholder="Nachrichtentext mit {platzhaltern}…"
+          />
+        </div>
+        {tpl.placeholders.length > 0 && (
+          <div>
+            <p className="text-xs text-slate-400 mb-1.5">Platzhalter — klicken zum Einfügen in die Nachricht:</p>
+            <div className="flex flex-wrap gap-1">
+              {tpl.placeholders.map(ph => (
+                <button
+                  key={ph}
+                  type="button"
+                  onClick={() => insertPlaceholder(ph)}
+                  className="font-mono text-xs bg-slate-100 hover:bg-primary/10 hover:text-primary text-slate-600 px-2 py-0.5 rounded border border-slate-200 hover:border-primary/30 transition-colors cursor-pointer"
+                >
+                  {`{${ph}}`}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="rounded-md bg-slate-50 border border-slate-100 px-3 py-2">
+          <p className="text-xs text-slate-400 mb-0.5">Vorschau:</p>
+          <p className="text-xs font-semibold text-slate-700">{title || "—"}</p>
+          <p className="text-xs text-slate-500">{message || "—"}</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PushTemplateSettings() {
+  const queryClient = useQueryClient();
+  const { data: templates, isLoading } = useQuery<PushTemplateEntry[]>({
+    queryKey: ["push-message-templates"],
+    queryFn: async () => {
+      const res = await fetch(`${API}/push/message-templates`, { credentials: "include" });
+      if (!res.ok) throw new Error();
+      return res.json();
+    },
+  });
+
+  if (isLoading) return (
+    <div className="flex justify-center py-10">
+      <Loader2 className="w-5 h-5 animate-spin text-primary" />
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="text-sm text-slate-500">
+          Titel und Nachrichtentext der Push-Benachrichtigungen anpassen. Platzhalter in geschweiften Klammern werden durch die jeweiligen Werte aus der Verladung ersetzt.
+        </p>
+      </div>
+      {templates?.map(tpl => (
+        <PushTemplateCard
+          key={tpl.event_key}
+          tpl={tpl}
+          onSaved={() => queryClient.invalidateQueries({ queryKey: ["push-message-templates"] })}
+        />
+      ))}
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
@@ -1099,7 +1247,7 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="allgemein" className="space-y-5">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="allgemein" className="flex items-center gap-1.5 text-xs">
             <Settings className="w-3.5 h-3.5" /> Allgemein
           </TabsTrigger>
@@ -1107,7 +1255,10 @@ export default function SettingsPage() {
             <PanelLeft className="w-3.5 h-3.5" /> Sidebar
           </TabsTrigger>
           <TabsTrigger value="email" className="flex items-center gap-1.5 text-xs">
-            <Mail className="w-3.5 h-3.5" /> E-Mail-Vorlagen
+            <Mail className="w-3.5 h-3.5" /> E-Mail
+          </TabsTrigger>
+          <TabsTrigger value="push" className="flex items-center gap-1.5 text-xs">
+            <BellRing className="w-3.5 h-3.5" /> Push-Texte
           </TabsTrigger>
           <TabsTrigger value="berichte" className="flex items-center gap-1.5 text-xs">
             <BarChart2 className="w-3.5 h-3.5" /> Berichte
@@ -1219,6 +1370,11 @@ export default function SettingsPage() {
               ))}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ── Tab: Push-Texte ── */}
+        <TabsContent value="push" className="mt-0">
+          <PushTemplateSettings />
         </TabsContent>
 
         {/* ── Tab: Berichte ── */}

@@ -9,7 +9,7 @@ import { ensureUserPreferencesTable } from "./routes/user-preferences";
 import { startScheduler, ensureReportWeeklyLogTable } from "./lib/scheduler";
 import { ensureShipmentTemplatesTable } from "./routes/shipment-templates";
 import { ensureAuftragAnalyseTable } from "./routes/auftragsauswertung";
-import { initWebPush, seedPushEventSettings } from "./routes/push";
+import { initWebPush, seedPushEventSettings, seedPushMessageTemplates } from "./routes/push";
 import { pool } from "@workspace/db";
 
 // Load .env relative to this file (Node 20.6+ built-in, no dotenv needed).
@@ -332,6 +332,12 @@ httpServer.listen(port, async (err?: Error) => {
     logger.info("push event settings seeded");
   } catch (e) {
     logger.warn({ err: e }, "seedPushEventSettings failed — non-fatal");
+  }
+  try {
+    await seedPushMessageTemplates();
+    logger.info("push message templates seeded");
+  } catch (e) {
+    logger.warn({ err: e }, "seedPushMessageTemplates failed — non-fatal");
   }
   try {
     await pool.query(`

@@ -1,7 +1,7 @@
 import { db, notifications, usersTable } from "@workspace/db";
 import { inArray } from "drizzle-orm";
 import type { Server as SocketIOServer } from "socket.io";
-import { sendPushToUsers, isPushEventEnabled } from "../routes/push";
+import { sendPushToUsers, isPushEventEnabled, getPushMessageTemplate, renderPushTemplate } from "../routes/push";
 
 export interface NotifyOptions {
   userId?: number;
@@ -15,10 +15,12 @@ export interface NotifyOptions {
   pushEventKey?: string;
   /** Wenn true, wird kein Web-Push gesendet (unabhängig von allen anderen Einstellungen). */
   suppressPush?: boolean;
+  /** Werte für Platzhalter in Push-Nachrichten-Templates (z.B. {bezeichnung}, {kennzeichen}). */
+  pushVars?: Record<string, string>;
 }
 
 export async function notify(io: SocketIOServer, options: NotifyOptions) {
-  const { userId, targetRoles, title, message, type = "info", linkTo, pushEventKey, suppressPush } = options;
+  const { userId, targetRoles, title, message, type = "info", linkTo, pushEventKey, suppressPush, pushVars } = options;
   const userIds: number[] = [];
 
   if (userId) {
@@ -65,7 +67,14 @@ export async function notify(io: SocketIOServer, options: NotifyOptions) {
       }
 
       if (pushUserIds.length > 0) {
-        await sendPushToUsers(pushUserIds, { title, message, linkTo, tag: `comet-${type}` });
+        let pushTitle = title;
+        let pushMessage = message;
+        if (pushEventKey && pushVars) {
+          const tpl = await getPushMessageTemplate(pushEventKey);
+          pushTitle = renderPushTemplate(tpl.title, pushVars) || title;
+          pushMessage = renderPushTemplate(tpl.message, pushVars) || message;
+        }
+        await sendPushToUsers(pushUserIds, { title: pushTitle, message: pushMessage, linkTo, tag: `comet-${type}` });
       }
     } catch (err: any) {
       console.warn("Web Push Fehler:", err?.message ?? err);

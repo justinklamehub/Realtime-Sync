@@ -62,6 +62,57 @@ export async function seedPushEventSettings() {
   }
 }
 
+// ── Push Message Templates ────────────────────────────────────────────────────
+
+export const PUSH_TEMPLATE_PLACEHOLDERS: Record<string, string[]> = {
+  "shipment.created":       ["bezeichnung", "kennzeichen", "spedition", "relation", "etaDate", "etaTime", "lkwArt", "telefon", "tor", "status", "wareStatus"],
+  "shipment.arrived":       ["bezeichnung", "kennzeichen", "spedition", "relation", "ataDate", "ataTime", "tor", "status"],
+  "shipment.dispatched":    ["bezeichnung", "kennzeichen", "spedition", "relation", "status", "tor"],
+  "reconciliation.started": ["spedition"],
+  "ticket.created":         ["titel", "nachricht"],
+};
+
+const DEFAULT_PUSH_TEMPLATES: Record<string, { title: string; message: string }> = {
+  "shipment.created":       { title: "Neue Verladung angemeldet",   message: "{spedition}: {bezeichnung}" },
+  "shipment.arrived":       { title: "LKW angekommen",               message: "{bezeichnung} ist eingetroffen – {tor}" },
+  "shipment.dispatched":    { title: "Verladung abgefertigt",        message: "{bezeichnung} wurde abgefertigt." },
+  "reconciliation.started": { title: "Abstimmung gestartet",         message: "Paletten-Abstimmung wurde eröffnet." },
+  "ticket.created":         { title: "Neues Ticket",                 message: "{titel}" },
+};
+
+export function renderPushTemplate(template: string, vars: Record<string, string | undefined>): string {
+  return template.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? "");
+}
+
+export async function getPushMessageTemplate(eventKey: string): Promise<{ title: string; message: string }> {
+  try {
+    const { rows } = await pool.query(
+      "SELECT title_template, message_template FROM push_message_templates WHERE event_key = $1",
+      [eventKey]
+    );
+    if (rows.length > 0) return { title: rows[0].title_template, message: rows[0].message_template };
+  } catch { /* table may not exist yet */ }
+  const def = DEFAULT_PUSH_TEMPLATES[eventKey];
+  return { title: def?.title ?? eventKey, message: def?.message ?? "" };
+}
+
+export async function seedPushMessageTemplates() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS push_message_templates (
+      event_key TEXT PRIMARY KEY,
+      title_template TEXT NOT NULL,
+      message_template TEXT NOT NULL
+    )
+  `);
+  for (const [key, def] of Object.entries(DEFAULT_PUSH_TEMPLATES)) {
+    await pool.query(
+      `INSERT INTO push_message_templates (event_key, title_template, message_template)
+       VALUES ($1, $2, $3) ON CONFLICT (event_key) DO NOTHING`,
+      [key, def.title, def.message]
+    );
+  }
+}
+
 // ── Push Event Check ──────────────────────────────────────────────────────────
 
 export async function isPushEventEnabled(
@@ -177,6 +228,46 @@ router.patch("/push/event-settings/:eventKey", requireCometAdmin, async (req, re
        ON CONFLICT (event_key) DO UPDATE
          SET enabled = EXCLUDED.enabled, target_roles = EXCLUDED.target_roles`,
       [eventKey, def?.label ?? eventKey, def?.description ?? "", enabled ?? true, target_roles ?? def?.target_roles ?? []]
+    );
+    return res.json({ ok: true });
+  } catch {
+    return res.status(500).json({ error: "Fehler" });
+  }
+});
+
+// Admin: Push-Nachrichten-Templates lesen
+router.get("/push/message-templates", requireCometAdmin, async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      "SELECT event_key, title_template, message_template FROM push_message_templates"
+    ).catch(() => ({ rows: [] as any[] }));
+    const templateMap = new Map(rows.map((r: any) => [r.event_key, r]));
+    const result = DEFAULT_PUSH_EVENTS.map((def) => ({
+      event_key: def.event_key,
+      label: def.label,
+      description: def.description,
+      title_template: (templateMap.get(def.event_key) as any)?.title_template ?? DEFAULT_PUSH_TEMPLATES[def.event_key]?.title ?? def.label,
+      message_template: (templateMap.get(def.event_key) as any)?.message_template ?? DEFAULT_PUSH_TEMPLATES[def.event_key]?.message ?? "",
+      placeholders: PUSH_TEMPLATE_PLACEHOLDERS[def.event_key] ?? [],
+    }));
+    return res.json(result);
+  } catch {
+    return res.status(500).json({ error: "Fehler" });
+  }
+});
+
+// Admin: Push-Nachrichten-Template aktualisieren
+router.patch("/push/message-templates/:eventKey", requireCometAdmin, async (req, res) => {
+  try {
+    const { eventKey } = req.params;
+    const { title_template, message_template } = req.body as { title_template?: string; message_template?: string };
+    const def = DEFAULT_PUSH_TEMPLATES[eventKey];
+    await pool.query(
+      `INSERT INTO push_message_templates (event_key, title_template, message_template)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (event_key) DO UPDATE
+         SET title_template = EXCLUDED.title_template, message_template = EXCLUDED.message_template`,
+      [eventKey, title_template ?? def?.title ?? eventKey, message_template ?? def?.message ?? ""]
     );
     return res.json({ ok: true });
   } catch {
