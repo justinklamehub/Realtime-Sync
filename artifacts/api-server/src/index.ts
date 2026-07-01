@@ -12,6 +12,13 @@ import { ensureAuftragAnalyseTable } from "./routes/auftragsauswertung";
 import { initWebPush, seedPushEventSettings } from "./routes/push";
 import { pool } from "@workspace/db";
 
+// Load .env relative to this file (Node 20.6+ built-in, no dotenv needed).
+// Works regardless of PM2's working directory at startup.
+try {
+  const envPath = new URL("../.env", import.meta.url).pathname;
+  (process as NodeJS.Process & { loadEnvFile?: (p: string) => void }).loadEnvFile?.(envPath);
+} catch { /* .env absent or Node < 20.6 – ignore */ }
+
 const rawPort = process.env["PORT"];
 
 if (!rawPort) {
