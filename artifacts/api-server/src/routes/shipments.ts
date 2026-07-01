@@ -263,6 +263,7 @@ router.post("/shipments", requireAuth, async (req, res) => {
           pushEventKey: "shipment.created",
           suppressPush: !isToday,
           pushVars: {
+            id: String(shipment.id),
             bezeichnung: shipment.bezeichnung ?? "",
             kennzeichen: shipment.kennzeichen ?? "",
             spedition: spedName ?? "",
@@ -523,6 +524,7 @@ router.patch("/shipments/:id", requireAuth, async (req, res) => {
           ? (await db.select({ name: speditionenTable.name }).from(speditionenTable).where(eq(speditionenTable.id, shipment.speditionId)).limit(1))[0]?.name ?? ""
           : "";
         const basePushVars = {
+          id: String(shipment.id),
           bezeichnung: shipment.bezeichnung ?? "",
           kennzeichen: shipment.kennzeichen ?? "",
           spedition: spedNameStatus,

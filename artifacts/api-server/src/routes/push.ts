@@ -65,9 +65,9 @@ export async function seedPushEventSettings() {
 // ── Push Message Templates ────────────────────────────────────────────────────
 
 export const PUSH_TEMPLATE_PLACEHOLDERS: Record<string, string[]> = {
-  "shipment.created":       ["bezeichnung", "kennzeichen", "spedition", "relation", "etaDate", "etaTime", "lkwArt", "telefon", "tor", "status", "wareStatus"],
-  "shipment.arrived":       ["bezeichnung", "kennzeichen", "spedition", "relation", "ataDate", "ataTime", "tor", "status"],
-  "shipment.dispatched":    ["bezeichnung", "kennzeichen", "spedition", "relation", "status", "tor"],
+  "shipment.created":       ["id", "bezeichnung", "kennzeichen", "spedition", "relation", "etaDate", "etaTime", "lkwArt", "telefon", "tor", "status", "wareStatus"],
+  "shipment.arrived":       ["id", "bezeichnung", "kennzeichen", "spedition", "relation", "ataDate", "ataTime", "tor", "status"],
+  "shipment.dispatched":    ["id", "bezeichnung", "kennzeichen", "spedition", "relation", "status", "tor"],
   "reconciliation.started": ["spedition"],
   "ticket.created":         ["titel", "nachricht"],
 };
