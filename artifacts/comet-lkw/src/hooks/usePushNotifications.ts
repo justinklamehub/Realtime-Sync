@@ -20,40 +20,16 @@ export function usePushNotifications() {
   const [error, setError] = useState<string | null>(null);
 
   const checkState = useCallback(async () => {
-    // 1. Browser-Support
+    // Nur Browser-Support prüfen — Server-Check gehört in subscribe(), nicht hier.
+    // So bleibt der Button sichtbar, auch wenn VAPID noch nicht konfiguriert ist.
     if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
       setState("unsupported");
       return;
     }
-
-    // 2. Server-Support — einmalige Prüfung; kein 503-Regen bei fehlendem VAPID-Key
-    try {
-      const keyRes = await fetch(`${API}/push/vapid-public-key`, {
-        credentials: "include",
-        signal: AbortSignal.timeout(5000),
-      });
-      if (!keyRes.ok) {
-        setState("unsupported");
-        return;
-      }
-      const keyData = await keyRes.json();
-      if (!keyData.supported || !keyData.publicKey) {
-        setState("unsupported");
-        return;
-      }
-    } catch {
-      // Netzwerkfehler oder Timeout → als nicht verfügbar behandeln
-      setState("unsupported");
-      return;
-    }
-
-    // 3. Benachrichtigungserlaubnis
     if (Notification.permission === "denied") {
       setState("denied");
       return;
     }
-
-    // 4. Vorhandenes SW-Abonnement prüfen
     try {
       const reg = await navigator.serviceWorker.getRegistration();
       if (!reg) {
@@ -74,11 +50,16 @@ export function usePushNotifications() {
   const subscribe = useCallback(async () => {
     setError(null);
     try {
-      // VAPID-Key laden (ist bereits geprüft in checkState, aber nochmal für den Schlüssel)
-      const keyRes = await fetch(`${API}/push/vapid-public-key`, { credentials: "include" });
-      if (!keyRes.ok) throw new Error("Server nicht bereit");
+      // Server-Support prüfen (VAPID konfiguriert?)
+      const keyRes = await fetch(`${API}/push/vapid-public-key`, {
+        credentials: "include",
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!keyRes.ok) throw new Error("Server nicht erreichbar");
       const keyData = await keyRes.json();
-      if (!keyData.supported || !keyData.publicKey) throw new Error("Push auf Server nicht konfiguriert");
+      if (!keyData.supported || !keyData.publicKey) {
+        throw new Error("Push-Benachrichtigungen sind auf dem Server noch nicht konfiguriert (VAPID-Keys fehlen).");
+      }
 
       // Erlaubnis anfragen
       const permission = await Notification.requestPermission();
@@ -87,7 +68,7 @@ export function usePushNotifications() {
         return;
       }
 
-      // SW registrieren falls nicht vorhanden
+      // SW registrieren falls noch nicht vorhanden
       let reg = await navigator.serviceWorker.getRegistration(SW_PATH);
       if (!reg) {
         reg = await navigator.serviceWorker.register(SW_PATH, { scope: "/" });

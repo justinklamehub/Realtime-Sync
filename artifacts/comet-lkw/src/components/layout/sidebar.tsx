@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/auth-context";
 import { Link, useLocation } from "wouter";
@@ -55,6 +55,7 @@ import {
 import { useNotifications, type AppNotification } from "@/hooks/use-notifications";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { usePresence, getPageName, ROLE_LABELS, type OnlineUser } from "@/hooks/use-presence";
+import { useToast } from "@/hooks/use-toast";
 import { useLocation as useWouterLocation } from "wouter";
 import { formatDistanceToNow } from "date-fns";
 import { de } from "date-fns/locale";
@@ -289,7 +290,14 @@ export function AppSidebar({ collapsed, onToggle, isDark, onToggleTheme }: AppSi
   const [showOnline, setShowOnline] = useState(false);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const { notifications, unreadCount, markRead, markAllRead, dismiss, dismissAll } = useNotifications();
-  const { state: pushState, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications();
+  const { state: pushState, error: pushError, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (pushError) {
+      toast({ title: "Push-Fehler", description: pushError, variant: "destructive" });
+    }
+  }, [pushError, toast]);
   const { onlineUsers } = usePresence(user?.id);
 
   const { data: pubSettings } = useQuery<Record<string, string>>({
