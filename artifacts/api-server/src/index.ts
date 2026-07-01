@@ -9,6 +9,7 @@ import { ensureUserPreferencesTable } from "./routes/user-preferences";
 import { startScheduler, ensureReportWeeklyLogTable } from "./lib/scheduler";
 import { ensureShipmentTemplatesTable } from "./routes/shipment-templates";
 import { ensureAuftragAnalyseTable } from "./routes/auftragsauswertung";
+import { initWebPush } from "./routes/push";
 import { pool } from "@workspace/db";
 
 const rawPort = process.env["PORT"];
@@ -304,5 +305,23 @@ httpServer.listen(port, async (err?: Error) => {
   } catch (e) {
     logger.warn({ err: e }, "seedEmailTemplates failed — non-fatal");
   }
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        endpoint TEXT NOT NULL,
+        p256dh TEXT NOT NULL,
+        auth TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(user_id, endpoint)
+      )
+    `);
+    logger.info("push_subscriptions table ensured");
+  } catch (e) {
+    logger.warn({ err: e }, "push_subscriptions table ensure failed — non-fatal");
+  }
+  initWebPush();
   startScheduler(io);
 });

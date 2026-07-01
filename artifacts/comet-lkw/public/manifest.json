@@ -1,0 +1,20 @@
+{
+  "name": "COMET LKW-Verladungsverwaltung",
+  "short_name": "COMET LKW",
+  "description": "Digitale Steuerung aller LKW-Verladungen",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F8FAFC",
+  "theme_color": "#1e40af",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "business"],
+  "lang": "de"
+}

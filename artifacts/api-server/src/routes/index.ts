@@ -20,6 +20,7 @@ import userPreferencesRouter from "./user-preferences";
 import reportRouter from "./report";
 import shipmentTemplatesRouter from "./shipment-templates";
 import auftragsauswertungRouter from "./auftragsauswertung";
+import pushRouter from "./push";
 
 const router: IRouter = Router();
 
@@ -44,5 +45,6 @@ router.use(ticketsRouter);
 router.use(userPreferencesRouter);
 router.use(reportRouter);
 router.use(auftragsauswertungRouter);
+router.use(pushRouter);
 
 export default router;

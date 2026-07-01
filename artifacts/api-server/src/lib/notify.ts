@@ -1,6 +1,7 @@
 import { db, notifications, usersTable } from "@workspace/db";
 import { inArray } from "drizzle-orm";
 import type { Server as SocketIOServer } from "socket.io";
+import { sendPushToUsers } from "../routes/push";
 
 export interface NotifyOptions {
   userId?: number;
@@ -35,6 +36,11 @@ export async function notify(io: SocketIOServer, options: NotifyOptions) {
   for (const notif of created) {
     io.to(`user:${notif.userId}`).emit("notification.new", notif);
   }
+
+  // Web Push (non-blocking, best-effort)
+  sendPushToUsers(userIds, { title, message, linkTo, tag: `comet-${type}` }).catch((err) => {
+    console.warn("Web Push Fehler:", err?.message ?? err);
+  });
 
   return created;
 }

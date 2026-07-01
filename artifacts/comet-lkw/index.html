@@ -1,21 +1,39 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
     <title>COMET LKW-Verladungsverwaltung</title>
-    <meta name="description" content="COMET LKW-Verladungsverwaltung — built on Replit. Update this description to reflect the app." />
+    <meta name="description" content="Digitale Steuerung aller LKW-Verladungen — COMET LKW-Verladungsverwaltung." />
     <meta name="robots" content="index, follow" />
     <meta property="og:title" content="COMET LKW-Verladungsverwaltung" />
-    <meta property="og:description" content="COMET LKW-Verladungsverwaltung — built on Replit. Update this description to reflect the app." />
+    <meta property="og:description" content="Digitale Steuerung aller LKW-Verladungen — COMET LKW-Verladungsverwaltung." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="COMET LKW-Verladungsverwaltung" />
-    <meta name="twitter:description" content="COMET LKW-Verladungsverwaltung — built on Replit. Update this description to reflect the app." />
+    <meta name="twitter:description" content="Digitale Steuerung aller LKW-Verladungen — COMET LKW-Verladungsverwaltung." />
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#1e40af" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="COMET LKW" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <!-- Icons -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/sw.js').catch(function (err) {
+            console.warn('SW registration failed:', err);
+          });
+        });
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

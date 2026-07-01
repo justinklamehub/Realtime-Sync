@@ -20,6 +20,8 @@ import {
   PanelLeftOpen,
   UserCog,
   Bell,
+  BellRing,
+  BellOff,
   X,
   CheckCheck,
   Trash2,
@@ -51,6 +53,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useNotifications, type AppNotification } from "@/hooks/use-notifications";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { usePresence, getPageName, ROLE_LABELS, type OnlineUser } from "@/hooks/use-presence";
 import { useLocation as useWouterLocation } from "wouter";
 import { formatDistanceToNow } from "date-fns";
@@ -286,6 +289,7 @@ export function AppSidebar({ collapsed, onToggle, isDark, onToggleTheme }: AppSi
   const [showOnline, setShowOnline] = useState(false);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const { notifications, unreadCount, markRead, markAllRead, dismiss, dismissAll } = useNotifications();
+  const { state: pushState, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications();
   const { onlineUsers } = usePresence(user?.id);
 
   const { data: pubSettings } = useQuery<Record<string, string>>({
@@ -733,6 +737,29 @@ export function AppSidebar({ collapsed, onToggle, isDark, onToggleTheme }: AppSi
                   </Link>
                 </div>
 
+                {/* Push-Benachrichtigungen — full width */}
+                {pushState !== "unsupported" && (
+                  <button
+                    onClick={() => pushState === "subscribed" ? pushUnsubscribe() : pushSubscribe()}
+                    disabled={pushState === "loading" || pushState === "denied"}
+                    className={cn(
+                      "w-full flex items-center justify-center gap-2 rounded-lg p-2 text-xs transition-colors mb-1.5",
+                      pushState === "subscribed"
+                        ? "bg-primary/20 text-primary hover:bg-primary/30"
+                        : pushState === "denied"
+                        ? "bg-slate-800/50 text-slate-600 cursor-not-allowed"
+                        : "bg-slate-800/50 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+                    )}
+                  >
+                    {pushState === "subscribed"
+                      ? <><BellRing className="w-3.5 h-3.5" /> Push aktiv</>
+                      : pushState === "denied"
+                      ? <><BellOff className="w-3.5 h-3.5" /> Push gesperrt</>
+                      : <><Bell className="w-3.5 h-3.5" /> Push aktivieren</>
+                    }
+                  </button>
+                )}
+
                 {/* Logout — full width */}
                 <button
                   onClick={() => logoutMutation.mutate()}
@@ -814,6 +841,40 @@ export function AppSidebar({ collapsed, onToggle, isDark, onToggleTheme }: AppSi
                     <TooltipContent side="right" className="text-xs">Mein Profil</TooltipContent>
                   </Tooltip>
                 </div>
+
+                {/* Push toggle (collapsed) */}
+                {pushState !== "unsupported" && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => pushState === "subscribed" ? pushUnsubscribe() : pushSubscribe()}
+                        disabled={pushState === "loading" || pushState === "denied"}
+                        className={cn(
+                          "mt-1 w-full h-9 flex items-center justify-center rounded-md transition-colors",
+                          pushState === "subscribed"
+                            ? "text-primary bg-primary/10 hover:bg-primary/20"
+                            : pushState === "denied"
+                            ? "text-slate-600 cursor-not-allowed"
+                            : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                        )}
+                      >
+                        {pushState === "subscribed"
+                          ? <BellRing className="w-4 h-4" />
+                          : pushState === "denied"
+                          ? <BellOff className="w-4 h-4" />
+                          : <Bell className="w-4 h-4" />
+                        }
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="text-xs">
+                      {pushState === "subscribed"
+                        ? "Push-Benachrichtigungen aktiv (klicken zum Deaktivieren)"
+                        : pushState === "denied"
+                        ? "Push vom Browser gesperrt"
+                        : "Push-Benachrichtigungen aktivieren"}
+                    </TooltipContent>
+                  </Tooltip>
+                )}
 
                 {/* Logout */}
                 <Tooltip>
