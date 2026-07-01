@@ -130,9 +130,10 @@ async function runWeeklyReportCheck() {
 // ── Scheduler starten ─────────────────────────────────────────────────────────
 
 async function runAllChecks(io: SocketIOServer) {
-  await runMonthlyCheck(io).catch((e) =>
-    logger.warn({ err: e }, "Monthly Abstimmung check failed — non-fatal")
-  );
+  // Monatliche Abstimmungs-Erinnerung vorerst deaktiviert
+  // await runMonthlyCheck(io).catch((e) =>
+  //   logger.warn({ err: e }, "Monthly Abstimmung check failed — non-fatal")
+  // );
   await runOffeneVerladungenCheck(io).catch((e) =>
     logger.warn({ err: e }, "Offene Verladungen check failed — non-fatal")
   );
