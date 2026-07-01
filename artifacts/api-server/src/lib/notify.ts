@@ -13,10 +13,12 @@ export interface NotifyOptions {
   /** Wenn gesetzt, wird push_event_settings für dieses Ereignis geprüft (aktiviert + Zielrollen).
    *  Ist der Key nicht gesetzt, wird Push ohne Prüfung an alle notifizierten User gesendet. */
   pushEventKey?: string;
+  /** Wenn true, wird kein Web-Push gesendet (unabhängig von allen anderen Einstellungen). */
+  suppressPush?: boolean;
 }
 
 export async function notify(io: SocketIOServer, options: NotifyOptions) {
-  const { userId, targetRoles, title, message, type = "info", linkTo, pushEventKey } = options;
+  const { userId, targetRoles, title, message, type = "info", linkTo, pushEventKey, suppressPush } = options;
   const userIds: number[] = [];
 
   if (userId) {
@@ -44,6 +46,7 @@ export async function notify(io: SocketIOServer, options: NotifyOptions) {
 
   // Web Push — non-blocking, best-effort
   ;(async () => {
+    if (suppressPush) return;
     try {
       let pushUserIds = [...userIds];
 

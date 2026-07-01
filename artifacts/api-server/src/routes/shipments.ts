@@ -252,6 +252,8 @@ router.post("/shipments", requireAuth, async (req, res) => {
         const spedName = shipment.speditionId
           ? (await db.select({ name: speditionenTable.name }).from(speditionenTable).where(eq(speditionenTable.id, shipment.speditionId)).limit(1))[0]?.name
           : null;
+        const todayIso = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+        const isToday = !shipment.etaDate || shipment.etaDate === todayIso;
         await notify(io, {
           targetRoles: ["comet_admin", "comet_leitstand"],
           title: "Neue Verladung angemeldet",
@@ -259,6 +261,7 @@ router.post("/shipments", requireAuth, async (req, res) => {
           type: "info",
           linkTo: "/shipments",
           pushEventKey: "shipment.created",
+          suppressPush: !isToday,
         });
       }
     }
