@@ -86,8 +86,8 @@ export async function isPushEventEnabled(
 
 router.get("/push/vapid-public-key", requireAuth, (_req, res) => {
   const key = process.env.VAPID_PUBLIC_KEY ?? "";
-  if (!key) return res.status(503).json({ error: "Push nicht konfiguriert" });
-  return res.json({ publicKey: key });
+  if (!key) return res.json({ supported: false, publicKey: null });
+  return res.json({ supported: true, publicKey: key });
 });
 
 router.post("/push/subscribe", requireAuth, async (req: any, res) => {

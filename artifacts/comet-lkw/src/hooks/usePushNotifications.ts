@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 
 const BASE = (import.meta as any).env.BASE_URL as string;
 const API = BASE.replace(/\/$/, "") + "/api";
-// SW is in /public, served at the root of the origin (independent of Vite base path)
 const SW_PATH = "/sw.js";
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
@@ -21,14 +20,40 @@ export function usePushNotifications() {
   const [error, setError] = useState<string | null>(null);
 
   const checkState = useCallback(async () => {
+    // 1. Browser-Support
     if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
       setState("unsupported");
       return;
     }
+
+    // 2. Server-Support — einmalige Prüfung; kein 503-Regen bei fehlendem VAPID-Key
+    try {
+      const keyRes = await fetch(`${API}/push/vapid-public-key`, {
+        credentials: "include",
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!keyRes.ok) {
+        setState("unsupported");
+        return;
+      }
+      const keyData = await keyRes.json();
+      if (!keyData.supported || !keyData.publicKey) {
+        setState("unsupported");
+        return;
+      }
+    } catch {
+      // Netzwerkfehler oder Timeout → als nicht verfügbar behandeln
+      setState("unsupported");
+      return;
+    }
+
+    // 3. Benachrichtigungserlaubnis
     if (Notification.permission === "denied") {
       setState("denied");
       return;
     }
+
+    // 4. Vorhandenes SW-Abonnement prüfen
     try {
       const reg = await navigator.serviceWorker.getRegistration();
       if (!reg) {
@@ -49,33 +74,33 @@ export function usePushNotifications() {
   const subscribe = useCallback(async () => {
     setError(null);
     try {
-      // 1. Fetch VAPID public key
+      // VAPID-Key laden (ist bereits geprüft in checkState, aber nochmal für den Schlüssel)
       const keyRes = await fetch(`${API}/push/vapid-public-key`, { credentials: "include" });
-      if (!keyRes.ok) throw new Error("Server nicht bereit (VAPID)");
-      const { publicKey } = await keyRes.json();
+      if (!keyRes.ok) throw new Error("Server nicht bereit");
+      const keyData = await keyRes.json();
+      if (!keyData.supported || !keyData.publicKey) throw new Error("Push auf Server nicht konfiguriert");
 
-      // 2. Request notification permission
+      // Erlaubnis anfragen
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
         setState("denied");
         return;
       }
 
-      // 3. Register SW if not already registered
+      // SW registrieren falls nicht vorhanden
       let reg = await navigator.serviceWorker.getRegistration(SW_PATH);
       if (!reg) {
         reg = await navigator.serviceWorker.register(SW_PATH, { scope: "/" });
       }
-      // Wait for SW to become active
       await navigator.serviceWorker.ready;
 
-      // 4. Subscribe to push
+      // Push-Abonnement anlegen
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey),
+        applicationServerKey: urlBase64ToUint8Array(keyData.publicKey),
       });
 
-      // 5. Send subscription to server
+      // An Server senden
       const subJson = sub.toJSON();
       const res = await fetch(`${API}/push/subscribe`, {
         method: "POST",
