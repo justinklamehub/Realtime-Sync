@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, Settings, Type, Mail, Inbox, CheckCircle2, XCircle, Eye, EyeOff, Image, Upload, Trash2 as TrashIcon, PanelLeft, Send, Server, ChevronUp, ChevronDown, Table2, Calculator, BarChart2, BellRing } from "lucide-react";
+import { Loader2, Save, Settings, Type, Mail, Inbox, CheckCircle2, XCircle, Eye, EyeOff, Image, Upload, Trash2 as TrashIcon, PanelLeft, Send, Server, ChevronUp, ChevronDown, Table2, Calculator, BarChart2, BellRing, RefreshCw, Terminal } from "lucide-react";
 import { SidebarNavConfig } from "./sidebar-nav-config";
 import { useAuth } from "@/contexts/auth-context";
 
@@ -1180,6 +1180,159 @@ function PushTemplateSettings() {
   );
 }
 
+// ── Server Restart ────────────────────────────────────────────────────────────
+
+type RestartStatus = "idle" | "running" | "done" | "error";
+
+function ServerRestartCard() {
+  const [status, setStatus] = useState<RestartStatus>("idle");
+  const [lines, setLines] = useState<string[]>([]);
+  const [confirm, setConfirm] = useState(false);
+  const termRef = useRef<HTMLDivElement>(null);
+  const esRef = useRef<EventSource | null>(null);
+
+  useEffect(() => {
+    if (termRef.current) {
+      termRef.current.scrollTop = termRef.current.scrollHeight;
+    }
+  }, [lines]);
+
+  function startRestart() {
+    setConfirm(false);
+    setLines([]);
+    setStatus("running");
+
+    const es = new EventSource(`${API}/admin/system/restart/stream`, { withCredentials: true });
+    esRef.current = es;
+
+    es.addEventListener("log", (e) => {
+      const { text } = JSON.parse(e.data);
+      setLines(prev => [...prev, text]);
+    });
+    es.addEventListener("done", (e) => {
+      const { text } = JSON.parse(e.data);
+      setLines(prev => [...prev, text]);
+      setStatus("done");
+      es.close();
+    });
+    es.addEventListener("error", (e) => {
+      try {
+        const { text } = JSON.parse((e as MessageEvent).data);
+        setLines(prev => [...prev, text]);
+      } catch {
+        setLines(prev => [...prev, "✗ Verbindung unterbrochen."]);
+      }
+      setStatus("error");
+      es.close();
+    });
+  }
+
+  function reset() {
+    esRef.current?.close();
+    setStatus("idle");
+    setLines([]);
+    setConfirm(false);
+  }
+
+  const statusColor: Record<RestartStatus, string> = {
+    idle:    "text-slate-400",
+    running: "text-amber-500",
+    done:    "text-emerald-500",
+    error:   "text-red-500",
+  };
+  const statusLabel: Record<RestartStatus, string> = {
+    idle:    "Bereit",
+    running: "Läuft…",
+    done:    "Abgeschlossen",
+    error:   "Fehler",
+  };
+
+  return (
+    <Card className="shadow-sm">
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+            <Server className="w-4 h-4 text-slate-600" />
+          </div>
+          <div className="flex-1">
+            <CardTitle className="text-base">API-Server neu starten</CardTitle>
+            <CardDescription className="text-xs mt-0.5">
+              Führt <code className="font-mono bg-slate-100 px-1 py-0.5 rounded text-[11px]">sudo bash /opt/comet/app/update.sh</code> auf dem Server aus.
+            </CardDescription>
+          </div>
+          <div className={`flex items-center gap-1.5 text-xs font-medium ${statusColor[status]}`}>
+            {status === "running" && <Loader2 className="w-3 h-3 animate-spin" />}
+            {status === "done" && <CheckCircle2 className="w-3 h-3" />}
+            {status === "error" && <XCircle className="w-3 h-3" />}
+            {statusLabel[status]}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {/* Terminal output */}
+        <div
+          ref={termRef}
+          className="bg-slate-950 rounded-lg border border-slate-800 font-mono text-xs text-slate-300 p-3 h-64 overflow-y-auto whitespace-pre-wrap leading-relaxed"
+        >
+          {lines.length === 0 ? (
+            <span className="text-slate-600">Ausgabe erscheint hier…</span>
+          ) : (
+            lines.map((line, i) => (
+              <span
+                key={i}
+                className={
+                  line.startsWith("✓") ? "text-emerald-400" :
+                  line.startsWith("✗") ? "text-red-400" :
+                  line.startsWith("▶") ? "text-amber-400" :
+                  "text-slate-300"
+                }
+              >{line}</span>
+            ))
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-2">
+          {!confirm && status !== "running" && (
+            <Button
+              variant="destructive"
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => setConfirm(true)}
+            >
+              <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+              Server neu starten
+            </Button>
+          )}
+          {confirm && (
+            <>
+              <span className="text-xs text-slate-500">Wirklich ausführen?</span>
+              <Button size="sm" variant="destructive" className="h-8 text-xs" onClick={startRestart}>
+                Ja, jetzt starten
+              </Button>
+              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setConfirm(false)}>
+                Abbrechen
+              </Button>
+            </>
+          )}
+          {status === "running" && (
+            <Button size="sm" variant="outline" className="h-8 text-xs" disabled>
+              <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+              Läuft…
+            </Button>
+          )}
+          {(status === "done" || status === "error") && (
+            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={reset}>
+              <Terminal className="w-3.5 h-3.5 mr-1.5" />
+              Zurücksetzen
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
@@ -1247,7 +1400,7 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="allgemein" className="space-y-5">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="allgemein" className="flex items-center gap-1.5 text-xs">
             <Settings className="w-3.5 h-3.5" /> Allgemein
           </TabsTrigger>
@@ -1265,6 +1418,9 @@ export default function SettingsPage() {
           </TabsTrigger>
           <TabsTrigger value="postausgang" className="flex items-center gap-1.5 text-xs">
             <Inbox className="w-3.5 h-3.5" /> Postausgang
+          </TabsTrigger>
+          <TabsTrigger value="system" className="flex items-center gap-1.5 text-xs">
+            <Server className="w-3.5 h-3.5" /> System
           </TabsTrigger>
         </TabsList>
 
@@ -1375,6 +1531,11 @@ export default function SettingsPage() {
         {/* ── Tab: Push-Texte ── */}
         <TabsContent value="push" className="mt-0">
           <PushTemplateSettings />
+        </TabsContent>
+
+        {/* ── Tab: System ── */}
+        <TabsContent value="system" className="mt-0">
+          <ServerRestartCard />
         </TabsContent>
 
         {/* ── Tab: Berichte ── */}
